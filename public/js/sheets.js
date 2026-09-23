@@ -425,7 +425,8 @@ function renderPermitDetailSheet(siteId, permitId){
       +(isContractor()?'<button class="btn secondary block" style="margin-top:8px;" data-action="close-permit" data-id="'+permitId+'" data-refuse="1">Withdraw request</button>':'');
   } else if(eff==='closed'){
     body += '<p class="site-card-sub">Closed by '+p.closedBy+', '+dateTime(p.closedAt)+(p.closeNotes?' — '+p.closeNotes:'')+'</p>';
-  } else if(canEdit()){
+  } else {
+    // Anyone on either side may close out a live permit once the work is made safe.
     body += '<label class="field-label" for="permitCloseNotes">Close-out notes</label><textarea id="permitCloseNotes" placeholder="Work complete, area made safe, isolation removed, etc."></textarea>'
       +'<button class="btn secondary block" style="margin-top:10px;" data-action="close-permit" data-id="'+permitId+'">Close out permit</button>';
   }
