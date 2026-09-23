@@ -535,7 +535,7 @@ function renderContractorsList(){
     const sitesFor = Object.values(S.state.sites).filter(s=>s.contractorId===c.id);
     const rated = c.reliability>0;
     return '<div class="card checkpoint"><div class="flexbetween"><div class="site-card-title">'+c.name+'</div><span class="score-pill" style="color:'+(rated?gaugeColor(c.reliability):'var(--grey)')+';" title="Based on first-time-right submissions and on-time responses">'+(rated?c.reliability+'<span class="lbl">/100</span>':'<span class="lbl">Not yet rated</span>')+'</span></div>'
-      +'<div class="site-card-sub">'+(c.trade||'Trade not set')+' · Reg '+(c.reg||'—')+' · '+(c.linked?'<span style="color:var(--green);">On SiteGuard</span>':'Not yet joined')+'</div>'
+      +'<div class="site-card-sub">'+(c.trade||'Trade not set')+' · Reg '+(c.reg||'—')+' · '+(c.linked?'<span style="color:var(--green);">On SiteGuard'+(c.linkedOrgName && c.linkedOrgName!==c.name?' as '+c.linkedOrgName:'')+'</span>':'Not yet joined')+'</div>'
       +'<div class="site-card-sub">'+(c.contact||'No contact')+(c.contactEmail?' · '+c.contactEmail:'')+'</div>'
       +'<div class="site-card-sub" style="margin-top:6px;">'+(sitesFor.length?sitesFor.map(s=>s.name).join(', '):'No sites yet')+'</div>'
       +(isOrgAdmin() && !readOnly() ? '<div class="row-actions"><button class="btn secondary small" data-action="edit-contractor" data-id="'+c.id+'">Edit details</button></div>' : '')+'</div>';

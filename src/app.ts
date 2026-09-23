@@ -10,7 +10,7 @@ import { ZodError } from 'zod';
 import { config, isProd } from './config.js';
 import { HttpError } from './lib/errors.js';
 import type { Ctx } from './lib/authz.js';
-import { resolveSession, SESSION_COOKIE } from './lib/sessions.js';
+import { renewCookie, resolveSession, SESSION_COOKIE } from './lib/sessions.js';
 import { safeEqual } from './lib/security.js';
 import authRoutes from './routes/auth.js';
 import orgRoutes from './routes/org.js';
@@ -77,6 +77,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     if (!req.url.startsWith('/api/')) return;
     req.ctx = await resolveSession(req.cookies[SESSION_COOKIE], req);
     if (req.ctx === null && req.cookies[SESSION_COOKIE]) reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    if (req.ctx?.renewedUntil) renewCookie(reply, req.cookies[SESSION_COOKIE]!, req.ctx.renewedUntil);
 
     const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
     const pathOnly = req.url.split('?')[0];

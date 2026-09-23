@@ -5,7 +5,7 @@ process.env.DATABASE_URL ??= 'postgres://siteguard:siteguard@localhost:5432/site
 process.env.TEST_DATABASE_URL && (process.env.DATABASE_URL = process.env.TEST_DATABASE_URL);
 process.env.LOCAL_STORAGE_DIR = '.data/test-uploads';
 process.env.APP_URL = 'http://localhost:3000';
-delete process.env.STRIPE_SECRET_KEY;
+if (!process.env.TEST_WITH_BILLING) delete process.env.STRIPE_SECRET_KEY;
 delete process.env.ANTHROPIC_API_KEY;
 
 const { pool } = await import('../src/db/pool.js');

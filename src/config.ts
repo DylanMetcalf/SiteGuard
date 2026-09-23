@@ -28,6 +28,8 @@ const schema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: bool(false),
+  /** Optional explicit server-side encryption, e.g. "AES256" or "aws:kms". */
+  S3_SSE: z.enum(['AES256', 'aws:kms']).optional(),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(20),
 
   // Email: SMTP connection URL, e.g. smtps://user:pass@smtp.postmarkapp.com:465.

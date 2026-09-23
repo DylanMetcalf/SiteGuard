@@ -78,7 +78,9 @@ export async function buildState(db: Db, ctx: OrgCtx) {
                  join sites s on s.id = r.site_id where s.contractor_id = c.id and rv.kind = 'correction')::int as corrections,
               (select count(*) from info_requests q join sites s on s.id = q.site_id where s.contractor_id = c.id and q.due_date is not null and q.status in ('submitted','completed'))::int as answered_with_due,
               (select count(*) from info_requests q join sites s on s.id = q.site_id where s.contractor_id = c.id and q.due_date is not null and q.status in ('submitted','completed') and q.responded_at::date <= q.due_date)::int as on_time
-         from contractors c where c.org_id = $1 order by c.created_at`,
+              , lo.name as linked_org_name
+         from contractors c left join organisations lo on lo.id = c.linked_org_id
+        where c.org_id = $1 order by c.created_at`,
       [ctx.org.id],
     );
     for (const c of rows) {
@@ -87,7 +89,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
       const reliability = c.submissions >= 3 ? Math.round(onTime ? (ftr + onTime) / 2 : ftr) : 0;
       state.contractors[c.id] = {
         id: c.id, name: c.name, reg: c.reg_number, coid: c.coid_number, trade: c.trade, contact: c.contact_name,
-        contactEmail: c.contact_email, linked: !!c.linked_org_id, reliability, onTimeRate: onTime, firstTimeRightRate: ftr,
+        contactEmail: c.contact_email, linked: !!c.linked_org_id, linkedOrgName: c.linked_org_name, reliability, onTimeRate: onTime, firstTimeRightRate: ftr,
       };
     }
   } else {

@@ -15,6 +15,7 @@ import { forbidden, notFound, unavailable } from '../lib/errors.js';
 import { requireUser, type OrgCtx } from '../lib/authz.js';
 import { createSession, destroySession } from '../lib/sessions.js';
 import { seedDemo } from '../demo/seed.js';
+import { storage } from '../lib/storage.js';
 
 export async function personasFor(db: Db, ctx: OrgCtx) {
   let group = ctx.org.is_demo ? ctx.org.demo_group : null;
@@ -64,13 +65,21 @@ export default async function demoRoutes(app: FastifyInstance) {
 
 /** Removes demo sandboxes older than the given age. */
 export async function purgeOldDemos(days = 3): Promise<number> {
-  return withTx(async (db) => {
+  const keys: string[] = [];
+  const purged = await withTx(async (db) => {
+    // Removing whole demo tenants is the one sanctioned way audit rows go away.
+    await db.query(`set local siteguard.purge = 'on'`);
     const groups = await many<{ demo_group: string }>(
       db,
       `select distinct demo_group from organisations where is_demo and demo_group is not null and created_at < now() - make_interval(days => $1)`,
       [days],
     );
     for (const { demo_group } of groups) {
+      for (const f of await many<{ storage_key: string }>(
+        db,
+        `select f.storage_key from files f join organisations o on o.id = f.org_id where o.demo_group = $1`,
+        [demo_group],
+      )) keys.push(f.storage_key);
       await db.query(
         `delete from users where is_demo and id in (select m.user_id from memberships m join organisations o on o.id = m.org_id where o.demo_group = $1)`,
         [demo_group],
@@ -81,4 +90,7 @@ export async function purgeOldDemos(days = 3): Promise<number> {
     }
     return groups.length;
   });
+  // Objects go only after the rows are gone; a failure here just leaves an orphan.
+  for (const key of keys) await storage.remove(key).catch(() => {});
+  return purged;
 }

@@ -62,7 +62,14 @@ class S3Storage implements Storage {
   }
   async put(key: string, body: Buffer, contentType: string) {
     await this.s3.send(
-      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType, ServerSideEncryption: 'AES256' }),
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+        // AWS S3 and R2 encrypt at rest by default; set S3_SSE for KMS or to be explicit.
+        ...(config.S3_SSE ? { ServerSideEncryption: config.S3_SSE } : {}),
+      }),
     );
   }
   async get(key: string, filename: string, contentType: string) {
@@ -94,18 +101,6 @@ export function contentDisposition(filename: string, inline = true): string {
 
 export const storage: Storage =
   config.STORAGE_DRIVER === 's3' ? new S3Storage(config.S3_BUCKET!) : new LocalStorage(config.LOCAL_STORAGE_DIR);
-
-/** Types we accept for compliance documents. Anything else is rejected. */
-export const ALLOWED_TYPES: Record<string, string[]> = {
-  'application/pdf': ['.pdf'],
-  'image/jpeg': ['.jpg', '.jpeg'],
-  'image/png': ['.png'],
-  'image/webp': ['.webp'],
-  'image/heic': ['.heic'],
-  'text/plain': ['.txt'],
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-};
 
 /** Sniffs magic bytes so a renamed executable can't pass as a PDF. */
 export function sniffType(buf: Buffer, declared: string, filename: string): string | null {

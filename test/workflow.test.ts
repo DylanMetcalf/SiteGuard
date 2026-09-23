@@ -195,3 +195,23 @@ describe('auth', () => {
     assert.ok(!Object.values(st.state.sites).some((s: any) => s.name === 'Perimeter Upgrade'));
   });
 });
+
+describe('audit trail and housekeeping', () => {
+  it('audit events cannot be edited or deleted', async () => {
+    await assert.rejects(pool.query(`update audit_events set detail = 'tampered'`), /append-only/);
+    await assert.rejects(pool.query(`delete from audit_events`), /append-only/);
+  });
+
+  it('expired demo sandboxes are purged completely', async () => {
+    const { purgeOldDemos } = await import('../src/routes/demo.js');
+    const demo = new Agent(app);
+    await demo.post('/api/demo');
+    const group = (await pool.query(`select demo_group from organisations where is_demo order by created_at desc limit 1`)).rows[0].demo_group;
+    await pool.query(`update organisations set created_at = now() - interval '10 days' where demo_group = $1`, [group]);
+    assert.ok((await purgeOldDemos()) >= 1);
+    assert.equal((await pool.query(`select count(*)::int as n from organisations where demo_group = $1`, [group])).rows[0].n, 0);
+    assert.equal((await demo.state()).authenticated, false);
+    const realAudit = (await pool.query(`select count(*)::int as n from audit_events a join organisations o on o.id = a.org_id where not o.is_demo`)).rows[0].n;
+    assert.ok(realAudit > 0, 'real tenants keep their history');
+  });
+});

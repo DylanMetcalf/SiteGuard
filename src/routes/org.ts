@@ -249,12 +249,21 @@ export async function auditFor(
   return many(
     db,
     `with my_sites as (
-       select s.id from sites s join contractors c on c.id = s.contractor_id
+       -- Hosts see their sites' whole history. A contractor sees a host's site
+       -- only from when it was invited, and only events by the host or itself.
+       select s.id, s.org_id as host_id,
+              case when s.org_id = $1 then '-infinity'::timestamptz
+                   else (select min(i.sent_at) from site_invitations i
+                          where i.site_id = s.id and i.contractor_id = s.contractor_id and i.status = 'accepted') end as since
+         from sites s join contractors c on c.id = s.contractor_id
         where s.org_id = $1 or (c.linked_org_id = $1 and s.status not in ('invited', 'declined'))
      )
      select a.id, a.created_at as ts, a.actor_name as actor, a.actor_role as role, a.action, a.detail, a.site_id as "siteId"
        from audit_events a
-      where (a.org_id = $1 or a.site_id in (select id from my_sites))
+       left join my_sites ms on ms.id = a.site_id
+      where (a.org_id = $1
+             or (ms.id is not null and ms.host_id = $1)
+             or (ms.id is not null and a.created_at >= coalesce(ms.since, 'infinity') and a.org_id in (ms.host_id, $1)))
         and ($2::date is null or a.created_at >= $2::date)
         and ($3::date is null or a.created_at < $3::date + 1)
         and ($4::uuid is null or a.site_id = $4)

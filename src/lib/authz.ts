@@ -52,6 +52,8 @@ export interface Ctx {
   csrfToken: string;
   org: OrgRow | null;
   role: Role | null;
+  /** Set when the session's expiry was extended on this request, so the cookie is re-issued. */
+  renewedUntil?: Date;
 }
 
 export interface OrgCtx extends Ctx {

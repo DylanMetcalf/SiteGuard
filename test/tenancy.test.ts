@@ -186,3 +186,26 @@ describe('external share links', () => {
     assert.equal((await hostB.post('/api/share-links', { siteId, kind: 'site_readiness' })).status, 404);
   });
 });
+
+describe('audit scoping', () => {
+  it('a contractor only sees a site\'s history from when it was invited, and never a third party\'s', async () => {
+    const email = uniqueEmail('first');
+    // Host invites someone else first, who declines; then reassigns to our contractor.
+    const other = (await signup(app, { orgName: 'Declining Co', orgKind: 'contractor' })).agent;
+    const s = await hostA.post('/api/sites', { name: 'Tailings Dam Survey', newContractor: { name: 'Declining Co', email } });
+    const tok = await lastEmailToken(email, '/site-invite');
+    await other.post(`/api/auth/site-invite/${tok}/decline`);
+    const hs = await hostA.state();
+    const contractorId = hs.state.sites[siteId].contractorId;
+    assert.equal((await hostA.post(`/api/sites/${s.body.id}/reassign`, { contractorId })).status, 200);
+    const inv = Object.values((await contractor.state()).state.invitations).find((i: any) => i.siteId === s.body.id) as any;
+    await contractor.post(`/api/invitations/${inv.id}/accept`);
+    const events = (await contractor.state()).state.audit.filter((a: any) => a.siteId === s.body.id);
+    assert.ok(events.length > 0);
+    assert.ok(!events.some((a: any) => /Declining Co/.test(a.detail) || a.action === 'Declined invitation'), JSON.stringify(events));
+    const hostEvents = (await hostA.state()).state.audit.filter((a: any) => a.siteId === s.body.id);
+    assert.ok(hostEvents.some((a: any) => a.action === 'Declined invitation'), 'the host still sees the full history');
+    const c = (await hostA.state()).state.contractors[contractorId];
+    assert.equal(c.linkedOrgName, 'Sparks Electrical');
+  });
+});

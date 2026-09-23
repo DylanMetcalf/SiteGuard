@@ -30,6 +30,10 @@ export async function createSession(
   });
 }
 
+export function renewCookie(reply: FastifyReply, token: string, expires: Date): void {
+  reply.setCookie(SESSION_COOKIE, token, { path: '/', httpOnly: true, sameSite: 'lax', secure: isProd, expires });
+}
+
 export async function destroySession(db: Db, reply: FastifyReply, sessionId: string): Promise<void> {
   await db.query('delete from sessions where id = $1', [sessionId]);
   reply.clearCookie(SESSION_COOKIE, { path: '/' });
@@ -72,12 +76,11 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
   }
 
   // Sliding expiry, written at most every 10 minutes.
+  let renewedUntil: Date | undefined;
   if (Date.now() - new Date(row.last_seen_at).getTime() > 10 * 60_000) {
-    await pool.query(
-      `update sessions set last_seen_at = now(), expires_at = now() + make_interval(days => $2) where id = $1`,
-      [row.id, config.SESSION_TTL_DAYS],
-    );
+    renewedUntil = new Date(Date.now() + config.SESSION_TTL_DAYS * 86400_000);
+    await pool.query(`update sessions set last_seen_at = now(), expires_at = $2 where id = $1`, [row.id, renewedUntil]);
   }
 
-  return { user: row.user, sessionId: row.id, csrfToken: row.csrf_token, org, role };
+  return { user: row.user, sessionId: row.id, csrfToken: row.csrf_token, org, role, renewedUntil };
 }
