@@ -27,6 +27,11 @@ that MVP. What's new is the backend underneath them.
 | **Secure external sharing.** | Expiring, revocable, audited read-only links (readiness summary or full safety file), plus public `/verify/<code>` pages |
 | **Real-time sync.** | Server-Sent Events + Postgres LISTEN/NOTIFY. Colleagues and the other company see changes without refreshing. |
 
+Onboarding: a new site owner gets a short **Getting started** checklist. Sites are created from
+**requirement starter packs**: a contractor baseline plus electrical, heights & lifting, hot work &
+confined space, and civil & plant add-ons, defined in `src/lib/templates.ts`. Every item stays
+editable per site.
+
 Product gaps from the last audit, also built:
 
 - **Safety Centre**: open incidents and permits across every site (More → Safety Centre).
