@@ -12,6 +12,7 @@ import { newToken, sha256, shortCode } from '../lib/security.js';
 import { computeReadiness, openSevereIncidents } from '../lib/readiness.js';
 import { planOf } from '../lib/plans.js';
 import { requireVerified } from './org.js';
+import { itemsFromPacks, TEMPLATE_PACKS } from '../lib/templates.js';
 import { acceptSiteInvitation } from './auth.js';
 
 const text = (max: number) => z.string().trim().max(max);
@@ -22,6 +23,7 @@ const requirementSchema = z.object({
   source: z.enum(['legal', 'client', 'site', 'project', 'company', 'best_practice', 'platform']),
   why: text(1000).default(''),
 });
+const packIdsSchema = z.array(z.enum(TEMPLATE_PACKS.map((p) => p.id) as [string, ...string[]])).max(TEMPLATE_PACKS.length);
 const newContractorSchema = z.object({
   name: text(200).min(1),
   trade: text(120).default(''),
@@ -121,6 +123,7 @@ export default async function siteRoutes(app: FastifyInstance) {
         contractorId: z.string().optional(),
         newContractor: newContractorSchema.optional(),
         templateSiteId: z.string().optional(),
+        templatePackIds: packIdsSchema.optional(),
         requirements: z.array(requirementSchema).max(200).optional(),
         emergency: emergencySchema.optional(),
       })
@@ -149,6 +152,8 @@ export default async function siteRoutes(app: FastifyInstance) {
           [body.templateSiteId, ctx.org.id],
         );
       }
+      // Starter packs add to whatever was copied, skipping names already present.
+      if (body.templatePackIds?.length) reqs = reqs.concat(itemsFromPacks(body.templatePackIds, reqs.map((r) => r.name)));
       for (const [i, r] of reqs.entries()) {
         await db.query(
           `insert into requirements (site_id, category, name, source, why, position) values ($1, $2, $3, $4, $5, $6)`,
@@ -243,6 +248,39 @@ export default async function siteRoutes(app: FastifyInstance) {
       await audit(db, ctx, 'Added requirement', body.name, site.id);
       await publishChange(db, parties);
       return { id: r.id };
+    });
+  });
+
+  app.get('/api/requirement-templates', async (req, reply) => {
+    requireOrg(req.ctx);
+    reply.header('cache-control', 'private, max-age=3600');
+    return { packs: TEMPLATE_PACKS };
+  });
+
+  /** Adds the items of one or more starter packs to a site, skipping requirements it already has. */
+  app.post('/api/sites/:id/requirements/apply-packs', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireHostAdmin(ctx);
+    requireWritable(ctx);
+    const { id } = req.params as { id: string };
+    const { packIds } = z.object({ packIds: packIdsSchema.min(1) }).parse(req.body);
+    return withTx(async (db) => {
+      const { site, side, parties } = await loadSite(db, ctx, id);
+      if (side !== 'host') throw forbidden();
+      await db.query('select id from sites where id = $1 for update', [site.id]);
+      const existing = await many<{ name: string }>(db, 'select name from requirements where site_id = $1', [site.id]);
+      const items = itemsFromPacks(packIds, existing.map((r) => r.name));
+      const start = Number((await one<{ n: number }>(db, 'select coalesce(max(position) + 1, 0) as n from requirements where site_id = $1', [site.id]))!.n);
+      for (const [i, r] of items.entries()) {
+        await db.query(
+          `insert into requirements (site_id, category, name, source, why, position) values ($1, $2, $3, $4, $5, $6)`,
+          [site.id, r.category, r.name, r.source, r.why, start + i],
+        );
+      }
+      const names = TEMPLATE_PACKS.filter((p) => packIds.includes(p.id)).map((p) => p.name).join(', ');
+      await audit(db, ctx, 'Applied requirement pack', `${names} — ${items.length} requirement${items.length === 1 ? '' : 's'} added`, site.id);
+      await publishChange(db, parties);
+      return { added: items.length };
     });
   });
 

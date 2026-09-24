@@ -5,7 +5,7 @@ import {
   S, ICONS, SOURCE_LABEL, INCIDENT_TYPES, PERMIT_TYPES, LIBRARY_TYPES, CERT_KINDS, APPOINTMENT_PRESETS,
   org, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId,
   computeReadiness, effectiveStatus, certStatus, badge, timeAgo, dateTime, todayStr, daysUntil, incidentTypeInfo, permitTypeInfo,
-  permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml,
+  permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml, deepEscape,
   on, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
 } from './core.js';
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
@@ -154,7 +154,7 @@ on('qa', (el)=>{
   const a = el.dataset.qa;
   if(a==='ai-draft'){ openSheet(renderAIDraftSheet()); return; }
   if(a==='verify'){ closeSheet(); S.nav='more'; S.moreView='verify'; render(); return; }
-  if(a==='add-site'){ openSheet(renderNewSiteSheet()); return; }
+  if(a==='add-site'){ openNewSite(); return; }
   pickSite(a);
 });
 
@@ -559,7 +559,7 @@ function contractorFields(prefix){
       : '<div class="site-card-sub" style="margin:4px 0 2px;">No contractors yet — enter their details and we\'ll email them an invitation.</div>')
     +'<div id="'+prefix+'NewContractor">'
     +'<label class="field-label" for="'+prefix+'CName">Contractor company name</label><input type="text" id="'+prefix+'CName" placeholder="e.g. ABC Electrical Pty Ltd">'
-    +'<label class="field-label" for="'+prefix+'CEmail">Contact email (the invitation goes here)</label><input type="email" id="'+prefix+'CEmail" placeholder="safety@abcelectrical.co.za">'
+    +'<label class="field-label" for="'+prefix+'CEmail">Contact email — the invitation goes here</label><input type="email" id="'+prefix+'CEmail" placeholder="safety@abcelectrical.co.za">'
     +'<label class="field-label" for="'+prefix+'CContact">Contact person</label><input type="text" id="'+prefix+'CContact" placeholder="e.g. Site foreman name">'
     +'<label class="field-label" for="'+prefix+'CTrade">Trade</label><input type="text" id="'+prefix+'CTrade" placeholder="e.g. Electrical"></div>';
 }
@@ -568,25 +568,76 @@ function readContractor(prefix){
   if(sel && sel.value !== '__new') return { contractorId: sel.value };
   const name = (val(prefix+'CName'));
   if(!name){ document.getElementById(prefix+'CName').focus(); return null; }
+  const email = val(prefix+'CEmail');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    // Without an address nobody is invited and the site waits forever.
+    showToast('Enter the contractor\'s email — that\'s where the invitation goes');
+    document.getElementById(prefix+'CEmail').focus();
+    return null;
+  }
   return { newContractor: { name, email: val(prefix+'CEmail'), contact: (val(prefix+'CContact')), trade: (val(prefix+'CTrade')) } };
 }
 on('toggle-new-contractor', (el)=>{ document.getElementById(el.dataset.prefix+'NewContractor').style.display = el.value==='__new' ? '' : 'none'; });
-function renderNewSiteSheet(){
+/* ---- requirement starter packs ---- */
+let packsCache = null;
+async function loadPacks(){
+  if(!packsCache) packsCache = deepEscape((await api.get('/api/requirement-templates')).packs);
+  return packsCache;
+}
+/** Checkbox list of starter packs; counts show only requirements the site doesn't already have. */
+function packPicker(packs, checked, existingNames){
+  const have = new Set((existingNames||[]).map(n=>n.toLowerCase()));
+  return packs.map(p=>{
+    const fresh = p.items.filter(i=>!have.has(i.name.toLowerCase()));
+    return '<div class="plan-card" style="padding:10px 12px;"><label class="flexbetween" style="gap:10px;cursor:pointer;">'
+      +'<span><span class="site-card-title" style="font-size:14px;">'+p.name+'</span>'
+      +'<span class="site-card-sub" style="display:block;">'+p.description+' · '+(fresh.length===p.items.length?p.items.length+' documents':fresh.length+' new of '+p.items.length)+'</span></span>'
+      +'<input type="checkbox" class="pack-box" value="'+p.id+'"'+(checked.includes(p.id)?' checked':'')+(fresh.length?'':' disabled')+' aria-label="'+p.name+'"></label>'
+      +'<details style="margin-top:6px;"><summary class="site-card-sub" style="cursor:pointer;">What\'s included</summary>'
+      + p.items.map(i=>'<div class="site-card-sub" style="padding:3px 0;'+(have.has(i.name.toLowerCase())?'text-decoration:line-through;':'')+'">'+i.category+' — '+i.name+'</div>').join('')
+      +'</details></div>';
+  }).join('');
+}
+const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
+const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
+
+function renderNewSiteSheet(packs){
   const templates = Object.values(S.state.sites).filter(s=>(S.state.requirements[s.id]||[]).length);
   return sheetHead('Add a site')
     +'<label class="field-label" for="newSiteName">Site / project name</label><input type="text" id="newSiteName" placeholder="e.g. Tweefontein Shaft — Pump Station Upgrade">'
     +'<label class="field-label" for="newSiteLocation">Location</label><input type="text" id="newSiteLocation" placeholder="e.g. North Pit, Tweefontein">'
     + contractorFields('ns')
-    +'<label class="field-label" for="newSiteTemplate">Requirements</label><select id="newSiteTemplate" class="field"><option value="">Start with no requirements (add them next)</option>'+templates.map(s=>'<option value="'+s.id+'">Copy from '+s.name+'</option>').join('')+'</select>'
+    +'<div class="section-title">Documents required from the contractor</div>'
+    + packPicker(packs, ['baseline'], []) + PACK_NOTE
+    +(templates.length ? '<label class="field-label" for="newSiteTemplate">Also copy from an existing site</label><select id="newSiteTemplate" class="field"><option value="">Don\'t copy</option>'+templates.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('')+'</select>' : '')
     +'<button class="btn orange block" style="margin-top:12px;" data-action="save-site">Create site and invite contractor</button>';
 }
-on('new-site', ()=>openSheet(renderNewSiteSheet()));
+async function openNewSite(){
+  try{ openSheet(renderNewSiteSheet(await loadPacks())); }
+  catch(e){ showToast(e.message); }
+}
+on('new-site', ()=>openNewSite());
 on('save-site', async (el)=>{
-  const name = (val('newSiteName'));
+  const name = val('newSiteName');
   if(!name){ document.getElementById('newSiteName').focus(); return; }
   const c = readContractor('ns'); if(!c) return;
-  const r = await act(()=>api.post('/api/sites', { name, location: (val('newSiteLocation')), templateSiteId: val('newSiteTemplate') || undefined, ...c }), 'Site created — invitation sent', el);
+  const r = await act(()=>api.post('/api/sites', { name, location: val('newSiteLocation'), templateSiteId: val('newSiteTemplate') || undefined, templatePackIds: checkedPacks(), ...c }), 'Site created — invitation sent', el);
   if(r){ closeSheet(); S.activeSiteId = r.id; S.nav='sites'; S.siteTab='compliance'; render(); }
+});
+on('apply-packs', async (el)=>{
+  const siteId = el.dataset.site;
+  let packs;
+  try{ packs = await loadPacks(); }catch(e){ showToast(e.message); return; }
+  const existing = (S.state.requirements[siteId]||[]).map(r=>unescapeHtml(r.name));
+  openSheet(sheetHead('Add a starter pack', S.state.sites[siteId].name)
+    + packPicker(packs, existing.length ? [] : ['baseline'], existing.map(escapeHtml)) + PACK_NOTE
+    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-packs" data-site="'+siteId+'">Add to this site</button>');
+});
+on('save-packs', async (el)=>{
+  const packIds = checkedPacks();
+  if(!packIds.length){ showToast('Choose at least one pack'); return; }
+  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/requirements/apply-packs', { packIds }), null, el);
+  if(r){ closeSheet(); showToast(r.added ? r.added+' requirement'+(r.added===1?'':'s')+' added' : 'Nothing new to add — the site already has those'); }
 });
 on('edit-site', (el)=>{
   const s = S.state.sites[el.dataset.site], e = s.emergency || {};

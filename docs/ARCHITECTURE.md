@@ -156,7 +156,7 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 38 integration tests against real Postgres, covering tenant isolation (cross-tenant
+- `npm test`: 41 integration tests against real Postgres, covering requirement starter packs, covering tenant isolation (cross-tenant
   reads and writes all 404), the role matrix, CSRF, draft-file privacy, share-link scope, expiry
   and revocation, audit scoping and immutability, the Site Ready gates, permit/defect/request
   workflows, workforce visibility, password reset and lockout, demo isolation, and billing (signed

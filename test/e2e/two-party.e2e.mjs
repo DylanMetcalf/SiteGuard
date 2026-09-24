@@ -69,9 +69,12 @@ await host.fill('#newSiteName', 'North Pit — Pump Station Upgrade');
 await host.fill('#newSiteLocation', 'North Pit');
 await host.fill('#nsCName', 'Sparks Electrical');
 await host.fill('#nsCEmail', contractorEmail);
+// Start from an empty list here; starter packs are exercised in the integration tests.
+await host.uncheck('.pack-box[value="baseline"]');
 await act(host, '[data-action="save-site"]');
 await host.waitForSelector('text=Awaiting contractor response');
 await act(host, '[data-action="add-requirement"]');
+
 await host.fill('#arCategory', 'Company Documents');
 await host.fill('#arName', 'Letter of Good Standing (COID)');
 await act(host, '[data-action="save-requirement"]');

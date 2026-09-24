@@ -87,14 +87,34 @@ export function dashboardLayout(){
   return { order: defaults.concat(all.filter(id=>!defaults.includes(id))), hidden: all.filter(id=>!defaults.includes(id)) };
 }
 
+/** First-run checklist for site owners; disappears once the core loop has happened once. */
+function gettingStarted(){
+  if(!isHost() || !isOrgAdmin() || isDemoMode()) return '';
+  const sites = Object.values(S.state.sites);
+  const steps = [
+    { done: sites.length>0, title:'Add your first site', sub:'Pick a starter pack of required documents and invite the contractor by email.', action:'new-site' },
+    { done: sites.some(s=>(S.state.requirements[s.id]||[]).length), title:'Set the documents the site needs', sub:'Start from a pack, then add or remove anything specific to the site.' },
+    { done: sites.some(s=>s.status==='in_progress'||s.status==='site_ready'), title:'Contractor accepts', sub:'They get an email link. Once they accept, you\'ll see their documents arrive here live.' },
+    { done: sites.some(s=>(S.state.requirements[s.id]||[]).some(r=>{ const d = S.state.documents[r.id]; return d && d.version && (d.status==='complete' || d.status==='correction_required'); })), title:'Review the first submission', sub:'Approve it or request a correction — the contractor is notified either way.' },
+  ];
+  if(steps.every(x=>x.done)) return '';
+  const next = steps.findIndex(x=>!x.done);
+  return '<div class="section-title">Getting started</div><div class="card checkpoint">'
+    + steps.map((x,i)=>'<div class="reqrow"><div class="qa-icon" style="width:28px;height:28px;border-radius:50%;flex:none;'+(x.done?'background:var(--green-bg);color:var(--green);':i===next?'background:var(--orange);color:#fff;':'')+'">'+(x.done?ICONS.check:(i+1))+'</div>'
+      +'<div class="reqrow-main"><div class="reqrow-name"'+(x.done?' style="color:var(--grey);text-decoration:line-through;"':'')+'>'+x.title+'</div>'+(i===next?'<div class="site-card-sub">'+x.sub+'</div>':'')+'</div>'
+      +(i===next && x.action && !readOnly()?'<button class="btn orange small" data-action="'+x.action+'">Start</button>':'')+'</div>').join('')
+    +'</div>';
+}
+
 function renderDashboard(){
   const { order, hidden } = dashboardLayout();
   const head = '<div class="view-head"><div class="flexbetween"><h1>'+greeting()+'</h1><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div>'
     +'<p class="greeting">'+(isContractor() ? org().name : org().name+' · '+(role()==='admin'?org().kindLabel:'portfolio overview'))+'</p></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
   const parts = order.filter(id=>!hidden.includes(id)).map(id=> (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
-  if(!parts.length) return head + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
-  return head + parts.join('');
+  const start = gettingStarted();
+  if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
+  return head + start + parts.join('');
 }
 
 function contractorDashboardContext(){
@@ -304,7 +324,7 @@ function renderSiteDetail(siteId){
       +'<div class="row-actions"><a class="btn secondary small" href="/verify/'+approval.verificationId+'" target="_blank" rel="noopener">View verification</a></div></div>';
   } else if(submission==='no_requirements'){
     html += '<div class="empty"><h3>No requirements set for this site</h3><p>'+(isContractor()?'The site hasn\'t defined what\'s required yet — check back soon.':'Add the documents this site needs from '+contractor.name+'.')+'</p>'
-      +(isHost() && isOrgAdmin() && !readOnly() ? '<button class="btn orange" data-action="add-requirement" data-site="'+siteId+'">Add a requirement</button>' : '')+'</div>';
+      +(isHost() && isOrgAdmin() && !readOnly() ? '<div class="row-actions" style="justify-content:center;"><button class="btn orange" data-action="apply-packs" data-site="'+siteId+'">Use a starter pack</button><button class="btn secondary" data-action="add-requirement" data-site="'+siteId+'">Add one by one</button></div>' : '')+'</div>';
   } else {
     html += '<div class="card checkpoint readiness-hero">'+gauge(percent, 78)
       +'<div><div class="site-card-title">Site Readiness</div><div class="site-card-sub">'+(counts.complete||0)+' of '+total+' requirements complete</div>'
@@ -328,7 +348,7 @@ function renderSiteDetail(siteId){
     });
     html += '</div>';
   });
-  if(total && isHost() && isOrgAdmin() && !readOnly()) html += '<button class="btn secondary block" data-action="add-requirement" data-site="'+siteId+'">+ Add a requirement</button>';
+  if(total && isHost() && isOrgAdmin() && !readOnly()) html += '<div class="row-actions"><button class="btn secondary" style="flex:1;" data-action="add-requirement" data-site="'+siteId+'">+ Add a requirement</button><button class="btn secondary" style="flex:1;" data-action="apply-packs" data-site="'+siteId+'">+ Add a starter pack</button></div>';
   return html;
 }
 

@@ -215,3 +215,34 @@ describe('audit trail and housekeeping', () => {
     assert.ok(realAudit > 0, 'real tenants keep their history');
   });
 });
+
+describe('requirement starter packs', () => {
+  it('creates a site from packs without duplicate requirements', async () => {
+    const packs = (await host.get('/api/requirement-templates')).body.packs;
+    assert.ok(packs.find((p: any) => p.id === 'baseline'));
+    const r = await host.post('/api/sites', { name: 'Pack Site', newContractor: { name: 'Pack Co' }, templatePackIds: ['baseline', 'electrical'] });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const reqs = (await host.state()).state.requirements[r.body.id];
+    const names = reqs.map((x: any) => x.name);
+    assert.equal(new Set(names.map((n: string) => n.toLowerCase())).size, names.length, 'no duplicates');
+    const expected = packs.filter((p: any) => ['baseline', 'electrical'].includes(p.id)).reduce((n: number, p: any) => n + p.items.length, 0);
+    assert.equal(names.length, expected);
+  });
+
+  it('applies packs to an existing site, skipping what it already has', async () => {
+    const r = await host.post('/api/sites', { name: 'Apply Site', newContractor: { name: 'Apply Co' }, requirements: [{ category: 'Company Documents', name: 'Letter of Good Standing (COID)', source: 'legal' }] });
+    const first = await host.post(`/api/sites/${r.body.id}/requirements/apply-packs`, { packIds: ['baseline'] });
+    assert.equal(first.status, 200);
+    const again = await host.post(`/api/sites/${r.body.id}/requirements/apply-packs`, { packIds: ['baseline'] });
+    assert.equal(again.body.added, 0, 'second apply adds nothing');
+    const names = (await host.state()).state.requirements[r.body.id].map((x: any) => x.name);
+    assert.equal(names.filter((n: string) => n === 'Letter of Good Standing (COID)').length, 1);
+    assert.equal(first.body.added, names.length - 1);
+  });
+
+  it('only host admins can apply packs, and unknown packs are rejected', async () => {
+    assert.equal((await contractor.post(`/api/sites/${siteId}/requirements/apply-packs`, { packIds: ['baseline'] })).status, 403);
+    assert.equal((await host.post(`/api/sites/${siteId}/requirements/apply-packs`, { packIds: ['nope'] })).status, 400);
+    assert.equal((await host.post(`/api/sites/${siteId}/requirements/apply-packs`, { packIds: [] })).status, 400);
+  });
+});
