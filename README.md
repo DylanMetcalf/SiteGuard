@@ -21,7 +21,7 @@ that MVP. What's new is the backend underneath them.
 | **Real authentication.** Email/password, invite-by-email, password reset, sessions. | Built in: scrypt hashes, httpOnly cookies, CSRF tokens, email confirmation, lockout, rate limits. The role switcher is now a demo-only persona picker. |
 | **Server-enforced permissions.** | Every read and write is checked against the caller's organisation and role. Another tenant's records return 404. Covered by tests. |
 | **File storage.** | S3-compatible (AWS S3, Cloudflare R2, MinIO), private objects, 60-second presigned downloads, magic-byte type checks |
-| **AI drafting via a backend proxy.** | Server-side Claude API calls, plan-gated with a monthly allowance, plus expiry-date detection on uploaded certificates. No key in the browser. |
+| **AI drafting via a backend proxy.** | Server-side Claude API calls, plan-gated with a monthly allowance, plus expiry-date detection on uploaded certificates. No key in the browser. Without a key, drafting uses built-in templates tailored to the described work. |
 | **Billing.** Plans, seats, trials, upgrade/downgrade. | Stripe Checkout + Customer Portal + webhooks. 14-day trial for hosts, free tier for contractors, per-seat plans. A lapsed account becomes read-only. |
 | **Email notifications.** | Transactional outbox with retries. Invites, corrections, requests, permit requests, serious incidents, and a reminder digest for expiring docs/certificates, unclosed permits, open incidents and overdue requests. |
 | **Secure external sharing.** | Expiring, revocable, audited read-only links (readiness summary or full safety file), plus public `/verify/<code>` pages |
@@ -31,6 +31,17 @@ Onboarding: a new site owner gets a short **Getting started** checklist. Sites a
 **requirement starter packs**: a contractor baseline plus electrical, heights & lifting, hot work &
 confined space, and civil & plant add-ons, defined in `src/lib/templates.ts`. Every item stays
 editable per site.
+
+**SiteGuard Assistant**: a chat that answers "what does the safety file need for this site or
+job?", checks how your sites are doing, and offers to **start the site** with the right starter
+packs (or gives contractors a checklist and drafts). With an AI key it uses Claude with read-only
+tools over your own data plus web search for site-specific research; without one it answers from
+built-in rules. It never changes anything itself: you confirm every action.
+
+**Compliance agent**: a background check every 15 minutes across every organisation's sites.
+It keeps a prioritised list of what needs attention (expired or expiring documents, reviews
+waiting, stale invitations, sites ready to approve, overdue requests, serious incidents, permits
+past expiry, lapsed worker medicals) on the dashboard, and items clear themselves once dealt with.
 
 Product gaps from the last audit, also built:
 
@@ -43,6 +54,12 @@ Product gaps from the last audit, also built:
 - **Toolbox talk attendance**: each attendee signs on the device. AI can draft the talk.
 - **Dashboard customisation**: each user chooses and orders their dashboard sections.
 
+## Going live
+
+Non-technical? Start with **[docs/LAUNCH_GUIDE.md](docs/LAUNCH_GUIDE.md)**: one-click deploy on
+Render with [`render.yaml`](render.yaml), email, domain, the AI key, costs in rands, and a demo
+script for selling on site.
+
 ## Quick start (local)
 
 Requirements: Node 20+ and Postgres 14+. Docker is optional.
@@ -53,6 +70,8 @@ docker compose up -d postgres mailpit   # or use your own Postgres
 npm install
 npm run dev                             # http://localhost:3000, runs migrations on start
 ```
+
+Or run everything, app included, with Docker: `docker compose up --build`.
 
 Open http://localhost:3000 and either **Create an account** or **Explore the demo**. The demo is a
 private sandbox with the MVP's sample mine, three contractor companies and personas you can switch
@@ -71,6 +90,7 @@ Without `SMTP_URL`, emails (confirmation links, invites) are printed to the serv
 | `npm run typecheck` | TypeScript |
 | `npm run build && npm start` | Production build and server |
 | `npm run migrate` / `migrate:prod` | Apply migrations manually (they also run on start) |
+| `npm run smoke` | Synthetic check of a deployed app (`SITEGUARD_URL=… npm run smoke`); also runs every 30 min in GitHub Actions |
 | `npm run worker:prod` | Email + reminder jobs as a separate process (optional; `RUN_JOBS_IN_WEB=false`) |
 
 ## Layout
@@ -81,7 +101,8 @@ src/
   config.ts                Environment (validated)
   db/                      Pool, migration runner, SQL migrations
   lib/                     authz (permission model), sessions, security, plans, storage,
-                           email outbox, AI proxy, realtime, readiness rules, audit
+                           email outbox, AI proxy, assistant, compliance agent, work-type
+                           knowledge + template drafts, realtime, readiness rules, audit
   routes/                  auth, org/team, bootstrap (per-user view), sites, documents,
                            safety (incidents/permits/diary/inspections), requests, files,
                            workforce, share links, billing, ai, events (SSE), demo
@@ -97,5 +118,6 @@ docs/                      Architecture and deployment guides
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): tenancy model, permission matrix, how the UI gets its
   data, security measures, and known limits.
+- [docs/LAUNCH_GUIDE.md](docs/LAUNCH_GUIDE.md): plain-language launch steps, costs and demo script.
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): recommended hosting, Stripe/email/storage setup, and a
   go-live checklist.

@@ -133,8 +133,31 @@ More rules the server enforces:
 - **Reminder digests** hourly, under an advisory lock. Each item (such as "COID letter expires in 7
   days") is recorded in `reminder_log`, so it's emailed once per threshold (30 days, 7 days,
   expired) rather than daily. Each person gets a single digest.
+- **Compliance agent** every 15 minutes, under an advisory lock (see below).
 - **Housekeeping:** expired sessions and tokens, and demo sandboxes older than 3 days (including
   their stored files).
+
+## Assistant and compliance agent
+
+**Assistant** (`lib/assistant.ts`, `POST /api/assistant`). The browser sends the conversation; the
+server returns a reply plus *cards* (start a site, checklist, draft, open a site).
+- With an API key and a plan that includes AI, it runs a manual Claude tool-use loop (adaptive
+  thinking, server-side refusal fallback, handling `tool_use`, `pause_turn` and `refusal`). Its
+  tools are read-only and scoped to the caller's organisation: starter packs, own sites, one
+  site's status (through `loadSite`, so cross-tenant ids return an error), plus
+  `propose_site` / `prepare_checklist` / `suggest_draft`, which only produce cards.
+  Web search (`AI_WEB_SEARCH`) supplies site-specific research, and citations are returned as
+  sources.
+- Without a key, or when the AI is rate-limited or the monthly allowance is spent, the same
+  endpoint answers from rules in `lib/knowledge.ts` and the starter packs.
+- Cards hand off to the normal endpoints (e.g. the Add a site sheet, prefilled), so every write
+  stays under the permission matrix and audit trail. Conversations are not stored.
+
+**Compliance agent** (`lib/agent.ts`). Every 15 minutes (and on demand) it computes findings per
+organisation with plain SQL rules and upserts them into `agent_findings` keyed by
+`(org_id, key)`. Findings not seen on a run are marked resolved, and a run that changes anything
+sends a live-update event. Findings are delivered in `/api/bootstrap` and are only ever
+selected by the viewer's own `org_id`.
 
 ## Known limits and next steps
 
@@ -156,7 +179,8 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 41 integration tests against real Postgres, covering requirement starter packs, tenant isolation (cross-tenant
+- `npm test`: 55 integration tests against real Postgres, covering the assistant's offline mode and
+  scoping, template drafting, the compliance agent's findings and tenant isolation, requirement starter packs, tenant isolation (cross-tenant
   reads and writes all 404), the role matrix, CSRF, draft-file privacy, share-link scope, expiry
   and revocation, audit scoping and immutability, the Site Ready gates, permit/defect/request
   workflows, workforce visibility, password reset and lockout, demo isolation, and billing (signed
@@ -168,7 +192,10 @@ These are deliberate scope boundaries, not hidden gaps:
   - The S3 driver against MinIO.
   - SMTP delivery through the outbox, against a local SMTP sink.
   - The AI proxy against a mock of the Messages API: streaming, PDF input, structured output,
-    refusal-fallback request, usage metering.
+    refusal-fallback request, usage metering, and the assistant's multi-step tool loop (tool
+    errors, citations, per-role tools, contractor scoping).
+  - The production build started the way the Render blueprint runs it, checked with
+    `scripts/smoke.mjs`.
   - The Docker image builds and boots.
 - **Not verified here, because it needs your accounts:** live Claude API calls, live Stripe
   Checkout and Customer Portal, and a real email provider's deliverability.

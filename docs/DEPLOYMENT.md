@@ -4,6 +4,11 @@ SiteGuard is one stateless Docker image plus four managed services: Postgres, S3
 storage, an SMTP provider, and Stripe. Migrations run automatically on start, guarded by an advisory
 lock, so rolling deploys with several replicas are safe.
 
+**Launching for the first time?** Follow [LAUNCH_GUIDE.md](LAUNCH_GUIDE.md): a plain-language,
+step-by-step walkthrough using the one-click Render blueprint in [`render.yaml`](../render.yaml)
+(app + Postgres + a disk for uploads), with costs. The rest of this page is the technical
+reference.
+
 ## Recommended hosting
 
 The customers are South African mines and contractors, so latency and data residency matter. Two
