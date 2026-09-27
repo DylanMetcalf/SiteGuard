@@ -162,7 +162,7 @@ export const WORK_PROFILES: WorkProfile[] = [
   },
 ];
 
-const GENERAL_HAZARDS = ['Slips, trips and falls on uneven ground', 'Manual handling', 'Heat, dust and noise exposure', 'Fatigue'];
+const GENERAL_HAZARDS = ['Slips, trips and falls on uneven ground', 'Manual handling injuries', 'Heat, dust and noise exposure', 'Fatigue'];
 const GENERAL_CONTROLS = [
   'Site induction completed by every worker',
   'Daily pre-task risk assessment and toolbox talk before work starts',
