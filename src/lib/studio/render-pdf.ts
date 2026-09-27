@@ -23,6 +23,9 @@ pdfmake.setLocalAccessPolicy((p) => STANDARD_FONTS.has(p));
 
 type Node = Record<string, unknown> | string | Node[];
 
+/** Renders any pdfmake definition with the same locked-down fonts and access policies. */
+export const pdfFromDefinition = (def: unknown): Promise<Buffer> => pdfmake.createPdf(def).getBuffer();
+
 /** Mixes a hex colour with white; t=0 is the colour, t=1 is white. */
 export function tint(hex: string, t: number): string {
   const n = parseInt(hex.slice(1), 16);

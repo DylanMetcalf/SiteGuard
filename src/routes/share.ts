@@ -17,6 +17,8 @@ import { planOf } from '../lib/plans.js';
 import { computeReadiness, effectiveStatus } from '../lib/readiness.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
+import { buildSafetyFile } from '../lib/bundle.js';
+import { contentDisposition } from '../lib/storage.js';
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -156,7 +158,7 @@ export default async function shareRoutes(app: FastifyInstance) {
           where r.site_id = $1 order by r.position, r.created_at`,
         [site.id],
       );
-      body += `<div class="card scroll"><h1 style="font-size:16px">Safety file</h1><table><tr><th>Requirement</th><th>Status</th><th>Version</th><th>Expiry</th><th>File</th></tr>${reqs
+      body += `<div class="card scroll"><h1 style="font-size:16px">Safety file <a href="/share/${esc(token)}/safety-file.pdf" style="font-size:13px;font-weight:600;margin-left:8px">Download the whole file (PDF)</a></h1><table><tr><th>Requirement</th><th>Status</th><th>Version</th><th>Expiry</th><th>File</th></tr>${reqs
         .map((q) => {
           const st = effectiveStatus(q.status ? { status: q.status, expiry_date: q.expiry_date } : null);
           const canView = q.current_file_id && ['complete', 'expiring', 'awaiting_review'].includes(st);
@@ -185,6 +187,28 @@ export default async function shareRoutes(app: FastifyInstance) {
     }
     reply.header('cache-control', 'no-store').header('referrer-policy', 'no-referrer');
     return reply.type('text/html').send(page(site.name, body));
+  });
+
+  /** The whole safety file as one PDF, for either side of the site. */
+  app.get('/api/sites/:id/safety-file.pdf', rl(10), async (req, reply) => {
+    const ctx = requireOrg(req.ctx);
+    const { id } = req.params as { id: string };
+    if (!isUuid(id)) throw notFound();
+    await loadSite(pool, ctx, id);
+    const { pdf, filename } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`);
+    reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, false));
+    return reply.type('application/pdf').send(pdf);
+  });
+
+  app.get('/share/:token/safety-file.pdf', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const { token } = req.params as { token: string };
+    const link = await resolveLink(token);
+    if (!link || link.revoked_at || new Date(link.expires_at) < new Date() || link.kind !== 'safety_file') {
+      return gone(reply, 'This link has expired or was revoked.');
+    }
+    const { pdf, filename } = await buildSafetyFile(pool, link.site_id, `external link from ${link.org_name}`);
+    reply.header('cache-control', 'no-store').header('referrer-policy', 'no-referrer').header('content-disposition', contentDisposition(filename, false));
+    return reply.type('application/pdf').send(pdf);
   });
 
   app.get('/share/:token/files/:fileId', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {

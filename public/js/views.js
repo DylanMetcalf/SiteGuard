@@ -399,6 +399,8 @@ function renderSiteDetail(siteId){
     if(canApprove) html += '<button class="btn primary block" data-action="approve-site" data-site="'+siteId+'" style="margin-bottom:14px;">Approve — Mark Site Ready</button>';
     if(isContractor() && !readOnly()) html += builderCard(siteId);
   }
+  const filed = (S.state.requirements[siteId]||[]).filter(r=>['complete','expiring','awaiting_review'].includes(effectiveStatus(S.state.documents[r.id]))).length;
+  if(filed) html += '<a class="bundle-link" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>';
 
   const grouped = {};
   items.forEach(it=>{ (grouped[it.req.category] = grouped[it.req.category]||[]).push(it); });
