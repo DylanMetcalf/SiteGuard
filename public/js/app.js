@@ -1,12 +1,14 @@
 // SiteGuard web app entry point: boot, render, event delegation and live sync.
 
 import { api } from './api.js';
-import { S, ICONS, actions, reload, setRender, showToast, closeSheet, consumeSkippedPop, afterPendingBack } from './core.js';
+import { S, ICONS, actions, on, reload, setRender, showToast, closeSheet, consumeSkippedPop, afterPendingBack } from './core.js';
 import { handleDeepLink, renderAuth, renderNoOrg } from './auth.js';
 import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
 import './assistant.js';
 import './studio.js';
+import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
+import './inbox.js';
 
 const app = document.getElementById('app');
 
@@ -50,6 +52,11 @@ window.addEventListener('unhandledrejection', (e)=>{ const r = e.reason || {}; i
 function render(){
   const b = S.boot;
   if(!b){ app.innerHTML = '<div class="empty"><p>Loading…</p></div>'; return; }
+  if(S.guestReviewToken){
+    // Someone opening a review link: no account needed, just the document.
+    app.innerHTML = '<div class="guest-top"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div><div class="brand-tag" style="display:block;">Document review</div></div></div></div><main class="view">'+renderReview()+'</main>';
+    return;
+  }
   if(!b.authenticated || S.authView){
     app.innerHTML = renderAuth();
     stopLive();
@@ -121,7 +128,7 @@ function startLive(){
   es.addEventListener('open', ()=>{ if(!S.live){ S.live = true; updateLiveDot(); } });
   es.addEventListener('change', ()=>{
     clearTimeout(refetchTimer);
-    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
+    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>refreshReview()).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
   });
   es.addEventListener('error', ()=>{
     S.live = false; updateLiveDot();
@@ -172,6 +179,8 @@ function finishTutorial(){
   try{
     // Fetch the session (and its CSRF token) first: some emailed links POST on arrival.
     await reload();
+    const rv = /^\/review\/([A-Za-z0-9_-]{20,100})$/.exec(location.pathname);
+    if(rv){ S.guestReviewToken = rv[1]; openGuestReview(rv[1]); return; }
     await handleDeepLink();
     await reload();
     if(S.pendingToast){ showToast(S.pendingToast); S.pendingToast = null; }
@@ -179,3 +188,5 @@ function finishTutorial(){
     app.innerHTML = '<div class="empty"><h3>Can\'t reach SiteGuard</h3><p>'+(e.message||'')+'</p><p>Refresh the page to try again.</p></div>';
   }
 })();
+
+on('open-review', (el)=>openReview(el.dataset.id));

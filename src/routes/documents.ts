@@ -13,6 +13,7 @@ import { sniffType, storage } from '../lib/storage.js';
 import { aiAllowed } from '../lib/plans.js';
 import { extractExpiryDate } from '../lib/ai.js';
 import { rl } from './auth.js';
+import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 
 export interface Slot {
   kind: 'site' | 'library';
@@ -187,6 +188,12 @@ export default async function documentRoutes(app: FastifyInstance) {
       }
       const resubmit = eff === 'correction_required' || eff === 'expired' || eff === 'expiring';
       await audit(db, ctx, body.aiDrafted ? 'Saved AI-drafted document' : resubmit ? 'Resubmitted document' : 'Submitted document', `${s.name} (${version})`, s.siteId);
+      if (s.kind === 'site' && s.hostOrgId) {
+        await notifyOrg(db, s.hostOrgId, REVIEWERS, {
+          kind: 'submitted', title: `${resubmit ? 'Resubmitted' : 'New'} for review: ${s.name}`,
+          body: `${ctx.org.name} · ${s.siteName}${body.note ? ` — ${body.note}` : ''}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! },
+        });
+      }
       await publishChange(db, s.parties);
       return { version, status };
     });
@@ -206,6 +213,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       }
       await db.query(`update documents set status = 'complete', updated_at = now() where id = $1`, [doc.id]);
       await audit(db, ctx, 'Approved document', `${s.name} (${doc.version})`, s.siteId);
+      if (s.contractorOrgId) await notifyOrg(db, s.contractorOrgId, null, { kind: 'approved', title: `Approved: ${s.name}`, body: `${s.siteName} · approved by ${ctx.user.name}, ${ctx.org.name}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
       await publishChange(db, s.parties);
       return { ok: true };
     });
@@ -228,6 +236,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       );
       await audit(db, ctx, 'Requested correction', `${s.name} — "${clip(text)}"`, s.siteId);
       if (s.contractorOrgId) {
+        await notifyOrg(db, s.contractorOrgId, null, { kind: 'correction', title: `Correction requested: ${s.name}`, body: `${s.siteName} — ${text}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
         await queueToOrg(db, s.contractorOrgId, null, (to) => ({
           to: to.email,
           subject: `Correction requested: ${s.name}`,

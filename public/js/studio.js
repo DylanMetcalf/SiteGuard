@@ -60,7 +60,7 @@ function docRow(d){
   const due = days < 0 ? '<span class="badge missing">Review overdue</span>' : days <= 30 ? '<span class="badge expiring">Review due in '+days+' days</span>' : '<span class="badge grey">Review '+d.reviewDue+'</span>';
   return '<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+d.title+'</div>'
     +'<div class="reqrow-meta"><span class="srctag">'+d.docNumber+' · Rev '+d.revision+'</span>'+(d.ai?'<span class="badge sage">AI</span>':'')+due+(d.siteName?'<span class="srctag">'+d.siteName+'</span>':'')+'</div>'
-    +'<div class="row-actions"><a class="btn secondary small" href="/api/files/'+d.pdfFileId+'" target="_blank" rel="noopener">PDF</a>'
+    +'<div class="row-actions"><button class="btn primary small" data-action="open-review" data-id="'+d.id+'">Open</button><a class="btn secondary small" href="/api/files/'+d.pdfFileId+'" target="_blank" rel="noopener">PDF</a>'
     +'<a class="btn secondary small" href="/api/files/'+d.docxFileId+'?download=1">Word</a>'
     +(readOnly()?'':'<button class="btn secondary small" data-action="studio-revise" data-id="'+d.id+'">New revision</button>')
     +(isContractor() && !readOnly()?'<button class="btn secondary small" data-action="studio-add" data-id="'+d.id+'">Add to safety file</button>':'')
@@ -152,7 +152,7 @@ on('studio-generate', async (el)=>{
       +'<div class="chat-card-title">'+ICONS.check+' Ready'+(r.ai?' · AI-tailored':'')+'</div>'
       +'<div class="site-card-title">'+escapeHtml(r.title)+'</div>'
       +'<div class="site-card-sub">'+escapeHtml(r.docNumber)+' · Rev '+r.revision+' · review by '+r.reviewDue+'</div>'
-      +'<div class="row-actions"><a class="btn secondary small" href="/api/files/'+detail.pdfFileId+'" target="_blank" rel="noopener">Open PDF</a><a class="btn secondary small" href="/api/files/'+detail.docxFileId+'?download=1">Download Word</a></div>'
+      +'<div class="row-actions"><button class="btn secondary small" data-action="open-review" data-id="'+r.id+'">Read &amp; edit</button><a class="btn secondary small" href="/api/files/'+detail.pdfFileId+'" target="_blank" rel="noopener">Open PDF</a><a class="btn secondary small" href="/api/files/'+detail.docxFileId+'?download=1">Download Word</a></div>'
       +(f.reqId && isContractor() ? '<button class="btn primary block" style="margin-top:12px;" data-action="studio-attach" data-req="'+f.reqId+'">'+(f.reqId.startsWith('lib:')?'Save to your library':'Attach and submit for review')+'</button>' : '')
       +(!f.reqId && isContractor() ? '<button class="btn secondary block" style="margin-top:10px;" data-action="studio-add" data-id="'+r.id+'">Add to a safety file…</button>' : '')
       +'<div class="site-card-sub" style="margin-top:8px;">Review it before use and sign the approval block. It\'s saved under More → Document Studio.</div></div>';

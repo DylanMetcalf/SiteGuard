@@ -265,6 +265,12 @@ async function attachDocuments(db: Db, ctx: OrgCtx, state: Record<string, any>, 
   );
   const byDoc: Record<string, any[]> = {};
   for (const v of versions) (byDoc[v.document_id] ??= []).push(v);
+  // Which current files are Document Studio documents (opens the review workspace).
+  const fileIds = docs.map((x) => x.current_file_id).filter(Boolean);
+  const studio = fileIds.length
+    ? await many<{ id: string; pdf_file_id: string }>(db, 'select id, pdf_file_id from generated_documents where pdf_file_id = any($1::uuid[])', [fileIds])
+    : [];
+  const studioByFile = new Map(studio.map((g) => [g.pdf_file_id, g.id]));
   for (const x of docs) {
     const all = byDoc[x.id] ?? [];
     const current = all[all.length - 1];
@@ -280,6 +286,7 @@ async function attachDocuments(db: Db, ctx: OrgCtx, state: Record<string, any>, 
       assetUrl: fileUrl(x.current_file_id),
       assetName: x.current_name,
       assetType: x.current_type,
+      studioDocId: studioByFile.get(x.current_file_id) ?? null,
       aiDrafted: !!current?.ai_drafted,
       // A file attached but not yet submitted is visible only to the submitting side.
       pendingFileId: ownerSide ? x.pending_file_id : null,
@@ -290,6 +297,16 @@ async function attachDocuments(db: Db, ctx: OrgCtx, state: Record<string, any>, 
       })),
     };
   }
+}
+
+async function inboxFor(userId: string, orgId: string) {
+  const items = await many<{ id: string; kind: string; title: string; body: string; link: unknown; created_at: Date; read_at: Date | null }>(
+    pool,
+    `select id::int as id, kind, title, body, link, created_at, read_at from notifications where user_id = $1 and org_id = $2 order by created_at desc limit 40`,
+    [userId, orgId],
+  );
+  const unread = await many<{ n: number }>(pool, `select count(*)::int as n from notifications where user_id = $1 and org_id = $2 and read_at is null`, [userId, orgId]);
+  return { unread: unread[0]?.n ?? 0, items: items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, body: i.body, link: i.link, createdAt: i.created_at, read: !!i.read_at })) };
 }
 
 export default async function bootstrapRoutes(app: FastifyInstance) {
@@ -334,6 +351,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
       myContractorId: c.org.kind === 'contractor' ? c.org.id : null,
       state: await buildState(pool, c),
       agent: await openFindings(c.org.id),
+      inbox: await inboxFor(c.user.id, c.org.id),
     };
   });
 }

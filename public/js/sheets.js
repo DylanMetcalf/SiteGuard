@@ -190,6 +190,11 @@ function renderReqSheet(reqId){
       +'<span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;">📎 '+doc.assetName+(doc.aiDrafted?' <span class="srctag">AI draft</span>':'')+'</span>'
       +'<a class="btn secondary small" href="'+doc.assetUrl+'" target="_blank" rel="noopener">View</a></div>';
   }
+  if(doc.studioDocId){
+    body += '<div class="card" style="margin-top:10px;background:var(--brand-bg);border-color:transparent;"><div class="chat-card-title" style="color:var(--brand);">'+ICONS.passport+' Document Studio document</div>'
+      +'<div class="site-card-sub" style="color:var(--ink-soft);">'+(canReview() && (eff==='awaiting_review'||eff==='correction_required') ? 'Review it section by section: approve each part, highlight text and leave comments.' : isContractor() ? 'Read the feedback section by section, edit it in the app and resubmit.' : 'Read it section by section, with all comments.')+'</div>'
+      +'<button class="btn primary small" style="margin-top:10px;" data-action="open-review" data-id="'+doc.studioDocId+'">'+(canReview() && eff==='awaiting_review' ? 'Review section by section' : 'Open in review workspace')+'</button></div>';
+  }
   if(doc.history && doc.history.length){
     body += '<details style="margin-top:8px;"><summary style="font-size:12.5px;color:var(--grey);cursor:pointer;">Version history ('+doc.history.length+' earlier)</summary>'
       + doc.history.slice().reverse().map(h=>'<div class="reqrow" style="padding:8px 0;"><div class="reqrow-main"><div class="reqrow-name" style="font-size:13px;">'+h.version+'</div>'

@@ -282,3 +282,30 @@ async function persist(
   ))!;
   return { id: row.id, docNumber, revision, title: content.title, ai, reviewDue: meta.reviewDate, siteId, requirementId };
 }
+
+/**
+ * Saves edited content as the next revision of a document: same number,
+ * re-rendered with current branding. Used by the review workspace editor.
+ */
+export async function reviseWithContent(ctx: OrgCtx, prevId: string, content: DocContent, note: string) {
+  if (!isUuid(prevId)) throw notFound();
+  const prev = await one<{ blueprint: string; inputs: Record<string, string>; site_id: string | null; requirement_id: string | null; doc_number: string; revision: number }>(
+    pool,
+    `select blueprint, inputs, site_id, requirement_id, doc_number, revision from generated_documents where id = $1 and org_id = $2`,
+    [prevId, ctx.org.id],
+  );
+  if (!prev) throw notFound();
+  const bp = blueprintById(prev.blueprint);
+  if (!bp) throw badRequest('That document type is no longer available.');
+  let site: BuildInput['site'];
+  if (prev.site_id) {
+    const s = await one<{ name: string; location: string; host_name: string; emergency: Record<string, string> }>(
+      pool,
+      `select s.name, s.location, o.name as host_name, s.emergency from sites s join organisations o on o.id = s.org_id where s.id = $1`,
+      [prev.site_id],
+    );
+    if (s) site = { name: s.name, location: s.location, clientName: s.host_name, emergency: s.emergency };
+  }
+  const req: GenerateRequest = { blueprintId: bp.id, values: prev.inputs ?? {}, reviseOf: prevId, revisionNote: note };
+  return withTx((tx) => persist(tx, ctx, bp, req, content, false, { site, siteId: prev.site_id, requirementId: prev.requirement_id, previous: prev }));
+}

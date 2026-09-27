@@ -11,6 +11,7 @@ import {
 } from './core.js';
 import { computeTasks } from './sheets.js';
 import { renderStudio } from './studio.js';
+import { renderReview } from './review.js';
 
 /* ============ SHELL ============ */
 export function topbar(){
@@ -22,7 +23,7 @@ export function topbar(){
     +'<div class="identity">'
     +'<button class="identity-avatar" data-action="open-assistant" aria-label="Ask the SiteGuard Assistant" title="Ask the SiteGuard Assistant" style="background:var(--brand-bg); color:var(--brand-ink);">'+ICONS.sparkle+'</button>'
     +'<button class="identity-avatar" data-action="open-search" aria-label="Search" style="background:var(--paper-raised); color:var(--ink);">'+ICONS.search+'</button>'
-    +'<button class="identity-avatar" data-action="open-tasks" data-filter="all" aria-label="Tasks" style="background:var(--paper-raised); color:var(--ink); position:relative;">'+ICONS.bell+(highCount?'<span class="bell-dot"></span>':'')+'</button>'
+    +(()=>{ const unread = (S.boot.inbox||{}).unread||0; return '<button class="identity-avatar" data-action="open-inbox" aria-label="Inbox'+(unread?', '+unread+' new':'')+'" style="background:var(--paper-raised); color:var(--ink); position:relative;">'+ICONS.bell+(unread?'<span class="bell-count">'+(unread>9?'9+':unread)+'</span>':highCount?'<span class="bell-dot"></span>':'')+'</button>'; })()
     +(personas && personas.length ? '<select class="persona-select" id="personaSel" aria-label="Demo persona" title="Demo persona — switches to another sample user (their real permissions apply)">'
         + personas.map(p=>'<option value="'+p.userId+'"'+(p.current?' selected':'')+' title="'+p.label+'">'+p.name+' ('+p.label.split(' · ')[1]+')</option>').join('')+'</select>' : '')
     +'<button class="identity-avatar" data-action="open-profile" aria-label="Profile">'+initials(myName())+'</button></div>'
@@ -58,6 +59,7 @@ export function renderView(){
   if(S.nav==='sites') return S.activeSiteId && S.state.sites[S.activeSiteId] ? renderSiteDetail(S.activeSiteId) : renderSitesList();
   if(S.nav==='passport') return isContractor() ? renderPassport() : renderContractorsList();
   if(S.nav==='more') return renderMore();
+  if(S.nav==='review') return renderReview();
   return '';
 }
 

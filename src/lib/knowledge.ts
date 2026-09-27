@@ -79,7 +79,8 @@ export const WORK_PROFILES: WorkProfile[] = [
   {
     id: 'confined',
     label: 'Confined space entry',
-    keywords: /\b(confined|tank\w*|vessel\w*|silo\w*|sump\w*|manhole\w*|pit\b|bin\b|chute\w*|culvert\w*|thickener|bunker)\b/i,
+    // Being near a tank isn't entering one: only entry into an enclosed space counts.
+    keywords: /\b(confined|manhole\w*|silo\w*|sump\w*|culvert\w*|(?:inside|into|in|enter\w*|entry|entering|within)\s+(?:a|an|the)?\s*(?:\w+\s+)?(?:tank|vessel|silo|sump|pit|bin|chute|culvert|thickener|bunker|hopper|launder|pipe)s?)\b/i,
     packIds: ['hot-confined'],
     permits: ['Confined space'],
     hazards: ['Oxygen-deficient or toxic atmosphere', 'Engulfment by material', 'Difficult rescue of an injured person', 'Heat stress'],
