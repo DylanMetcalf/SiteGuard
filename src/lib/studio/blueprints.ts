@@ -68,7 +68,9 @@ const bullets = (items: string[]): Block => ({ type: 'bullets', items });
 const numbered = (items: string[]): Block => ({ type: 'numbered', items });
 const note = (text: string): Block => ({ type: 'note', text });
 const sec = (heading: string, ...blocks: Block[]): Section => ({ heading, blocks });
-const siteLabel = (i: BuildInput) => (i.site ? `${i.site.name}${i.site.location ? `, ${i.site.location}` : ''}` : v(i, 'site', 'the site'));
+/** "Name, Location", without repeating a location the name already contains. */
+export const joinSite = (name: string, location?: string) => (location && !name.toLowerCase().includes(location.toLowerCase()) ? `${name}, ${location}` : name);
+const siteLabel = (i: BuildInput) => (i.site ? joinSite(i.site.name, i.site.location) : v(i, 'site', 'the site'));
 const clientLabel = (i: BuildInput) => i.site?.clientName || v(i, 'client', 'the client');
 const scopeText = (i: BuildInput) => v(i, 'scope', v(i, 'task', 'the work described in this document'));
 

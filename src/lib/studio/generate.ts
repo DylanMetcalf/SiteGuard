@@ -14,7 +14,7 @@ import { aiAllowed } from '../plans.js';
 import { anthropic, FALLBACK, recordTokens, reserveAiRequest } from '../ai.js';
 import { storage } from '../storage.js';
 import { storeFile } from '../../routes/documents.js';
-import { blueprintById, type Blueprint, type BuildInput } from './blueprints.js';
+import { blueprintById, joinSite, type Blueprint, type BuildInput } from './blueprints.js';
 import { docContentSchema, type DocContent, type DocMeta } from './model.js';
 import { renderPdf } from './render-pdf.js';
 import { renderDocx } from './render-docx.js';
@@ -260,7 +260,7 @@ async function persist(
     companyAddress: ctx.org.address || undefined,
     preparedBy: ctx.user.name,
     preparedByTitle: ctx.user.title || undefined,
-    siteName: site ? `${site.name}${site.location ? `, ${site.location}` : ''}` : req.values.site || undefined,
+    siteName: site ? joinSite(site.name, site.location) : req.values.site || undefined,
     clientName: site?.clientName,
     brandColor: branding.brandColor,
     logo: await loadLogo(db, ctx, branding.logoFileId),
