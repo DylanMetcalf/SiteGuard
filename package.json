@@ -17,7 +17,8 @@
     "test": "node --import tsx --test --test-concurrency=1 test/*.test.ts",
     "migrate:prod": "node dist/db/migrate.js",
     "worker:prod": "node dist/jobs/worker.js",
-    "test:e2e": "node test/e2e/two-party.e2e.mjs"
+    "test:e2e": "node test/e2e/two-party.e2e.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

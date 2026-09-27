@@ -20,6 +20,7 @@ import documentRoutes from './routes/documents.js';
 import safetyRoutes from './routes/safety.js';
 import requestRoutes from './routes/requests.js';
 import fileRoutes from './routes/files.js';
+import { pool } from './db/pool.js';
 import aiRoutes from './routes/ai.js';
 import assistantRoutes from './routes/assistant.js';
 import agentRoutes from './routes/agent.js';
@@ -120,7 +121,15 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     return reply.status(500).send({ error: 'server_error', message: 'Something went wrong on our side. Try again.' });
   });
 
-  app.get('/healthz', async () => ({ ok: true }));
+  // Liveness plus a database round trip, for the host's health check and uptime monitoring.
+  app.get('/healthz', async (_req, reply) => {
+    try {
+      await pool.query('select 1');
+      return { ok: true };
+    } catch {
+      return reply.code(503).send({ ok: false, error: 'database_unavailable' });
+    }
+  });
 
   await app.register(authRoutes);
   await app.register(orgRoutes);
