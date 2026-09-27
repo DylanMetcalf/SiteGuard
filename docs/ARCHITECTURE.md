@@ -165,6 +165,25 @@ ISO week).
 `SUPPORT_EMAIL`; `POST /api/client-errors` writes browser errors to the server log without storing
 them.
 
+## Document Studio
+
+`src/lib/studio/`: `blueprints.ts` (document types, questions and template content), `model.ts`
+(the document model and its validation), `render-pdf.ts` (pdfmake, standard fonts, no network or
+disk access) and `render-docx.ts` (docx), `generate.ts` (numbering, revisions, AI tailoring and
+storage), and routes in `routes/studio.ts`.
+
+- Generation reads context and runs the AI **outside** any transaction, then allocates the
+  document number (under a lock on the organisation row), renders both formats and stores them in
+  one short transaction.
+- The AI returns the document through a `submit_document` tool whose input is validated against
+  the same zod schema; invalid output is sent back once or twice to be fixed, and any failure falls
+  back to the complete template draft, so generation never fails because of the AI.
+- Generated files are ordinary files owned by the organisation, so downloads use the existing
+  permission-checked `/api/files/:id`. `POST /api/documents/:slot/attach-generated` puts a generated
+  PDF into a requirement or library slot as the pending attachment; the normal submit endpoint does
+  the rest, with the review date as the expiry date.
+- Branding (logo file, colour, number prefix) lives in the organisation's `settings`.
+
 ## Known limits and next steps
 
 These are deliberate scope boundaries, not hidden gaps:
@@ -185,7 +204,8 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 59 integration tests against real Postgres, covering the assistant's offline mode and
+- `npm test`: 69 integration tests, including every Document Studio blueprint rendered to PDF and
+  Word, numbering and revisions, branding, attach-and-submit and tenant isolation, against real Postgres, covering the assistant's offline mode and
   scoping, template drafting, the compliance agent's findings and tenant isolation, requirement starter packs, tenant isolation (cross-tenant
   reads and writes all 404), the role matrix, CSRF, draft-file privacy, share-link scope, expiry
   and revocation, audit scoping and immutability, the Site Ready gates, permit/defect/request

@@ -27,6 +27,8 @@ haven't built.
 - Secrets only via environment variables (`src/config.ts`); never in code or sent to the browser. AI
   calls stay server-side (`src/lib/ai.ts`, `src/lib/assistant.ts`) and must work without a key
   (template/rules fallback).
+- Document Studio: new document types go through the `add-document-blueprint` skill in
+  `.claude/skills/`; every blueprint must render with empty answers (tested).
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and

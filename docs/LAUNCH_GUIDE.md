@@ -218,9 +218,11 @@ mine and three contractors, deleted automatically after three days.
 3. **Ask SiteGuard (2 min).** Type the prospect's real job, e.g. *"Safety file for electrical work
    and welding on the conveyor at [their mine]"*. It lists the requirements, permits and hazards,
    and offers **Start this site**. Tap it: the site is ready with the right document list.
-4. **The contractor's side (2 min).** Switch persona (top bar) to a contractor. Show the checklist,
-   uploading a certificate from the phone camera, and **Draft a document** producing a risk
-   assessment in seconds.
+4. **The contractor's side (3 min).** Switch persona (top bar) to Sipho, a contractor. Open the
+   Leeuwpan risk assessment the mine sent back for correction and tap **Create it in Document
+   Studio**. Describe the job, tap **Create document**, and open the PDF: a numbered, branded risk
+   assessment with a risk register and sign-off blocks. Tap **Attach and submit for review**. (Upload
+   a logo under More → Organisation settings first to show the company's own branding.)
 5. **Review and Site Ready (2 min).** Switch back to the mine persona, approve a document, and show
    the Site Ready verification and a share link a safety auditor can open without an account.
 6. **Close (2 min).** "Contractors use it free. You pay per user after a 14-day trial. Can we set up
@@ -239,6 +241,14 @@ mine and three contractors, deleted automatically after three days.
 - **Safety net:** CI runs the tests on every pull request, so a change that breaks something is
   flagged before you merge it. Render marks a deploy as failed if the app doesn't pass its health
   check, and **siteguard → Events → Rollback** returns to the previous version with one click.
+
+## Branding your documents
+
+Each company sets its own document branding under **More → Organisation settings → Document
+branding**: logo (PNG or JPG), brand colour and document number prefix (e.g. `ABC` gives
+`ABC-RA-001`). Every document created in **Document Studio** uses them. Documents are yearly
+controlled documents: the compliance agent reminds the company when a review is due, and **New
+revision** re-issues it under the same number.
 
 ## When something goes wrong
 

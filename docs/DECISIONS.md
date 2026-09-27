@@ -5,6 +5,18 @@ Newest first.
 
 ---
 
+**DECISION** Rebrand to deep navy and sage with softer, card-based UI and self-hosted fonts (Onest, JetBrains Mono).
+**REASON** Orange/grey is common among competitors; navy signals trust and professionalism to mining buyers, sage gives a distinctive, calm accent. Self-hosting fonts removes a third-party request (privacy, speed, reliability). Colours are tokens, so the palette can still change in one place.
+**DATE** 2026-09-27
+
+**DECISION** Document Studio writes documents from our own blueprints (original content) plus AI tailoring, not by copying published templates.
+**REASON** Other companies' templates are copyrighted and of unknown quality. Our blueprints follow the structure SHE departments expect, cite only legal references we are sure of, and are reviewed in code; the AI tailors them to the job and can research a site's published requirements at generation time.
+**DATE** 2026-09-27
+
+**DECISION** Documents are generated server-side as PDF (pdfmake, standard fonts) and Word (docx) from one document model.
+**REASON** PDF is what gets submitted and printed; Word lets SHE managers edit. One model keeps both identical, avoids a headless browser on the server, and lets the AI's output be validated before rendering.
+**DATE** 2026-09-27
+
 **DECISION** Launch on Render (Frankfurt) from the `render.yaml` blueprint, with uploads on an attached disk instead of S3/R2.
 **REASON** A non-technical founder can deploy it in one click with no code; one bill, daily disk snapshots and managed Postgres backups. The trade-off is a single app instance and no zero-downtime deploys, which is fine for a pilot. Move files to R2 (`STORAGE_DRIVER=s3`) and scale out when customers need it; Fly.io Johannesburg or AWS Cape Town remain the options for in-country hosting.
 **DATE** 2026-09-27

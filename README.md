@@ -38,6 +38,18 @@ packs (or gives contractors a checklist and drafts). With an AI key it uses Clau
 tools over your own data plus web search for site-specific research; without one it answers from
 built-in rules. It never changes anything itself: you confirm every action.
 
+**Document Studio**: professional, branded safety documents as **PDF and editable Word**. Pick a
+document type, answer a few questions, and SiteGuard writes the full document with the company's
+logo, colour, document number, revision history, review date, page numbers and sign-off blocks.
+Fourteen types in seven categories: Health & Safety policy, contractor SHE plan, site-specific risk
+assessment (HIRA, 5×5 matrix), method statement, hot work, confined space, lock-out/isolation and
+fall protection procedures, emergency response plan, legal appointment letters, section 37(2)
+agreement, toolbox talk, PPE register and equipment inspection checklists. With an AI key, Claude
+tailors each document to the job and can research the site's published requirements. A
+requirement that a blueprint can produce shows **Create it in Document Studio**, and the result is
+attached and submitted for review in one step. Documents due for review are flagged by the
+compliance agent. See `src/lib/studio/`.
+
 **Compliance agent**: a background check every 15 minutes across every organisation's sites.
 It keeps a prioritised list of what needs attention (expired or expiring documents, reviews
 waiting, stale invitations, sites ready to approve, overdue requests, serious incidents, permits
