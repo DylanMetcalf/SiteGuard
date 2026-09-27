@@ -130,6 +130,7 @@ function renderQuickActions(){
     items.push({icon:ICONS.audit, title:'Log site diary', sub:'Crew, conditions, work done', action:'diary'});
     items.push({icon:ICONS.verify, title:'Verify a record', sub:'Check a Site Ready verification', action:'verify'});
   }
+  if(isContractor() && isOrgAdmin()) items.push({icon:ICONS.link, title:'Join a site with a code', sub:'Type the code the site gave you', action:'join'});
   items.unshift({icon:ICONS.passport, title:'Create a document', sub:'Document Studio: branded PDF and Word safety documents', action:'studio'});
   items.unshift({icon:ICONS.sparkle, title:'Ask the assistant', sub:isContractor()?'What a site needs, your sites\' status, drafts':'Site requirements, start a site, portfolio status', action:'assistant'});
   if(readOnly()) return sheetHead('Quick actions') + '<div class="notice">Your organisation is read-only until a plan is chosen.</div>';
@@ -158,6 +159,7 @@ on('qa', (el)=>{
   if(a==='ai-draft'){ openSheet(renderAIDraftSheet()); return; }
   if(a==='assistant'){ actions['open-assistant'](); return; }
   if(a==='studio'){ actions['open-studio'](); return; }
+  if(a==='join'){ actions['join-site'](); return; }
   if(a==='verify'){ closeSheet(); S.nav='more'; S.moreView='verify'; render(); return; }
   if(a==='add-site'){ openNewSite(); return; }
   pickSite(a);
@@ -1071,4 +1073,28 @@ on('send-feedback', async (el)=>{
   if(message.length < 3){ document.getElementById('fbMessage').focus(); return; }
   const view = [S.nav, S.moreView, S.siteTab].filter(Boolean).join('/');
   if(await act(()=>api.post('/api/feedback', { kind: val('fbKind'), message, context: { view, userAgent: navigator.userAgent.slice(0,400) } }), 'Thanks — sent to the SiteGuard team', el)) closeSheet();
+});
+
+/* ============ JOIN CODES ============ */
+on('join-code', async (el)=>{
+  el.disabled = true;
+  try{
+    const r = await api.post('/api/sites/'+el.dataset.site+'/join-code');
+    openSheet(sheetHead('Join code', escapeHtml(r.siteName))
+      +'<div class="join-code" aria-label="Join code">'+escapeHtml(r.code)+'</div>'
+      +'<p class="site-card-sub" style="text-align:center;">Give this to the contractor. In SiteGuard they tap <strong>Join a site with a code</strong> and type it in — they\'re connected straight away. It works for '+r.expiresInDays+' days, and making a new code cancels this one.</p>'
+      +'<button class="btn secondary block" style="margin-top:12px;" data-action="copy-join-code" data-code="'+escapeHtml(r.code)+'">Copy code</button>');
+  }catch(e){ showToast(e.message); }
+  el.disabled = false;
+});
+on('copy-join-code', async (el)=>{ try{ await navigator.clipboard.writeText(el.dataset.code); showToast('Code copied'); }catch{ showToast('Write the code down: '+el.dataset.code); } });
+on('join-site', ()=>openSheet(sheetHead('Join a site', 'With the code the site gave you')
+  +'<label class="field-label" for="joinCode">Join code</label><input type="text" id="joinCode" class="join-input" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345" autofocus>'
+  +'<div class="site-card-sub" style="margin-top:6px;">Capitals, dashes and spaces don\'t matter.</div>'
+  +'<button class="btn primary block" style="margin-top:12px;" data-action="join-go">Join site</button>'));
+on('join-go', async (el)=>{
+  const code = val('joinCode');
+  if(code.replace(/[^A-Za-z0-9]/g,'').length < 8){ showToast('Join codes have 8 letters and numbers'); document.getElementById('joinCode').focus(); return; }
+  const r = await act(()=>api.post('/api/sites/join', { code }), 'You\'ve joined the site', el);
+  if(r){ closeSheet(); S.nav='sites'; S.activeSiteId=r.siteId; S.siteTab='compliance'; render(); window.scrollTo(0,0); }
 });

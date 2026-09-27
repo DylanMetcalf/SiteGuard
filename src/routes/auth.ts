@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { notifyOrg } from '../lib/notify.js';
 import { z } from 'zod';
 import { one, pool, withTx, type Db } from '../db/pool.js';
 import { config } from '../config.js';
@@ -73,6 +74,7 @@ export async function acceptSiteInvitation(db: Db, ctx: OrgCtx, invitationId: st
   await db.query(`update site_invitations set status = 'accepted', responded_at = now(), responded_by = $2 where id = $1`, [inv.id, ctx.user.id]);
   await db.query(`update sites set status = 'in_progress' where id = $1 and status = 'invited'`, [inv.site_id]);
   await audit(db, ctx, 'Accepted invitation', inv.site_name, inv.site_id);
+  await notifyOrg(db, inv.org_id, ['owner', 'admin', 'reviewer'], { kind: 'accepted', title: `${ctx.org.name} joined ${inv.site_name}`, body: 'They can now see the site\'s requirements and start submitting documents.', link: { kind: 'site', siteId: inv.site_id } });
   await publishChange(db, [inv.org_id, ctx.org.id]);
   return { siteId: inv.site_id, hostOrgId: inv.org_id };
 }

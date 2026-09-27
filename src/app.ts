@@ -27,6 +27,7 @@ import agentRoutes from './routes/agent.js';
 import supportRoutes from './routes/support.js';
 import studioRoutes from './routes/studio.js';
 import reviewRoutes from './routes/review.js';
+import joinRoutes from './routes/join.js';
 import billingRoutes from './routes/billing.js';
 import shareRoutes from './routes/share.js';
 import eventRoutes from './routes/events.js';
@@ -166,6 +167,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(supportRoutes);
   await app.register(studioRoutes);
   await app.register(reviewRoutes);
+  await app.register(joinRoutes);
   await app.register(billingRoutes);
   await app.register(shareRoutes);
   await app.register(eventRoutes);

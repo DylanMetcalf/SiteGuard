@@ -196,7 +196,7 @@ function contractorWidget(id, ctx){
     ).join('');
   }
   if(id==='focus'){
-    if(!mySites.length) return invited.length ? '' : '<div class="empty"><h3>No sites yet</h3><p>Once a site invites '+org().name+', it will show up here. Sites invite you by email — you can accept from the link or right here.</p></div>';
+    if(!mySites.length) return invited.length ? '' : '<div class="empty"><h3>No sites yet</h3><p>Once a site invites '+org().name+', it will show up here. Sites invite you by email, or give you a join code on site.</p>'+(isOrgAdmin()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>';
     const focus = S.state.sites[S.focusSiteId];
     const {counts, percent, total} = computeReadiness(focus.id);
     const pct = focus.status==='site_ready' ? 100 : percent;
@@ -317,7 +317,7 @@ function renderSitesList(){
   const sites = Object.values(S.state.sites);
   return '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')+'</div>'
     +'<p>'+sites.length+' site'+(sites.length===1?'':'s')+'</p></div>'
-    + (sites.length ? sites.map(portfolioRow).join('') : '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company.':'Add a site to start tracking contractor compliance.')+'</p></div>');
+    + (sites.length ? sites.map(portfolioRow).join('') : '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>');
 }
 
 function renderSiteDetail(siteId){
@@ -365,7 +365,7 @@ function renderSiteDetail(siteId){
       +'<div class="site-card-title" style="font-size:14px;">Awaiting contractor response</div>'
       +'<div class="site-card-sub">'+contractor.name+' was invited '+(invite?timeAgo(invite.sentAt):'')+(invite&&invite.email?' ('+invite.email+')':'')+' and hasn\'t accepted yet. Requirements are visible below but the contractor can\'t submit against them until they accept.</div>'
       +'</div><span class="badge blue">Pending</span></div>'
-      +(isOrgAdmin() && !readOnly() ? '<div class="row-actions"><button class="btn secondary small" data-action="resend-invitation" data-site="'+siteId+'">Resend invitation</button><button class="btn secondary small" data-action="reassign-site" data-site="'+siteId+'">Assign a different contractor</button></div>' : '')
+      +(isOrgAdmin() && !readOnly() ? '<div class="row-actions"><button class="btn primary small" data-action="join-code" data-site="'+siteId+'">Get a join code</button><button class="btn secondary small" data-action="resend-invitation" data-site="'+siteId+'">Resend invitation</button><button class="btn secondary small" data-action="reassign-site" data-site="'+siteId+'">Assign a different contractor</button></div>' : '')
       +'</div>';
   } else if(site.status==='declined' && isHost()){
     html += '<div class="card checkpoint" style="margin-top:12px;border-color:var(--red);"><div class="site-card-title" style="font-size:14px;">Invitation declined</div>'
@@ -631,6 +631,7 @@ function renderMore(){
   const item = (view, icon, title, sub) => '<button class="menu-row" data-action="goto-more" data-view="'+view+'"><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
   let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div><div class="card">';
   html += item('studio', ICONS.passport, 'Document Studio', 'Branded safety documents as PDF and Word');
+  if(isContractor() && isOrgAdmin()) html += '<button class="menu-row" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Join a site with a code</div><div class="qa-sub">Type the code the site gave you</div></div>'+ICONS.chevron+'</button>';
   const nf = (S.boot.agent||{findings:[]}).findings.length;
   html += item('agent', ICONS.verify, 'Compliance agent', nf ? nf+' item'+(nf===1?'':'s')+' need attention' : 'Continuous checks across every site');
   html += '<button class="menu-row" data-action="open-assistant"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">SiteGuard Assistant</div><div class="qa-sub">Ask what a site or job needs, or how your sites are doing</div></div>'+ICONS.chevron+'</button>';

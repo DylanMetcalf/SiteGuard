@@ -550,3 +550,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:2px s
   background:var(--paper-raised); border:1px solid var(--grey-line); border-radius:18px; padding:10px 12px; box-shadow:var(--shadow-lg); font-size:13.5px; font-weight:600;}
 .rv-bar input{flex:1; min-width:200px;}
 body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px));}
+
+/* ===== Join codes ===== */
+.join-code{font-family:var(--font-mono); font-size:34px; font-weight:600; letter-spacing:.12em; text-align:center; padding:22px 10px; margin:6px 0 12px; border-radius:18px; background:var(--brand-bg); color:var(--brand);}
+.join-input{font-family:var(--font-mono); font-size:22px !important; letter-spacing:.14em; text-transform:uppercase; text-align:center;}
