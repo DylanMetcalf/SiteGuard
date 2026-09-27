@@ -9,6 +9,7 @@ import { many, pool, type Db } from '../db/pool.js';
 import { features } from '../config.js';
 import { actorRole, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
 import { aiAllowed, planOf, standing } from '../lib/plans.js';
+import { openFindings } from '../lib/agent.js';
 import { auditFor } from './org.js';
 import { personasFor } from './demo.js';
 import { workforceState } from './workforce.js';
@@ -329,6 +330,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
       personas: await personasFor(pool, c),
       myContractorId: c.org.kind === 'contractor' ? c.org.id : null,
       state: await buildState(pool, c),
+      agent: await openFindings(c.org.id),
     };
   });
 }

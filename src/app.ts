@@ -22,6 +22,7 @@ import requestRoutes from './routes/requests.js';
 import fileRoutes from './routes/files.js';
 import aiRoutes from './routes/ai.js';
 import assistantRoutes from './routes/assistant.js';
+import agentRoutes from './routes/agent.js';
 import billingRoutes from './routes/billing.js';
 import shareRoutes from './routes/share.js';
 import eventRoutes from './routes/events.js';
@@ -131,6 +132,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(fileRoutes);
   await app.register(aiRoutes);
   await app.register(assistantRoutes);
+  await app.register(agentRoutes);
   await app.register(billingRoutes);
   await app.register(shareRoutes);
   await app.register(eventRoutes);

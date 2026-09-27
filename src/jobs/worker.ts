@@ -9,6 +9,7 @@ import { deliverPendingEmail } from '../lib/email.js';
 import { cleanupExpired, runReminders } from './reminders.js';
 import { purgeOldDemos } from '../routes/demo.js';
 import { pool } from '../db/pool.js';
+import { runAgent } from '../lib/agent.js';
 
 export function startJobs(log: (msg: string) => void = console.log): () => void {
   let stopped = false;
@@ -40,11 +41,29 @@ export function startJobs(log: (msg: string) => void = console.log): () => void 
   const startup = setTimeout(hourly, 15_000);
   const hourlyTimer = setInterval(hourly, 60 * 60_000);
 
+  // The compliance agent reviews every organisation every 15 minutes.
+  let reviewing = false;
+  const review = async () => {
+    if (reviewing || stopped) return;
+    reviewing = true;
+    try {
+      await runAgent();
+    } catch (err) {
+      log(`compliance agent error: ${(err as Error).message}`);
+    } finally {
+      reviewing = false;
+    }
+  };
+  const agentStartup = setTimeout(review, 20_000);
+  const agentTimer = setInterval(review, 15 * 60_000);
+
   return () => {
     stopped = true;
     clearInterval(mailTimer);
     clearInterval(hourlyTimer);
     clearTimeout(startup);
+    clearInterval(agentTimer);
+    clearTimeout(agentStartup);
   };
 }
 

@@ -68,14 +68,14 @@ function greeting(){
 }
 
 export const DASHBOARD_WIDGETS = {
-  contractor: [['assistant','Ask SiteGuard'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
-  host: [['assistant','Ask SiteGuard'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
+  contractor: [['agent','Compliance agent'],['assistant','Ask SiteGuard'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
+  host: [['agent','Compliance agent'],['assistant','Ask SiteGuard'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
 };
 const DEFAULT_WIDGETS = {
-  contractor: ['assistant','invitations','focus','allSites','workforce','company'],
-  admin: ['safety','assistant','organisation','portfolio','invitations','workforce'],
-  reviewer: ['safety','assistant','attention','portfolio','workforce'],
-  viewer: ['safety','assistant','attention','portfolio'],
+  contractor: ['agent','assistant','invitations','focus','allSites','workforce','company'],
+  admin: ['safety','agent','assistant','organisation','portfolio','invitations','workforce'],
+  reviewer: ['safety','agent','assistant','attention','portfolio','workforce'],
+  viewer: ['safety','agent','assistant','attention','portfolio'],
 };
 export function dashboardLayout(){
   const all = DASHBOARD_WIDGETS[isContractor()?'contractor':'host'].map(w=>w[0]);
@@ -86,6 +86,43 @@ export function dashboardLayout(){
   }
   const defaults = DEFAULT_WIDGETS[role()] || all;
   return { order: defaults.concat(all.filter(id=>!defaults.includes(id))), hidden: all.filter(id=>!defaults.includes(id)) };
+}
+
+/* ---- Compliance agent ---- */
+const SEV_BADGE = { high:'<span class="badge missing">High</span>', medium:'<span class="badge expiring">Medium</span>', low:'<span class="badge grey">Low</span>' };
+function findingRow(f, i){
+  return '<div class="reqrow" data-action="agent-go" data-i="'+i+'" role="button" tabindex="0" style="cursor:pointer;">'
+    +'<div class="reqrow-main"><div class="reqrow-name">'+f.title+'</div><div class="site-card-sub">'+f.detail+'</div></div>'
+    +'<div style="flex:none;">'+SEV_BADGE[f.severity]+'</div></div>';
+}
+function relTime(ts){
+  const mins = Math.round((Date.now() - new Date(ts).getTime()) / 60000);
+  if(isNaN(mins)) return '';
+  if(mins < 1) return 'just now';
+  if(mins < 60) return mins+' min ago';
+  if(mins < 24*60) return Math.round(mins/60)+' h ago';
+  return timeAgo(ts);
+}
+function agentStatusLine(){
+  const a = S.boot.agent || { findings: [] };
+  return (a.lastRunAt ? 'Checked '+relTime(a.lastRunAt) : 'Not checked yet')+' · runs every 15 minutes';
+}
+function agentWidget(){
+  const a = S.boot.agent || { findings: [] };
+  const f = a.findings;
+  const head = '<div class="section-title">Compliance agent</div><div class="card">'
+    +'<div class="flexbetween" style="gap:8px;"><div class="site-card-sub">'+agentStatusLine()+'</div><button class="btn secondary small" data-action="agent-run">Check now</button></div>';
+  if(!f.length) return head + '<div class="reqrow"><div class="qa-icon" style="background:var(--green-bg);color:var(--green);">'+ICONS.check+'</div><div class="reqrow-main"><div class="reqrow-name">Nothing needs attention</div><div class="site-card-sub">The agent reviews every site for expiries, reviews, requests, incidents and permits.</div></div></div></div>';
+  return head + f.slice(0,4).map(findingRow).join('')
+    +(f.length>4 ? '<button class="btn secondary block" style="margin-top:8px;" data-action="goto-more" data-view="agent">See all '+f.length+'</button>' : '')
+    +'</div>';
+}
+function renderAgent(){
+  const f = (S.boot.agent || { findings: [] }).findings;
+  return '<div class="view-head"><h1>Compliance agent</h1><p>'+agentStatusLine()+'</p></div>'
+    +'<div class="card"><div class="site-card-sub">SiteGuard checks every site continuously, the way a careful SHE coordinator would, and lists what needs doing, most urgent first. Items clear themselves once they\'re dealt with.</div>'
+    +'<button class="btn secondary small" style="margin-top:8px;" data-action="agent-run">Check now</button></div>'
+    +(f.length ? '<div class="card">'+f.map(findingRow).join('')+'</div>' : '<div class="empty"><h3>All clear</h3><p>Nothing needs attention right now.</p></div>');
 }
 
 function assistantWidget(){
@@ -119,7 +156,7 @@ function renderDashboard(){
   const head = '<div class="view-head"><div class="flexbetween"><h1>'+greeting()+'</h1><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div>'
     +'<p class="greeting">'+(isContractor() ? org().name : org().name+' · '+(role()==='admin'?org().kindLabel:'portfolio overview'))+'</p></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
-  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
+  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
   const start = gettingStarted();
   if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
   return head + start + parts.join('');
@@ -575,6 +612,8 @@ function renderMore(){
   if(S.moreView) return '<div style="margin-bottom:14px;"><button class="btn secondary small" data-action="goto-more" data-view="">← More</button></div>' + (MORE_VIEWS[S.moreView] ? MORE_VIEWS[S.moreView]() : '');
   const item = (view, icon, title, sub) => '<button class="menu-row" data-action="goto-more" data-view="'+view+'"><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
   let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div><div class="card">';
+  const nf = (S.boot.agent||{findings:[]}).findings.length;
+  html += item('agent', ICONS.verify, 'Compliance agent', nf ? nf+' item'+(nf===1?'':'s')+' need attention' : 'Continuous checks across every site');
   html += '<button class="menu-row" data-action="open-assistant"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">SiteGuard Assistant</div><div class="qa-sub">Ask what a site or job needs, or how your sites are doing</div></div>'+ICONS.chevron+'</button>';
   if(isHost()) html += item('safety', ICONS.alert, 'Safety Centre', 'Open incidents and permits across every site');
   html += item('workforce', ICONS.hardhat, 'Workforce', isContractor()?'Your workers\' medicals, inductions and training':'Contractor workers assigned to your sites');
@@ -602,6 +641,7 @@ const MORE_VIEWS = {
   team: () => renderTeam(),
   billing: () => renderBilling(),
   settings: renderSettings,
+  agent: renderAgent,
 };
 
 /* ---- Safety Centre (cross-site incidents & permits) ---- */
@@ -973,4 +1013,25 @@ on('leave-demo', async ()=>{
   try{ await api.post('/api/auth/logout'); }catch{ /* ignore */ }
   S.authView = 'signup'; S.nav='dashboard'; S.activeSiteId=null; S.moreView=null;
   await reload();
+});
+
+on('agent-go', (el)=>{
+  const f = ((S.boot.agent||{}).findings||[])[Number(el.dataset.i)];
+  if(!f) return;
+  const a = f.action || {};
+  if(a.kind==='site' && a.siteId && S.state.sites[a.siteId]){
+    S.nav='sites'; S.activeSiteId=a.siteId; S.siteTab = a.tab==='safety' ? 'activity' : 'compliance';
+  } else if(a.kind==='workforce'){ S.nav='more'; S.moreView='workforce'; }
+  else if(a.kind==='library'){ S.nav='passport'; }
+  else if(a.kind==='safety'){ S.nav='more'; S.moreView='safety'; }
+  else { showToast('That item is no longer available'); return; }
+  render(); window.scrollTo(0,0);
+});
+on('agent-run', async (el)=>{
+  el.disabled = true; el.textContent = 'Checking…';
+  try{
+    const r = await api.post('/api/agent/run');
+    await reload();
+    showToast(r.findings.length ? r.findings.length+' item'+(r.findings.length===1?'':'s')+' need attention' : 'All clear');
+  }catch(e){ showToast(e.message); el.disabled = false; el.textContent = 'Check now'; }
 });

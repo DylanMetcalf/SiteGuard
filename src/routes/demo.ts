@@ -15,6 +15,7 @@ import { forbidden, notFound, unavailable } from '../lib/errors.js';
 import { requireUser, type OrgCtx } from '../lib/authz.js';
 import { createSession, destroySession } from '../lib/sessions.js';
 import { seedDemo } from '../demo/seed.js';
+import { runAgentForOrg } from '../lib/agent.js';
 import { storage } from '../lib/storage.js';
 
 export async function personasFor(db: Db, ctx: OrgCtx) {
@@ -36,7 +37,11 @@ export default async function demoRoutes(app: FastifyInstance) {
   app.post('/api/demo', { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req, reply) => {
     if (!features.demo) throw unavailable('Demo sandboxes are turned off on this server.');
     await withTx(async (db) => {
-      const { entryUserId } = await seedDemo(db);
+      const { entryUserId, group } = await seedDemo(db);
+      // Give the new sandbox its compliance agent findings straight away.
+      for (const org of await many<{ id: string; kind: string }>(db, 'select id, kind from organisations where demo_group = $1', [group])) {
+        await runAgentForOrg(db, org);
+      }
       const u = (await one<{ last_active_org_id: string }>(db, 'select last_active_org_id from users where id = $1', [entryUserId]))!;
       if (req.ctx) await destroySession(db, reply, req.ctx.sessionId);
       await createSession(db, reply, req, entryUserId, u.last_active_org_id);
