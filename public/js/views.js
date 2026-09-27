@@ -175,7 +175,10 @@ function renderDashboard(){
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
   const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
-  const start = gettingStarted();
+  let start = gettingStarted();
+  // A new contractor's first step is usually a code the site gave them: put it first.
+  if(ctx && !ctx.mySites.length && !ctx.invited.length && isOrgAdmin() && !readOnly())
+    start = '<button class="qa-item join-first" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Got a code from a site?</div><div class="qa-sub">Join the site with it — takes 10 seconds</div></div>'+ICONS.chevron+'</button>' + start;
   if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
   return head + start + parts.join('');
 }

@@ -50,6 +50,7 @@ function reportError(message, stack){
 window.addEventListener('error', (e)=>reportError(e.message, e.error && e.error.stack));
 window.addEventListener('unhandledrejection', (e)=>{ const r = e.reason || {}; if(r.name==='ApiError' || r.status!==undefined) return; reportError(r.message || String(r), r.stack); });
 
+let wasOutside = false;
 function render(){
   const b = S.boot;
   if(!b){ app.innerHTML = '<div class="empty"><p>Loading…</p></div>'; return; }
@@ -61,6 +62,7 @@ function render(){
   if(!b.authenticated || S.authView){
     app.innerHTML = renderAuth();
     stopLive();
+    wasOutside = true;
     return;
   }
   if(!b.org){ app.innerHTML = renderNoOrg(); stopLive(); return; }
@@ -71,9 +73,10 @@ function render(){
     return;
   }
   const y = window.scrollY;
+  const arriving = wasOutside; wasOutside = false; // just signed in or up: start at the top, not where the form was scrolled
   app.innerHTML = topbar() + '<main class="view">'+renderView()+'</main>' + bottomNav();
   syncHistory();
-  if(S.keepScroll) window.scrollTo(0, y);
+  if(arriving) window.scrollTo(0, 0); else if(S.keepScroll) window.scrollTo(0, y);
   startLive();
   maybeShowTutorial();
 }

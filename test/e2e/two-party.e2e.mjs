@@ -109,7 +109,7 @@ log('host saw the acceptance live (no refresh)');
 await act(contractor, '[data-action="open-req"]');
 await contractor.setInputFiles('#fileInput', PDF);
 await contractor.waitForSelector('#submitReqBtn:not([disabled])', { timeout: 8000 });
-await contractor.fill('#expiryInput', '2099-06-30');
+await contractor.fill('#expiryInput', '2040-06-30');
 await act(contractor, '[data-action="submit-req"]');
 log('contractor uploaded and submitted');
 

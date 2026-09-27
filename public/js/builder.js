@@ -98,22 +98,31 @@ function stepRun(b){
       +'<button class="btn secondary block" style="margin-top:8px;" data-action="builder-close">Close</button>' : '');
 }
 
-function show(){
+/** Redraws the builder if it is on screen; `open` brings it back after the user closed it. */
+function show(open){
   const b = S.builder; if(!b) return;
-  const html = b.step===1 ? stepPick(b) : b.step===2 ? stepQuestions(b) : stepRun(b);
   const sheet = sheetEl();
-  if(sheet && sheet.dataset.builder==='1'){ sheet.innerHTML = html; }
+  const onScreen = sheet && sheet.dataset.builder==='1';
+  if(!onScreen && !open) return; // closed while writing: keep working quietly, the toast says when it's done
+  const html = b.step===1 ? stepPick(b) : b.step===2 ? stepQuestions(b) : stepRun(b);
+  if(onScreen){ sheet.innerHTML = html; }
   else { openSheet(html); const s = sheetEl(); if(s) s.dataset.builder = '1'; }
 }
 
+// Keep answers as they are typed, so closing the sheet by accident loses nothing.
+document.addEventListener('input', (e)=>{
+  const t = e.target, b = S.builder;
+  if(b && t && t.id && t.id.startsWith('bf_') && t.id!=='bf_research') b.values[t.id.slice(3)] = t.value;
+});
+
 on('builder-open', async (el)=>{
   const siteId = el.dataset.site;
-  if(S.builder && S.builder.siteId===siteId && S.builder.step===3){ show(); return; }
+  if(S.builder && S.builder.siteId===siteId && S.builder.step>1){ show(true); return; }
   let catalog;
   try{ catalog = await loadCatalogPublic(); }catch(e){ showToast(e.message); return; }
   const me = S.boot.me;
   S.builder = { siteId, step:1, catalog, items:[], values: { ceo: '', appointedBy: unescapeHtml(me.name)+(me.title?', '+unescapeHtml(me.title):''), supervisor: '', presenter: unescapeHtml(me.name) }, running:false };
-  show();
+  show(true);
 });
 on('builder-next', ()=>{
   const b = S.builder;
