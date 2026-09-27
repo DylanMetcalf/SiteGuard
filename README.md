@@ -43,6 +43,13 @@ It keeps a prioritised list of what needs attention (expired or expiring documen
 waiting, stale invitations, sites ready to approve, overdue requests, serious incidents, permits
 past expiry, lapsed worker medicals) on the dashboard, and items clear themselves once dealt with.
 
+Ask the assistant **"What needs my attention today?"** and it answers from the agent's findings.
+Owners and admins also get a **Monday summary email** (switchable in Organisation settings).
+
+**Built for low-maintenance running:** in-app *Report a problem* (stored, and emailed to
+`SUPPORT_EMAIL`), browser errors reported to the server log automatically, a health check, a
+30-minute uptime check, CI on every change, and weekly Dependabot update pull requests.
+
 Product gaps from the last audit, also built:
 
 - **Safety Centre**: open incidents and permits across every site (More → Safety Centre).

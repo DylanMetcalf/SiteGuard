@@ -1046,3 +1046,16 @@ on('dash-move', (el)=>{
 on('dash-save', async (el)=>{ if(await act(()=>api.put('/api/me/dashboard', dashDraft), 'Dashboard saved', el)) closeSheet(); });
 on('dash-reset', async (el)=>{ if(await act(()=>api.put('/api/me/dashboard', { order:[], hidden:[] }), 'Dashboard reset', el)) closeSheet(); });
 
+
+/* ============ FEEDBACK ============ */
+on('open-feedback', ()=>openSheet(sheetHead('Report a problem or suggest an idea')
+  +'<label class="field-label" for="fbKind">Type</label><select id="fbKind" class="field"><option value="problem">Something isn\'t working</option><option value="idea">An idea or request</option></select>'
+  +'<label class="field-label" for="fbMessage">What happened, or what would help?</label><textarea id="fbMessage" rows="5" placeholder="e.g. When I upload a photo of a certificate from my phone, the expiry date doesn\'t fill in."></textarea>'
+  +'<div class="site-card-sub" style="margin-top:4px;">We include which screen you were on and your browser type, nothing else.</div>'
+  +'<button class="btn orange block" style="margin-top:12px;" data-action="send-feedback">Send</button>'));
+on('send-feedback', async (el)=>{
+  const message = val('fbMessage');
+  if(message.length < 3){ document.getElementById('fbMessage').focus(); return; }
+  const view = [S.nav, S.moreView, S.siteTab].filter(Boolean).join('/');
+  if(await act(()=>api.post('/api/feedback', { kind: val('fbKind'), message, context: { view, userAgent: navigator.userAgent.slice(0,400) } }), 'Thanks — sent to the SiteGuard team', el)) closeSheet();
+});

@@ -9,7 +9,7 @@ import { deliverPendingEmail } from '../lib/email.js';
 import { cleanupExpired, runReminders } from './reminders.js';
 import { purgeOldDemos } from '../routes/demo.js';
 import { pool } from '../db/pool.js';
-import { runAgent } from '../lib/agent.js';
+import { runAgent, sendWeeklySummaries } from '../lib/agent.js';
 
 export function startJobs(log: (msg: string) => void = console.log): () => void {
   let stopped = false;
@@ -31,6 +31,7 @@ export function startJobs(log: (msg: string) => void = console.log): () => void 
     try {
       const sent = await runReminders();
       if (sent) log(`reminders: queued ${sent} digest email(s)`);
+      await sendWeeklySummaries();
       await cleanupExpired();
       const purged = await purgeOldDemos();
       if (purged) log(`demo: purged ${purged} old sandbox(es)`);

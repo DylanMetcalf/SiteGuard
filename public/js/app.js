@@ -9,6 +9,16 @@ import './assistant.js';
 
 const app = document.getElementById('app');
 
+// Send unexpected browser errors to the server log (a few per page load), so bugs surface without a user report.
+let reported = 0;
+function reportError(message, stack){
+  if(reported++ >= 5 || !message) return;
+  const view = [S.nav, S.moreView, S.siteTab].filter(Boolean).join('/');
+  api.post('/api/client-errors', { message: String(message).slice(0,2000), stack: stack ? String(stack).slice(0,4000) : undefined, url: location.pathname, view }).catch(()=>{});
+}
+window.addEventListener('error', (e)=>reportError(e.message, e.error && e.error.stack));
+window.addEventListener('unhandledrejection', (e)=>{ const r = e.reason || {}; if(r.name==='ApiError' || r.status!==undefined) return; reportError(r.message || String(r), r.stack); });
+
 function render(){
   const b = S.boot;
   if(!b){ app.innerHTML = '<div class="empty"><p>Loading…</p></div>'; return; }

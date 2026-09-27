@@ -46,6 +46,9 @@ services:
       # e.g. SiteGuard <no-reply@siteguard.co.za> (the domain must be verified with your email provider)
       - key: EMAIL_FROM
         sync: false
+      # Your own address: "Report a problem" messages from users are emailed here.
+      - key: SUPPORT_EMAIL
+        sync: false
       # Claude API key from console.anthropic.com. Blank = built-in templates and rules.
       - key: ANTHROPIC_API_KEY
         sync: false

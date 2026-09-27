@@ -627,6 +627,7 @@ function renderMore(){
   if(isOrgAdmin()) html += item('settings', ICONS.gear, 'Organisation settings', 'Company details, notifications, integrations');
   html += '</div><div class="section-title">Account</div><div class="card">'
     +'<button class="menu-row" data-action="open-profile"><div class="qa-icon">'+initials(myName())+'</div><div style="flex:1;"><div class="qa-title">'+myName()+'</div><div class="qa-sub">'+S.boot.me.email+'</div></div>'+ICONS.chevron+'</button>'
+    +'<button class="menu-row" data-action="open-feedback"><div class="qa-icon">'+ICONS.alert+'</div><div style="flex:1;"><div class="qa-title">Report a problem or suggest an idea</div><div class="qa-sub">Goes straight to the SiteGuard team</div></div>'+ICONS.chevron+'</button>'
     +'<button class="menu-row" data-action="auth-signout"><div class="qa-icon">⎋</div><div><div class="qa-title">Sign out</div></div></button></div>';
   return html;
 }
@@ -844,6 +845,7 @@ function renderSettings(){
     +(ro?'':'<button class="btn orange block" style="margin-top:12px;" data-action="save-org">Save company details</button>')+'</div>';
   html += '<div class="section-title">Notifications</div><div class="card">'
     +'<div class="toggle-row"><label for="digestToggle">Email reminder digests (expiring documents &amp; certificates, open incidents, overdue requests)</label><input type="checkbox" id="digestToggle" '+(s.reminderDigest===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-digest"')+'></div>'
+    +'<div class="toggle-row"><label for="weeklyToggle">Monday compliance summary for admins (from the compliance agent)</label><input type="checkbox" id="weeklyToggle" '+(s.weeklySummary===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-weekly"')+'></div>'
     +'<div class="site-card-sub" style="margin-top:6px;">Invitations, correction requests, requests for information, permit requests and serious incidents are always emailed.</div></div>';
   if(isHost()){
     html += '<div class="section-title">InspectX integration</div><div class="card"><div class="site-card-sub" style="margin-bottom:10px;">SiteGuard works fully without InspectX. Once enabled, inspections with an external reference link straight across.</div>'
@@ -1007,6 +1009,7 @@ on('save-org', (el)=>{
   return act(()=>api.patch('/api/org', body), 'Company details saved', el);
 });
 on('toggle-digest', (el)=>act(()=>api.patch('/api/org/settings', { reminderDigest: el.checked }), el.checked?'Reminder digests on':'Reminder digests off'));
+on('toggle-weekly', (el)=>act(()=>api.patch('/api/org/settings', { weeklySummary: el.checked }), el.checked?'Weekly summary on':'Weekly summary off'));
 on('save-integration', (el)=>act(()=>api.patch('/api/org/settings', { inspectxEnabled: document.getElementById('inspectxToggle').checked, inspectxBaseUrl: document.getElementById('inspectxUrl').value.trim() }), 'Settings saved', el));
 on('resend-verification', (el)=>act(()=>api.post('/api/auth/resend-verification'), 'Confirmation email sent', el));
 on('leave-demo', async ()=>{

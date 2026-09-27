@@ -213,6 +213,7 @@ export default async function orgRoutes(app: FastifyInstance) {
         inspectxEnabled: z.boolean().optional(),
         inspectxBaseUrl: z.string().trim().max(300).refine((v) => v === '' || /^https:\/\//.test(v), 'must start with https://').optional(),
         reminderDigest: z.boolean().optional(),
+        weeklySummary: z.boolean().optional(),
       })
       .parse(req.body);
     await withTx(async (db) => {

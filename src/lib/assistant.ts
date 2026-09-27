@@ -14,6 +14,7 @@ import { computeReadiness, effectiveStatus } from './readiness.js';
 import { TEMPLATE_PACKS, itemsFromPacks, type TemplateItem } from './templates.js';
 import { hazardsFor, recommendPacks } from './knowledge.js';
 import { DRAFT_TYPES, anthropic, FALLBACK, recordTokens } from './ai.js';
+import { openFindings } from './agent.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -172,6 +173,11 @@ function tools(ctx: OrgCtx): Anthropic.Beta.BetaToolUnion[] {
       input_schema: { type: 'object', properties: {} },
     },
     {
+      name: 'get_attention_items',
+      description: "The compliance agent's current findings for this organisation, most urgent first: expired or expiring documents, reviews waiting, overdue requests, serious incidents, permits past expiry, lapsed worker certificates. Use for 'what needs my attention' or 'what should I do today'.",
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
       name: 'list_my_sites',
       description: "Lists the sites this organisation can see, with readiness percentage and counts of missing, awaiting-review, correction-required, expired and expiring documents, open incidents and live permits.",
       input_schema: { type: 'object', properties: {} },
@@ -236,7 +242,7 @@ You are talking to ${ctx.user.name} (${roleLabel(ctx.org.kind, ctx.role)}) at ${
 
 What you help with:
 - Working out what a contractor safety file needs for a particular site or scope of work.
-- Reporting on the user's own sites and what is outstanding.
+- Reporting on the user's own sites and what is outstanding. For "what needs my attention" or "what should I do today", call get_attention_items and turn the findings into a short, prioritised to-do list.
 - Suggesting documents to draft.
 
 When someone asks what a site or job needs:
@@ -271,6 +277,16 @@ async function runTool(ctx: OrgCtx, block: Anthropic.Beta.BetaToolUseBlock, st: 
     switch (block.name) {
       case 'list_starter_packs':
         return ok(TEMPLATE_PACKS.map((p) => ({ id: p.id, name: p.name, description: p.description, items: p.items.map((i) => `${i.category}: ${i.name}`) })));
+      case 'get_attention_items': {
+        const { lastRunAt, findings } = await openFindings(ctx.org.id);
+        for (const f of findings.slice(0, 3)) {
+          if (f.siteId && !st.cards.some((c) => c.type === 'open_site' && c.siteId === f.siteId)) {
+            const name = (await many<{ name: string }>(pool, 'select name from sites where id = $1', [f.siteId]))[0]?.name;
+            if (name) st.cards.push({ type: 'open_site', siteId: f.siteId, name });
+          }
+        }
+        return ok({ lastCheckedAt: lastRunAt, findings: findings.map(({ severity, title, detail }) => ({ severity, title, detail })) });
+      }
       case 'list_my_sites': {
         const sites = await mySites(ctx);
         return ok(sites.length ? sites : 'This organisation has no sites yet.');
@@ -423,6 +439,7 @@ function help(ctx: OrgCtx): string {
     "I'm the SiteGuard Assistant. Try asking:",
     `- "What do I need for a safety file for electrical work at Shaft 3?"`,
     `- "Which of my sites are behind?"`,
+    `- "What needs my attention today?"`,
     `- "Draft a method statement for welding on the thickener"`,
     canCreateSites(ctx) ? "When you describe a site or job, I'll list the requirements and offer to start the site for you." : "When you describe a site or job, I'll list the documents to prepare.",
   ].join('\n');
@@ -443,6 +460,19 @@ export async function runAssistantOffline(ctx: OrgCtx, history: ChatMessage[]): 
     const brief = text.replace(/^(please\s+)?(can you\s+|could you\s+)?(draft|write|create|generate|make)\s+(me\s+)?(an?\s+)?[\w\s/-]*?\b(for|on|about|covering)\s+/i, '').trim() || text;
     cards.push({ type: 'draft', docType: draftHint[1], brief: brief.charAt(0).toUpperCase() + brief.slice(1) });
     return reply(`I can draft a ${draftHint[1].toLowerCase()} from that description. Tap below to generate it, then review and edit before use.`);
+  }
+
+  if (/\b(attention|priorit\w*|today|to-?do|urgent|focus|what should i|where do i start|agent)\b/i.test(text) && !profiles.length) {
+    const { findings } = await openFindings(ctx.org.id);
+    if (!findings.length) return reply("Nothing needs attention right now. The compliance agent checks every site every 15 minutes and will list anything that comes up on your dashboard.");
+    const icon = { high: '**High**', medium: 'Medium', low: 'Low' } as const;
+    const lines = findings.slice(0, 8).map((f) => `- ${icon[f.severity]}: ${f.title}. ${f.detail}`);
+    const siteIds = [...new Set(findings.map((f) => f.siteId).filter((x): x is string => !!x))].slice(0, 3);
+    for (const id of siteIds) {
+      const name = (await many<{ name: string }>(pool, 'select name from sites where id = $1', [id]))[0]?.name;
+      if (name) cards.push({ type: 'open_site', siteId: id, name });
+    }
+    return reply(`Here's what needs attention, most urgent first:\n${lines.join('\n')}${findings.length > 8 ? `\n\n…and ${findings.length - 8} more under More → Compliance agent.` : ''}`);
   }
 
   const wantsStatus = /\b(status|ready|readiness|behind|outstanding|overview|my sites|progress|missing|expir\w*|what'?s (left|due))\b/i.test(text);

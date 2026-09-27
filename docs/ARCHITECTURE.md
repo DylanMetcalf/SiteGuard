@@ -157,7 +157,13 @@ server returns a reply plus *cards* (start a site, checklist, draft, open a site
 organisation with plain SQL rules and upserts them into `agent_findings` keyed by
 `(org_id, key)`. Findings not seen on a run are marked resolved, and a run that changes anything
 sends a live-update event. Findings are delivered in `/api/bootstrap` and are only ever
-selected by the viewer's own `org_id`.
+selected by the viewer's own `org_id`. The assistant reads them (`get_attention_items`), and the
+hourly job emails owners and admins a Monday summary (`weeklySummary` org setting, deduplicated per
+ISO week).
+
+**Support signals.** `POST /api/feedback` stores in-app problem reports (`feedback` table) and emails
+`SUPPORT_EMAIL`; `POST /api/client-errors` writes browser errors to the server log without storing
+them.
 
 ## Known limits and next steps
 
@@ -179,7 +185,7 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 55 integration tests against real Postgres, covering the assistant's offline mode and
+- `npm test`: 59 integration tests against real Postgres, covering the assistant's offline mode and
   scoping, template drafting, the compliance agent's findings and tenant isolation, requirement starter packs, tenant isolation (cross-tenant
   reads and writes all 404), the role matrix, CSRF, draft-file privacy, share-link scope, expiry
   and revocation, audit scoping and immutability, the Site Ready gates, permit/defect/request

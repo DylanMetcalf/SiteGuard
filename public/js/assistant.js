@@ -10,12 +10,12 @@ const chat = () => (S.chat ??= { items: [], busy: false });
 
 const EXAMPLES_HOST = [
   'What does a contractor need for electrical work on a conveyor at a coal mine?',
-  'Which of my sites are behind?',
+  'What needs my attention today?',
   'Safety file requirements for scaffolding and welding on a plant shutdown',
 ];
 const EXAMPLES_CONTRACTOR = [
   'What documents do I need for welding inside a tank at a gold mine?',
-  'Which of my sites are behind?',
+  'What needs my attention today?',
   'Draft a method statement for replacing conveyor idlers',
 ];
 

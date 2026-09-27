@@ -1,0 +1,17 @@
+# Keeps libraries up to date: once a week GitHub opens a pull request with the
+# updates, CI runs the full test suite on it, and you merge it if it's green.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

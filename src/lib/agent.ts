@@ -12,6 +12,7 @@ import type { Db } from '../db/pool.js';
 import { many, pool, withTx } from '../db/pool.js';
 import { computeReadiness } from './readiness.js';
 import { publishChange } from './realtime.js';
+import { appUrl, queueToOrg } from './email.js';
 
 export type Severity = 'high' | 'medium' | 'low';
 export interface FindingAction {
@@ -282,4 +283,53 @@ export async function openFindings(orgId: string): Promise<{ lastRunAt: string |
     .map((r) => ({ id: r.id, siteId: r.site_id, severity: r.severity, title: r.title, detail: r.detail, action: r.action, since: r.first_seen.toISOString() }))
     .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || a.since.localeCompare(b.since));
   return { lastRunAt: run[0]?.last_run_at.toISOString() ?? null, findings };
+}
+
+/** ISO week label, e.g. 2026-W40, used to send the weekly summary once. */
+function isoWeek(d: Date): string {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const year = t.getUTCFullYear();
+  const week = Math.ceil(((t.getTime() - Date.UTC(year, 0, 1)) / 86400000 + 1) / 7);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+/**
+ * Monday-morning compliance summary to each organisation's owners and admins,
+ * from the agent's open findings. Safe to call hourly: each person gets it once
+ * a week, from 06:00 South African time on Monday.
+ */
+export async function sendWeeklySummaries(now = new Date()): Promise<number> {
+  const sast = new Date(now.getTime() + 2 * 3600_000);
+  if (sast.getUTCDay() !== 1 || sast.getUTCHours() < 6) return 0;
+  const week = isoWeek(sast);
+  const orgs = await many<{ id: string; name: string }>(
+    pool,
+    `select id, name from organisations where not is_demo and coalesce((settings->>'weeklySummary')::boolean, true)`,
+  );
+  let sent = 0;
+  for (const org of orgs) {
+    const { findings } = await openFindings(org.id);
+    const high = findings.filter((f) => f.severity === 'high').length;
+    const lines = findings.length
+      ? [
+          `The SiteGuard compliance agent has ${plural(findings.length, 'item')} open for ${org.name}${high ? `, ${high} of them high priority` : ''}:`,
+          ...findings.slice(0, 10).map((f) => `• [${f.severity}] ${f.title}`),
+          ...(findings.length > 10 ? [`…and ${findings.length - 10} more in SiteGuard.`] : []),
+        ]
+      : [`Nothing needs attention at ${org.name} this week. The compliance agent will keep checking every 15 minutes.`];
+    await withTx(async (db) => {
+      await queueToOrg(db, org.id, ['owner', 'admin'], (to) => ({
+        to: to.email,
+        subject: findings.length ? `SiteGuard weekly summary: ${plural(findings.length, 'item')} to action` : 'SiteGuard weekly summary: all clear',
+        lines: [`Hi ${to.name},`, ...lines],
+        action: { label: 'Open SiteGuard', url: appUrl('/') },
+        dedupeKey: `weekly:${org.id}:${to.email}:${week}`,
+        footer: 'Admins can turn this summary off under More → Organisation settings → Notifications.',
+      }));
+    });
+    sent++;
+  }
+  return sent;
 }

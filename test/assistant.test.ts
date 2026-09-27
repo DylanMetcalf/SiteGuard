@@ -95,3 +95,33 @@ describe('template drafting (no AI key)', () => {
     assert.equal((await contractor.post('/api/ai/draft', { type: 'Poem', brief: 'x' })).status, 400);
   });
 });
+
+describe('assistant and compliance agent together', () => {
+  it('answers "what needs my attention" from the agent\'s findings', async () => {
+    await host.post('/api/sites', { name: 'Empty Site', newContractor: { name: 'Sparky', email: uniqueEmail('sparky2') } });
+    await host.post('/api/agent/run');
+    const r = await ask(host, 'What needs my attention today?');
+    assert.match(r.body.reply, /Empty Site has no required documents/);
+    assert.equal(r.status, 200);
+    assert.match(r.body.reply, /most urgent first/);
+    assert.ok(r.body.cards.some((c: any) => c.type === 'open_site'));
+    const other = await ask(otherHost, 'What needs my attention today?');
+    assert.match(other.body.reply, /Nothing needs attention/);
+  });
+});
+
+describe('support', () => {
+  it('stores problem reports from signed-in users only', async () => {
+    const r = await host.post('/api/feedback', { kind: 'problem', message: 'Upload button does nothing', context: { view: 'sites/compliance' } });
+    assert.equal(r.status, 200);
+    const { pool } = await import('./helpers.js');
+    const row = (await pool.query(`select kind, message, context from feedback order by created_at desc limit 1`)).rows[0];
+    assert.equal(row.message, 'Upload button does nothing');
+    assert.equal(row.context.view, 'sites/compliance');
+    assert.equal((await new Agent(app).post('/api/feedback', { message: 'hello there' })).status, 401);
+  });
+
+  it('accepts browser error reports', async () => {
+    assert.equal((await new Agent(app).post('/api/client-errors', { message: 'TypeError: x is undefined', url: '/' })).status, 200);
+  });
+});

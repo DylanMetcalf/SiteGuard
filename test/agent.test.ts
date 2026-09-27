@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { FastifyInstance } from 'fastify';
 import { Agent, lastEmailToken, PDF, pool, setup, signup, teardown, uniqueEmail } from './helpers.js';
-import { runAgent } from '../src/lib/agent.js';
+import { runAgent, sendWeeklySummaries } from '../src/lib/agent.js';
 
 let app: FastifyInstance;
 let host: Agent;
@@ -84,5 +84,21 @@ describe('compliance agent', () => {
     assert.ok(n >= 3);
     const r = await pool.query(`select count(*)::int as n from agent_findings where resolved_at is null`);
     assert.ok(r.rows[0].n > 0);
+  });
+
+  it('emails owners a Monday summary once a week, and respects the setting', async () => {
+    const tuesday = new Date('2026-09-29T08:00:00Z');
+    assert.equal(await sendWeeklySummaries(tuesday), 0);
+    const monday = new Date('2026-09-28T06:30:00Z'); // 08:30 in South Africa
+    assert.ok((await sendWeeklySummaries(monday)) >= 3);
+    await sendWeeklySummaries(monday); // a second run in the same week sends nothing new
+    const mails = await pool.query(`select subject from email_outbox where dedupe_key like 'weekly:%'`);
+    const zeta = mails.rows.filter((m: { subject: string }) => /to action/.test(m.subject));
+    assert.ok(zeta.length >= 1);
+    const before = mails.rowCount;
+    await bystander.req('PATCH', '/api/org/settings', { weeklySummary: false });
+    await sendWeeklySummaries(new Date('2026-10-05T06:30:00Z'));
+    const after = await pool.query(`select count(*)::int as n from email_outbox where dedupe_key like 'weekly:%'`);
+    assert.equal(after.rows[0].n, (before ?? 0) + 2); // next week: Zeta and Bolt, not the opted-out bystander
   });
 });

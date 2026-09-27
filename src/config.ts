@@ -37,6 +37,8 @@ const schema = z.object({
   // Unset → emails are written to the log (and still recorded in the outbox).
   SMTP_URL: z.string().optional(),
   EMAIL_FROM: z.string().default('SiteGuard <no-reply@siteguard.local>'),
+  /** Where "Report a problem" messages are emailed (e.g. your own address). Unset → logged only. */
+  SUPPORT_EMAIL: z.string().email().optional(),
 
   // AI drafting via server-side proxy. Unset → AI features are hidden.
   ANTHROPIC_API_KEY: z.string().optional(),

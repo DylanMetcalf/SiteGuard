@@ -84,6 +84,7 @@ the next plan is about $20/month for 50,000.
 6. In Render: **siteguard → Environment**, set:
    - `SMTP_URL` = `smtps://resend:re_YOUR_KEY_HERE@smtp.resend.com:465`
    - `EMAIL_FROM` = `SiteGuard <no-reply@yourdomain.co.za>`
+   - `SUPPORT_EMAIL` = your own address. When a user taps **More → Report a problem**, it lands here.
 7. Test: create a real account on your site. The confirmation email should arrive within a minute.
    (Check spam the first time and mark it "not spam".)
 
@@ -195,8 +196,12 @@ covers.
   checks the site every 30 minutes and emails you if it's down.
 - **Logs.** Render → **siteguard → Logs** shows what the app is doing, including any emails
   written to the log while email isn't set up.
-- **Compliance agent.** Runs inside the app every 15 minutes on every customer's sites. Nothing to
-  set up.
+- **Compliance agent.** Runs inside the app every 15 minutes on every customer's sites, and emails
+  each customer's admins a summary on Monday mornings. Nothing to set up.
+- **Problems users hit.** *Report a problem* messages arrive at `SUPPORT_EMAIL`. Errors in users'
+  browsers are written to Render's log automatically (search the log for `browser error`).
+- **Library updates.** Every Monday GitHub (Dependabot) opens a pull request updating the app's
+  libraries. The automatic tests run on it; if they're green, merge it and Render redeploys.
 - **Backups.** Render backs up the paid database and snapshots the disk daily. Once a month, try a
   restore of the database into a new one to prove it works.
 
@@ -221,6 +226,19 @@ mine and three contractors, deleted automatically after three days.
 6. **Close (2 min).** "Contractors use it free. You pay per user after a 14-day trial. Can we set up
    your first site together now?" Create a real account on the spot and use **Ask SiteGuard** to
    start their first site.
+
+## Updates and maintenance
+
+- **Nobody reinstalls anything.** SiteGuard is a website. When a change is merged on GitHub, Render
+  rebuilds and redeploys it automatically (a minute or two of downtime at most), and every user
+  gets the new version the next time the page loads. Database changes (migrations) apply
+  themselves on start-up.
+- **Making a change or fixing a bug:** describe it to Claude Code (for example in a session on this
+  repository). It makes the change, runs the tests, and opens a pull request. You check the
+  summary, and merging it deploys it.
+- **Safety net:** CI runs the tests on every pull request, so a change that breaks something is
+  flagged before you merge it. Render marks a deploy as failed if the app doesn't pass its health
+  check, and **siteguard → Events → Rollback** returns to the previous version with one click.
 
 ## When something goes wrong
 
