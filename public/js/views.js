@@ -12,6 +12,7 @@ import {
 import { computeTasks } from './sheets.js';
 import { renderStudio } from './studio.js';
 import { renderReview } from './review.js';
+import { builderCard } from './builder.js';
 
 /* ============ SHELL ============ */
 export function topbar(){
@@ -396,6 +397,7 @@ function renderSiteDetail(siteId){
     else if(submission==='ready_to_approve' && safetyBlocksApproval) html += '<div class="notice" style="background:var(--red-bg);color:var(--red);">All requirements complete, but this site can\'t be marked Ready while a lost time injury or fatality investigation is still open.</div>';
     else if(submission==='ready_to_approve' && !canReview()) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">All requirements complete — waiting on final site approval.</div>';
     if(canApprove) html += '<button class="btn primary block" data-action="approve-site" data-site="'+siteId+'" style="margin-bottom:14px;">Approve — Mark Site Ready</button>';
+    if(isContractor() && !readOnly()) html += builderCard(siteId);
   }
 
   const grouped = {};

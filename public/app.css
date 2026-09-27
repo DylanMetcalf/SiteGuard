@@ -554,3 +554,22 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 /* ===== Join codes ===== */
 .join-code{font-family:var(--font-mono); font-size:34px; font-weight:600; letter-spacing:.12em; text-align:center; padding:22px 10px; margin:6px 0 12px; border-radius:18px; background:var(--brand-bg); color:var(--brand);}
 .join-input{font-family:var(--font-mono); font-size:22px !important; letter-spacing:.14em; text-transform:uppercase; text-align:center;}
+
+/* ===== Safety File Builder ===== */
+.builder-card{background:linear-gradient(135deg, var(--sage-bg), var(--paper-raised) 75%); border-color:var(--sage-soft);}
+.builder-steps{display:flex; gap:6px; margin:4px 0 12px; flex-wrap:wrap;}
+.builder-steps span{font-size:12px; font-weight:600; padding:5px 10px; border-radius:999px; background:var(--paper-deep); color:var(--grey);}
+.builder-steps span.on{background:var(--brand); color:var(--on-brand);}
+.builder-steps span.done{background:var(--green-bg); color:var(--green);}
+.builder-manual{margin-top:10px; font-size:13.5px;}
+.builder-manual summary{cursor:pointer; font-weight:600; color:var(--ink-soft);}
+.builder-manual ul{margin:6px 0 0 18px;}
+.bld-progress{height:8px; border-radius:999px; background:var(--paper-deep); overflow:hidden; margin:4px 0 10px;}
+.bld-progress i{display:block; height:100%; background:var(--sage); border-radius:999px; transition:width .3s ease;}
+.bld-state{width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:none; background:var(--paper-deep); color:var(--grey);}
+.bld-state.done{background:var(--green-bg); color:var(--green);}
+.bld-state.failed{background:var(--red-bg); color:var(--red);}
+.bld-state svg{width:16px; height:16px;}
+.bld-dot{width:8px; height:8px; border-radius:50%; background:var(--grey-line);}
+.bld-spin{width:16px; height:16px; border-radius:50%; border:2.5px solid var(--sage-soft); border-top-color:var(--sage-strong); animation:bldspin .8s linear infinite;}
+@keyframes bldspin{to{transform:rotate(360deg);}}

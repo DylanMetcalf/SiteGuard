@@ -198,3 +198,6 @@ on('studio-add', async (el)=>{
 on('studio-add-go', (el)=>{ const slot = val('studioSlot'); if(slot && S.studioLast) attachAndSubmit(slot, S.studioLast.id, el); });
 
 export { reload };
+
+/** The document catalogue, for other modules (e.g. the Safety File Builder). */
+export const loadCatalogPublic = () => loadCatalog();

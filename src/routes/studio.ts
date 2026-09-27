@@ -55,7 +55,7 @@ export default async function studioRoutes(app: FastifyInstance) {
   });
 
   /** Creates a document, or a new revision with `reviseOf`. May take up to a minute with AI. */
-  app.post('/api/studio/documents', rl(10), async (req) => {
+  app.post('/api/studio/documents', rl(30), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
     const body = z

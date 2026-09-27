@@ -9,6 +9,7 @@ import './assistant.js';
 import './studio.js';
 import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
 import './inbox.js';
+import './builder.js';
 
 const app = document.getElementById('app');
 
