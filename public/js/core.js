@@ -194,7 +194,7 @@ export function statusLabelForSubmission(s){
 }
 export function gaugeColor(pct){
   if(pct>=90) return 'var(--green)';
-  if(pct>=60) return 'var(--orange)';
+  if(pct>=60) return 'var(--brand)';
   return 'var(--red)';
 }
 export function gauge(pct, size){

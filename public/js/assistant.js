@@ -46,7 +46,7 @@ function renderCard(card, mi, ci, packs){
       +'<div class="qa-title">'+(card.name ? escapeHtml(card.name) : 'New site')+(card.location ? ' <span class="site-card-sub">· '+escapeHtml(card.location)+'</span>' : '')+'</div>'
       +'<div class="site-card-sub">Packs: '+card.packIds.map(id=>packName(packs, id)).join(', ')+(n ? ' + '+n+' site-specific item'+(n===1?'':'s') : '')+'</div>'
       +(card.rationale ? '<div class="site-card-sub" style="margin-top:4px;">'+escapeHtml(card.rationale)+'</div>' : '')
-      +'<div class="chat-card-actions">'+btn('chat-card-site', 'Review and create', 'orange')+'</div></div>';
+      +'<div class="chat-card-actions">'+btn('chat-card-site', 'Review and create', 'primary')+'</div></div>';
   }
   if(card.type === 'checklist'){
     const byCat = {};
@@ -57,7 +57,7 @@ function renderCard(card, mi, ci, packs){
   }
   if(card.type === 'draft'){
     return '<div class="chat-card"><div class="chat-card-title">'+ICONS.sparkle+' '+escapeHtml(card.docType)+'</div>'
-      +'<div class="chat-card-actions">'+btn('chat-card-draft', 'Draft it now', 'orange')+'</div></div>';
+      +'<div class="chat-card-actions">'+btn('chat-card-draft', 'Draft it now', 'primary')+'</div></div>';
   }
   if(card.type === 'open_site'){
     return '<div class="chat-card chat-card-inline">'+btn('chat-card-open', ICONS.sites+' Open '+escapeHtml(card.name))+'</div>';
@@ -108,7 +108,7 @@ export function openAssistant(question){
     +'<button class="sheet-close" data-action="close-sheet" aria-label="Close">'+ICONS.cross+'</button></div></div>'
     +'<div id="chatLog" class="chat-log"></div>'
     +'<form class="chat-form" id="chatForm"><textarea id="chatInput" rows="2" maxlength="4000" placeholder="e.g. What does the safety file need for welding at Shaft 3?" aria-label="Message"></textarea>'
-    +'<button class="btn orange" id="chatSend" type="submit">Send</button></form>');
+    +'<button class="btn primary" id="chatSend" type="submit">Send</button></form>');
   const sheet = sheetEl();
   if(sheet) sheet.classList.add('chat-sheet');
   const form = document.getElementById('chatForm');

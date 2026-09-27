@@ -126,7 +126,7 @@ function showTutorialStep(){
   overlay.className='overlay tutorial';
   overlay.innerHTML = '<div class="sheet tut-card" role="dialog" aria-modal="true"><div class="tut-icon">'+ICONS.sparkle+'</div><h2>'+step.title+'</h2><p>'+step.text+'</p>'
     +'<div class="tut-dots">'+TUTORIAL_STEPS.map((s,i)=>'<span class="'+(i===tutorialStep?'active':'')+'"></span>').join('')+'</div>'
-    +'<button class="btn orange block" id="tutNext">'+(isLast?'Get started':'Next')+'</button>'
+    +'<button class="btn primary block" id="tutNext">'+(isLast?'Get started':'Next')+'</button>'
     +(isLast?'':'<button class="btn secondary block" style="margin-top:8px;" id="tutSkip">Skip</button>')+'</div>';
   document.body.appendChild(overlay);
   overlay.querySelector('#tutNext').onclick = ()=>{ if(isLast) finishTutorial(); else { tutorialStep++; showTutorialStep(); } };

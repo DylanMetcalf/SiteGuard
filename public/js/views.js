@@ -19,7 +19,7 @@ export function topbar(){
     +'<div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard'+(isDemoMode()?' <span class="demo-tag">DEMO</span>':'')+'</div>'
     +'<div class="brand-tag"><span class="live-dot'+(S.live?'':' off')+'" title="'+(S.live?'Live — changes from colleagues appear automatically':'Reconnecting…')+'"></span>'+org().name+'</div></div></div>'
     +'<div class="identity">'
-    +'<button class="identity-avatar" data-action="open-assistant" aria-label="Ask the SiteGuard Assistant" title="Ask the SiteGuard Assistant" style="background:var(--orange-bg); color:var(--orange-ink);">'+ICONS.sparkle+'</button>'
+    +'<button class="identity-avatar" data-action="open-assistant" aria-label="Ask the SiteGuard Assistant" title="Ask the SiteGuard Assistant" style="background:var(--brand-bg); color:var(--brand-ink);">'+ICONS.sparkle+'</button>'
     +'<button class="identity-avatar" data-action="open-search" aria-label="Search" style="background:var(--paper-raised); color:var(--ink);">'+ICONS.search+'</button>'
     +'<button class="identity-avatar" data-action="open-tasks" data-filter="all" aria-label="Tasks" style="background:var(--paper-raised); color:var(--ink); position:relative;">'+ICONS.bell+(highCount?'<span class="bell-dot"></span>':'')+'</button>'
     +(personas && personas.length ? '<select class="persona-select" id="personaSel" aria-label="Demo persona" title="Demo persona — switches to another sample user (their real permissions apply)">'
@@ -31,7 +31,7 @@ export function topbar(){
 function banners(){
   const o = org(), f = S.boot.features;
   let html = '';
-  if(o.isDemo) html += '<div class="banner warn"><span>Demo sandbox — sample data, deleted automatically after a few days. The persona menu switches between sample users.</span><button class="btn small secondary" data-action="leave-demo">Create a real account</button></div>';
+  if(o.isDemo) html += '<div class="banner warn"><span>Demo with sample data. Switch people with the menu above.</span><button class="btn small secondary" data-action="leave-demo">Create a real account</button></div>';
   if(!S.boot.me.verified) html += '<div class="banner info"><span>Confirm your email address — we sent a link to '+S.boot.me.email+'.</span><button class="btn small secondary" data-action="resend-verification">Resend</button></div>';
   if(f.billing && !o.isDemo){
     if(o.standing==='lapsed') html += '<div class="banner bad"><span>Read-only: '+(o.subscriptionStatus==='trialing'?'your trial has ended':'your subscription is inactive')+'. Everything stays viewable; choose a plan to keep making changes.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="goto-more" data-view="billing">Billing</button>':'')+'</div>';
@@ -127,9 +127,9 @@ function renderAgent(){
 
 function assistantWidget(){
   const hint = isContractor() ? 'e.g. What do I need for welding inside a tank at a gold mine?' : 'e.g. Safety file for electrical work on a conveyor at a coal mine';
-  return '<div class="section-title">Ask SiteGuard</div><div class="card">'
+  return '<div class="section-title">Ask SiteGuard</div><div class="card ask-hero">'
     +'<div class="site-card-sub">'+(isContractor()?'Find out what a site or job needs, check your sites, or get a document drafted.':'Describe a site or job to get its safety-file requirements and start it in one tap, or ask how your sites are doing.')+'</div>'
-    +'<div class="ask-card"><input type="text" id="askDash" placeholder="'+hint+'" aria-label="Ask SiteGuard"><button class="btn orange small" data-action="ask-dashboard">Ask</button></div></div>';
+    +'<div class="ask-card"><input type="text" id="askDash" placeholder="'+hint+'" aria-label="Ask SiteGuard"><button class="btn primary small" data-action="ask-dashboard">Ask</button></div></div>';
 }
 
 /** First-run checklist for site owners; disappears once the core loop has happened once. */
@@ -145,16 +145,24 @@ function gettingStarted(){
   if(steps.every(x=>x.done)) return '';
   const next = steps.findIndex(x=>!x.done);
   return '<div class="section-title">Getting started</div><div class="card checkpoint">'
-    + steps.map((x,i)=>'<div class="reqrow"><div class="qa-icon" style="width:28px;height:28px;border-radius:50%;flex:none;'+(x.done?'background:var(--green-bg);color:var(--green);':i===next?'background:var(--orange);color:#fff;':'')+'">'+(x.done?ICONS.check:(i+1))+'</div>'
+    + steps.map((x,i)=>'<div class="reqrow"><div class="qa-icon" style="width:28px;height:28px;border-radius:50%;flex:none;'+(x.done?'background:var(--green-bg);color:var(--green);':i===next?'background:var(--brand);color:#fff;':'')+'">'+(x.done?ICONS.check:(i+1))+'</div>'
       +'<div class="reqrow-main"><div class="reqrow-name"'+(x.done?' style="color:var(--grey);text-decoration:line-through;"':'')+'>'+x.title+'</div>'+(i===next?'<div class="site-card-sub">'+x.sub+'</div>':'')+'</div>'
-      +(i===next && x.action && !readOnly()?'<button class="btn orange small" data-action="'+x.action+'">Start</button>':'')+'</div>').join('')
+      +(i===next && x.action && !readOnly()?'<button class="btn primary small" data-action="'+x.action+'">Start</button>':'')+'</div>').join('')
     +'</div>';
 }
 
 function renderDashboard(){
   const { order, hidden } = dashboardLayout();
-  const head = '<div class="view-head"><div class="flexbetween"><h1>'+greeting()+'</h1><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div>'
-    +'<p class="greeting">'+(isContractor() ? org().name : org().name+' · '+(role()==='admin'?org().kindLabel:'portfolio overview'))+'</p></div>';
+  const sitesAll = Object.values(S.state.sites);
+  const active = sitesAll.filter(s=>s.status==='in_progress'||s.status==='site_ready').length;
+  const ready = sitesAll.filter(s=>s.status==='site_ready').length;
+  const findings = ((S.boot.agent||{}).findings||[]);
+  const urgent = findings.filter(f=>f.severity==='high').length;
+  const stat = (n, label) => '<div class="hero-stat"><b>'+n+'</b><span>'+label+'</span></div>';
+  const head = '<div class="dash-hero"><div class="flexbetween" style="align-items:flex-start;"><div><p class="hero-eyebrow">'+org().name+'</p><h1>'+greeting()+'</h1>'
+    +'<p class="greeting">'+(urgent ? urgent+' urgent item'+(urgent===1?'':'s')+' need'+(urgent===1?'s':'')+' you today.' : findings.length ? findings.length+' item'+(findings.length===1?'':'s')+' to look at — nothing urgent.' : 'Everything is in order across your sites.')+'</p></div>'
+    +'<button class="btn secondary small" data-action="customise-dashboard">Customise</button></div>'
+    +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
   const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
   const start = gettingStarted();
@@ -236,7 +244,7 @@ function hostWidget(id){
   }
   if(id==='portfolio'){
     return '<div class="section-title">Site portfolio</div>'
-      + (sites.length ? sites.map(portfolioRow).join('') : '<div class="empty"><h3>No sites yet</h3><p>'+(isOrgAdmin()?'Add your first site to start tracking contractor compliance.':'Once an admin adds a site, it will show up here.')+'</p>'+(isOrgAdmin()?'<button class="btn orange" data-action="new-site">Add a site</button>':'')+'</div>');
+      + (sites.length ? sites.map(portfolioRow).join('') : '<div class="empty"><h3>No sites yet</h3><p>'+(isOrgAdmin()?'Add your first site to start tracking contractor compliance.':'Once an admin adds a site, it will show up here.')+'</p>'+(isOrgAdmin()?'<button class="btn primary" data-action="new-site">Add a site</button>':'')+'</div>');
   }
   if(id==='invitations'){
     const pending = Object.values(S.state.invitations).filter(i=>i.status==='pending');
@@ -298,7 +306,7 @@ export function portfolioRow(site){
 /* ============ SITES ============ */
 function renderSitesList(){
   const sites = Object.values(S.state.sites);
-  return '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn orange small" data-action="new-site">+ Add site</button>':'')+'</div>'
+  return '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')+'</div>'
     +'<p>'+sites.length+' site'+(sites.length===1?'':'s')+'</p></div>'
     + (sites.length ? sites.map(portfolioRow).join('') : '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company.':'Add a site to start tracking contractor compliance.')+'</p></div>');
 }
@@ -314,7 +322,7 @@ function renderSiteDetail(siteId){
       +'<div class="card checkpoint"><div class="site-card-title">'+site.name+'</div>'
       +'<div class="site-card-sub" style="margin-top:6px;">'+site.hostName+' · '+site.location+'</div>'
       +'<div class="site-card-sub" style="margin-top:10px;">'+site.hostName+' has invited '+org().name+' to work this site and submit a safety file. Accepting shows you the requirements and starts tracking readiness; declining removes it from your list.</div>'
-      +(isOrgAdmin() && invite ? '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn orange" style="flex:1;" data-action="invitation-decide" data-id="'+invite.id+'" data-decision="accept">Accept</button>'
+      +(isOrgAdmin() && invite ? '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn primary" style="flex:1;" data-action="invitation-decide" data-id="'+invite.id+'" data-decision="accept">Accept</button>'
         +'<button class="btn secondary" style="flex:1;" data-action="invitation-decide" data-id="'+invite.id+'" data-decision="decline">Decline</button></div>'
         : '<div class="notice" style="margin-top:12px;">An owner or admin of '+org().name+' needs to accept this invitation.</div>')
       +'</div>';
@@ -353,7 +361,7 @@ function renderSiteDetail(siteId){
   } else if(site.status==='declined' && isHost()){
     html += '<div class="card checkpoint" style="margin-top:12px;border-color:var(--red);"><div class="site-card-title" style="font-size:14px;">Invitation declined</div>'
       +'<div class="site-card-sub">'+contractor.name+' declined this invitation. Assign a different contractor or follow up directly.</div>'
-      +(isOrgAdmin() && !readOnly() ? '<div class="row-actions"><button class="btn orange small" data-action="reassign-site" data-site="'+siteId+'">Assign a contractor</button></div>' : '')+'</div>';
+      +(isOrgAdmin() && !readOnly() ? '<div class="row-actions"><button class="btn primary small" data-action="reassign-site" data-site="'+siteId+'">Assign a contractor</button></div>' : '')+'</div>';
   }
 
   if(safety.count){
@@ -369,7 +377,7 @@ function renderSiteDetail(siteId){
       +'<div class="row-actions"><a class="btn secondary small" href="/verify/'+approval.verificationId+'" target="_blank" rel="noopener">View verification</a></div></div>';
   } else if(submission==='no_requirements'){
     html += '<div class="empty"><h3>No requirements set for this site</h3><p>'+(isContractor()?'The site hasn\'t defined what\'s required yet — check back soon.':'Add the documents this site needs from '+contractor.name+'.')+'</p>'
-      +(isHost() && isOrgAdmin() && !readOnly() ? '<div class="row-actions" style="justify-content:center;"><button class="btn orange" data-action="apply-packs" data-site="'+siteId+'">Use a starter pack</button><button class="btn secondary" data-action="add-requirement" data-site="'+siteId+'">Add one by one</button></div>' : '')+'</div>';
+      +(isHost() && isOrgAdmin() && !readOnly() ? '<div class="row-actions" style="justify-content:center;"><button class="btn primary" data-action="apply-packs" data-site="'+siteId+'">Use a starter pack</button><button class="btn secondary" data-action="add-requirement" data-site="'+siteId+'">Add one by one</button></div>' : '')+'</div>';
   } else {
     html += '<div class="card checkpoint readiness-hero">'+gauge(percent, 78)
       +'<div><div class="site-card-title">Site Readiness</div><div class="site-card-sub">'+(counts.complete||0)+' of '+total+' requirements complete</div>'
@@ -378,7 +386,7 @@ function renderSiteDetail(siteId){
     else if(submission==='under_review') html += '<div class="notice">'+counts.awaiting_review+' item(s) awaiting reviewer sign-off.</div>';
     else if(submission==='ready_to_approve' && safetyBlocksApproval) html += '<div class="notice" style="background:var(--red-bg);color:var(--red);">All requirements complete, but this site can\'t be marked Ready while a lost time injury or fatality investigation is still open.</div>';
     else if(submission==='ready_to_approve' && !canReview()) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">All requirements complete — waiting on final site approval.</div>';
-    if(canApprove) html += '<button class="btn orange block" data-action="approve-site" data-site="'+siteId+'" style="margin-bottom:14px;">Approve — Mark Site Ready</button>';
+    if(canApprove) html += '<button class="btn primary block" data-action="approve-site" data-site="'+siteId+'" style="margin-bottom:14px;">Approve — Mark Site Ready</button>';
   }
 
   const grouped = {};
@@ -422,7 +430,7 @@ function renderSiteActivity(siteId){
   const ro = readOnly();
   const permits = S.state.permits[siteId] || [];
   let html = '<div class="section-title">Permit to work register</div>';
-  if(!ro && (isContractor() || canReview())) html += '<button class="btn orange block" data-action="new-permit" data-site="'+siteId+'" style="margin-bottom:10px;">'+(isContractor()?'Request a permit':'Issue a permit')+'</button>';
+  if(!ro && (isContractor() || canReview())) html += '<button class="btn primary block" data-action="new-permit" data-site="'+siteId+'" style="margin-bottom:10px;">'+(isContractor()?'Request a permit':'Issue a permit')+'</button>';
   html += permits.length ? '<div class="card">' + permits.map(p=>renderPermitRow(p, siteId)).join('') + '</div>'
     : '<div class="card"><div class="site-card-sub">No permits raised for this site. High-risk work — hot work, heights, confined space, excavation, lifting, electrical isolation — should have one before it starts.</div></div>';
 
@@ -439,7 +447,7 @@ function renderSiteActivity(siteId){
 
   html += '<div class="section-title">Inspections &amp; corrective actions</div>';
   const list = S.state.inspections[siteId]||[];
-  if(canReview() && !ro) html += '<button class="btn orange block" data-action="new-inspection" data-site="'+siteId+'" style="margin-bottom:14px;">Log inspection</button>';
+  if(canReview() && !ro) html += '<button class="btn primary block" data-action="new-inspection" data-site="'+siteId+'" style="margin-bottom:14px;">Log inspection</button>';
   if(!list.length) return html + '<div class="empty"><h3>No inspections logged yet</h3><p>Scheduled inspections and spot checks will appear here.</p></div>';
   list.forEach(insp=>{
     const openDefects = insp.defects.filter(d=>d.status!=='verified').length;
@@ -471,7 +479,7 @@ function renderDefectRow(d){
   let actions;
   if(d.status==='verified') actions = '<span class="badge complete">'+ICONS.check+'Verified</span>';
   else if(isContractor() && (d.status==='assigned'||d.status==='open') && !readOnly()) actions = '<button class="btn secondary small" data-action="defect" data-op="resolve" data-id="'+d.id+'">Mark resolved</button>';
-  else if(canReview() && d.status==='resolved' && !readOnly()) actions = '<button class="btn orange small" data-action="defect" data-op="verify" data-id="'+d.id+'">Verify &amp; close</button>';
+  else if(canReview() && d.status==='resolved' && !readOnly()) actions = '<button class="btn primary small" data-action="defect" data-op="verify" data-id="'+d.id+'">Verify &amp; close</button>';
   else if(d.status==='resolved') actions = '<span class="badge awaiting_review">Awaiting verification</span>';
   else actions = '<span class="badge missing">'+(d.status==='assigned'?'Assigned':'Open')+'</span>';
   return '<div class="defect-row"><div class="flexbetween"><span class="sev '+d.severity+'">'+sevLabel+'</span>'+actions+'</div>'
@@ -676,7 +684,7 @@ function renderSafetyCentre(){
 function renderWorkforce(){
   const workers = Object.values(S.state.workers||{});
   const own = workers.filter(w=>w.own), others = workers.filter(w=>!w.own);
-  let html = '<div class="view-head"><div class="flexbetween"><h1>Workforce</h1>'+(canEdit() && !readOnly()?'<button class="btn orange small" data-action="new-worker">+ Add worker</button>':'')+'</div>'
+  let html = '<div class="view-head"><div class="flexbetween"><h1>Workforce</h1>'+(canEdit() && !readOnly()?'<button class="btn primary small" data-action="new-worker">+ Add worker</button>':'')+'</div>'
     +'<p>Per-worker medical surveillance, inductions and training. Only the last 4 characters of ID numbers are stored.</p></div>';
   if(isContractor() || own.length){
     html += '<div class="section-title">'+(isContractor()?'Your workers':'Your own staff')+'</div>'
@@ -693,7 +701,7 @@ function renderWorkforce(){
 function renderAppointments(){
   const list = S.state.appointments || [];
   const own = list.filter(a=>a.own), others = list.filter(a=>!a.own);
-  let html = '<div class="view-head"><div class="flexbetween"><h1>Appointments register</h1>'+(isOrgAdmin() && !readOnly()?'<button class="btn orange small" data-action="new-appointment">+ Record</button>':'')+'</div>'
+  let html = '<div class="view-head"><div class="flexbetween"><h1>Appointments register</h1>'+(isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-appointment">+ Record</button>':'')+'</div>'
     +'<p>Statutory appointments (e.g. OHS Act s16(1)/16(2), Construction Regulations 8(1)/8(7), MHSA appointments) with their signed letters.</p></div>';
   html += '<div class="section-title">'+org().name+'</div>' + (own.length ? '<div class="card">'+own.map(appointmentRow).join('')+'</div>' : '<div class="card"><div class="site-card-sub">No appointments recorded yet.</div></div>');
   if(others.length) html += '<div class="section-title">Other organisations on your sites</div><div class="card">'+others.map(appointmentRow).join('')+'</div>';
@@ -714,7 +722,7 @@ function renderAudit(){
     +'<label class="field-label" for="auditSite">Site</label><select id="auditSite" class="field"><option value="">All sites</option>'
       + sites.map(s=>'<option value="'+s.id+'"'+(f.siteId===s.id?' selected':'')+'>'+s.name+'</option>').join('')+'</select>'
     +'<div style="display:flex;gap:8px;margin-top:10px;"><button class="btn secondary small" style="flex:1;" data-action="audit-filter">Apply filter</button>'
-    +'<button class="btn orange small" style="flex:1;" data-action="audit-export">Export PDF</button></div></div>'
+    +'<button class="btn primary small" style="flex:1;" data-action="audit-export">Export PDF</button></div></div>'
     +'<div class="site-card-sub" style="margin-bottom:8px;">'+(filtered?rows.length+' event'+(rows.length===1?'':'s')+' matching filter':'Latest '+rows.length+' events — filter or export for the full history')+'</div>'
     +'<div class="card">' + (rows.length ? rows.map(a=>'<div class="audit-row"><div class="audit-dot action"></div><div class="audit-body">'
       +'<div class="audit-action"><strong>'+a.actor+'</strong> ('+a.role+') — '+a.action+'</div>'
@@ -743,7 +751,7 @@ function renderVerify(){
   const approved = Object.entries(S.state.approvals);
   let html = '<div class="view-head"><h1>Verify</h1><p>Check a SiteGuard Site Ready record. Anyone can verify a code at /verify/&lt;code&gt; — no account needed.</p></div>'
     +'<div class="card"><label class="field-label" for="verifyCode">Verification code</label><input type="text" id="verifyCode" placeholder="e.g. SG-2026-7K4M2QXA">'
-    +'<button class="btn orange block" style="margin-top:10px;" data-action="verify-code">Check code</button></div>';
+    +'<button class="btn primary block" style="margin-top:10px;" data-action="verify-code">Check code</button></div>';
   if(!approved.length) return html + '<div class="empty"><h3>No Site Ready records yet</h3><p>Approved sites will be listed here.</p></div>';
   if(!S.verifySiteId || !S.state.approvals[S.verifySiteId]) S.verifySiteId = approved[0][0];
   const approval = S.state.approvals[S.verifySiteId];
@@ -774,7 +782,7 @@ function renderTeam(){
     html += '<div class="card"><div class="site-card-title" style="font-size:14px;">Invite a colleague</div>'
       +'<label class="field-label" for="inviteEmail">Email</label><input type="email" id="inviteEmail" placeholder="name@company.co.za">'
       +'<label class="field-label" for="inviteRole">Role</label><select id="inviteRole" class="field">'+roleOpts(isContractor()?'member':'reviewer')+'</select>'
-      +'<button class="btn orange block" style="margin-top:10px;" data-action="invite-user">Send invitation</button>'
+      +'<button class="btn primary block" style="margin-top:10px;" data-action="invite-user">Send invitation</button>'
       +'<div class="site-card-sub" style="margin-top:8px;">'+roleHelp()+'</div></div>';
   }
   html += '<div class="section-title">Members</div><div class="card">'+t.members.map(m=>{
@@ -822,7 +830,7 @@ function renderBilling(){
   html += '<label class="field-label" for="billSeats">Seats</label><input type="number" id="billSeats" min="'+Math.max(1,b.seatsUsed)+'" value="'+Math.max(b.seatLimit, b.seatsUsed)+'">';
   html += b.plans.map(p=>'<div class="plan-card'+(p.id===b.plan?' current':'')+'"><div class="flexbetween"><div class="site-card-title">'+escapeHtml(p.name)+'</div>'+(p.id===b.plan?'<span class="badge approved">Current</span>':'')+'</div>'
     +'<div class="site-card-sub">'+escapeHtml(p.blurb)+'</div>'
-    +(p.paid ? (p.purchasable ? '<button class="btn '+(p.id===b.plan?'secondary':'orange')+' small" style="margin-top:8px;" data-action="billing-choose" data-plan="'+p.id+'">'+(b.hasSubscription ? (p.id===b.plan?'Update seats':'Switch to '+escapeHtml(p.name)) : 'Subscribe')+'</button>' : '<div class="site-card-sub" style="margin-top:6px;">Not available yet.</div>') : '<div class="site-card-sub" style="margin-top:6px;">Free — no card needed.</div>')
+    +(p.paid ? (p.purchasable ? '<button class="btn '+(p.id===b.plan?'secondary':'primary')+' small" style="margin-top:8px;" data-action="billing-choose" data-plan="'+p.id+'">'+(b.hasSubscription ? (p.id===b.plan?'Update seats':'Switch to '+escapeHtml(p.name)) : 'Subscribe')+'</button>' : '<div class="site-card-sub" style="margin-top:6px;">Not available yet.</div>') : '<div class="site-card-sub" style="margin-top:6px;">Free — no card needed.</div>')
     +'</div>').join('');
   html += '<div class="site-card-sub" style="margin-top:8px;">Plan changes are prorated. Cancel any time from “Payment method &amp; invoices”; your data stays readable.</div>';
   return html;
@@ -842,7 +850,7 @@ function renderSettings(){
     +'<label class="field-label" for="orgVat">VAT number (optional)</label><input type="text" id="orgVat" value="'+o.vat+'">'
     +'<label class="field-label" for="orgAddress">Physical address</label><input type="text" id="orgAddress" value="'+o.address+'">'
     +(isContractor()?'<label class="field-label" for="orgTrade">Trade</label><input type="text" id="orgTrade" value="'+o.trade+'">':'')
-    +(ro?'':'<button class="btn orange block" style="margin-top:12px;" data-action="save-org">Save company details</button>')+'</div>';
+    +(ro?'':'<button class="btn primary block" style="margin-top:12px;" data-action="save-org">Save company details</button>')+'</div>';
   html += '<div class="section-title">Notifications</div><div class="card">'
     +'<div class="toggle-row"><label for="digestToggle">Email reminder digests (expiring documents &amp; certificates, open incidents, overdue requests)</label><input type="checkbox" id="digestToggle" '+(s.reminderDigest===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-digest"')+'></div>'
     +'<div class="toggle-row"><label for="weeklyToggle">Monday compliance summary for admins (from the compliance agent)</label><input type="checkbox" id="weeklyToggle" '+(s.weeklySummary===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-weekly"')+'></div>'
