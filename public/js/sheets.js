@@ -617,6 +617,7 @@ function renderNewSiteSheet(packs, prefill){
   const templates = Object.values(S.state.sites).filter(s=>(S.state.requirements[s.id]||[]).length);
   const extras = S.newSiteExtras || [];
   return sheetHead('Add a site', pf.fromAssistant ? 'Prepared by the assistant — check everything before creating' : '')
+    +(S.boot.me.verified ? '' : '<div class="notice">Confirm your email address first — the contractor\'s invitation can only be sent once it\'s confirmed. We sent a link to '+S.boot.me.email+'. <button class="linkish" data-action="resend-verification">Resend it</button></div>')
     +'<label class="field-label" for="newSiteName">Site / project name</label><input type="text" id="newSiteName" value="'+escapeHtml(pf.name||'')+'" placeholder="e.g. Tweefontein Shaft — Pump Station Upgrade">'
     +'<label class="field-label" for="newSiteLocation">Location</label><input type="text" id="newSiteLocation" value="'+escapeHtml(pf.location||'')+'" placeholder="e.g. North Pit, Tweefontein">'
     + contractorFields('ns')
