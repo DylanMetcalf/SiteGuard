@@ -6,7 +6,7 @@ import {
   org, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId,
   computeReadiness, effectiveStatus, certStatus, badge, timeAgo, dateTime, todayStr, daysUntil, incidentTypeInfo, permitTypeInfo,
   permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml, deepEscape,
-  on, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
+  on, actions, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
 } from './core.js';
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
 
@@ -117,7 +117,7 @@ function renderQuickActions(){
   if(isContractor()){
     items.push({icon:ICONS.sites, title:'Work on a safety file', sub:'Open the requirements for one of your sites', action:'safetyfile'});
     items.push({icon:ICONS.passport, title:'Upload to your documents', sub:'Attach a file to a requirement or your company library', action:'upload'});
-    items.push({icon:ICONS.sparkle, title:'Draft a document with AI', sub:'Risk assessment, method statement, toolbox talk…', action:'ai-draft'});
+    items.push({icon:ICONS.sparkle, title:S.boot.features.ai?'Draft a document with AI':'Draft a document', sub:'Risk assessment, method statement, toolbox talk…', action:'ai-draft'});
     items.push({icon:ICONS.audit, title:'Log today\'s site diary', sub:'Crew, conditions, work done', action:'diary'});
     items.push({icon:ICONS.hardhat, title:'Record a toolbox talk', sub:'Capture attendance with signatures', action:'toolbox'});
     items.push({icon:ICONS.alert, title:'Report an incident', sub:'Near miss to fatality', action:'incident'});
@@ -129,6 +129,7 @@ function renderQuickActions(){
     items.push({icon:ICONS.audit, title:'Log site diary', sub:'Crew, conditions, work done', action:'diary'});
     items.push({icon:ICONS.verify, title:'Verify a record', sub:'Check a Site Ready verification', action:'verify'});
   }
+  items.unshift({icon:ICONS.sparkle, title:'Ask the assistant', sub:isContractor()?'What a site needs, your sites\' status, drafts':'Site requirements, start a site, portfolio status', action:'assistant'});
   if(readOnly()) return sheetHead('Quick actions') + '<div class="notice">Your organisation is read-only until a plan is chosen.</div>';
   return sheetHead('Quick actions') + items.map(it=>'<button class="qa-item" data-action="qa" data-qa="'+it.action+'"><div class="qa-icon">'+it.icon+'</div><div><div class="qa-title">'+it.title+'</div><div class="qa-sub">'+it.sub+'</div></div></button>').join('');
 }
@@ -153,6 +154,7 @@ on('pick-site', (el)=>{ closeSheet(); PURPOSE[el.dataset.purpose](el.dataset.sit
 on('qa', (el)=>{
   const a = el.dataset.qa;
   if(a==='ai-draft'){ openSheet(renderAIDraftSheet()); return; }
+  if(a==='assistant'){ actions['open-assistant'](); return; }
   if(a==='verify'){ closeSheet(); S.nav='more'; S.moreView='verify'; render(); return; }
   if(a==='add-site'){ openNewSite(); return; }
   pickSite(a);
@@ -443,23 +445,31 @@ on('close-permit', async (el)=>{
 
 /* ============ AI DRAFTING (via the server proxy) ============ */
 const DRAFT_TYPES = ['Site-specific risk assessment','Method statement','Toolbox talk record','Emergency response plan','Daily site diary template'];
+function draftModeNote(){
+  if(S.boot.features.ai) return 'Your company details from Organisation settings go into the header. Drafting runs on SiteGuard\'s server — no API key in your browser.';
+  return 'Template mode: SiteGuard builds a structured draft from your description, with hazards and controls for the work you describe. '
+    +(S.boot.features.aiConfigured
+      ? 'AI-written drafts are included in '+(isContractor()?'Contractor Pro':'Site Professional')+'.'
+      : 'AI-written drafts switch on once your administrator adds an AI key.');
+}
 function renderAIDraftSheet(){
-  if(!S.boot.features.ai){
-    return sheetHead('Draft with AI') + '<p class="site-card-sub">'+(S.boot.features.aiConfigured
-      ? 'AI drafting is included in '+(isContractor()?'Contractor Pro':'Site Professional')+'.'+(isOrgAdmin()?' You can upgrade under More → Plan &amp; billing.':' Ask an admin to upgrade.')
-      : 'AI drafting isn\'t configured on this server.')+'</p>';
-  }
-  return sheetHead('Draft a document with AI')
+  return sheetHead(S.boot.features.ai?'Draft a document with AI':'Draft a document')
     +'<label class="field-label" for="draftType">Document type</label><select id="draftType" class="field">'+DRAFT_TYPES.map(t=>'<option>'+t+'</option>').join('')+'</select>'
     +'<label class="field-label" for="draftBrief">Tell it about the job</label><textarea id="draftBrief" placeholder="e.g. Rewiring the conveyor drive station at Shaft 3, live electrical work involved"></textarea>'
-    +'<div class="site-card-sub" style="margin-top:4px;">Your company details from Organisation settings go into the header. Drafting runs on SiteGuard\'s server — no API key in your browser.</div>'
+    +'<div class="site-card-sub" style="margin-top:4px;">'+draftModeNote()+'</div>'
     +'<button class="btn orange block" style="margin-top:10px;" data-action="generate-draft">Generate draft</button>'
     +'<div id="draftOutput"></div>';
+}
+export function openDraft(type, brief){
+  openSheet(renderAIDraftSheet());
+  const t = document.getElementById('draftType'), b = document.getElementById('draftBrief');
+  if(t && type && DRAFT_TYPES.includes(type)) t.value = type;
+  if(b && brief) b.value = brief;
 }
 let draftAbort = null;
 async function streamDraft(type, brief, onText){
   draftAbort = new AbortController();
-  return api.stream('/api/ai/draft', { type, brief }, onText, draftAbort.signal);
+  return api.stream('/api/ai/draft', { type, brief }, onText, draftAbort.signal, (h)=>{ S.lastDraftMode = h.get('x-draft-mode')||'ai'; });
 }
 on('ai-draft', ()=>openSheet(renderAIDraftSheet()));
 on('generate-draft', async (el)=>{
@@ -489,8 +499,9 @@ on('save-draft', async (el)=>{
   el.disabled = true; el.textContent = 'Saving…';
   const blob = new Blob([S.lastDraft||''], {type:'text/plain'});
   const ok = await act(async ()=>{
-    await api.upload(docUrl(slot,'file'), blob, unescapeHtml(t.name).replace(/[^\w\s()-]/g,'')+' (AI draft).txt');
-    await api.post(docUrl(slot,'submit'), { note:'AI draft — review before use', aiDrafted:true });
+    await api.upload(docUrl(slot,'file'), blob, unescapeHtml(t.name).replace(/[^\w\s()-]/g,'')+(S.lastDraftMode==='template'?' (draft).txt':' (AI draft).txt'));
+    const ai = S.lastDraftMode!=='template';
+    await api.post(docUrl(slot,'submit'), { note:(ai?'AI draft':'Template draft')+' — review before use', aiDrafted:ai });
   }, 'Saved to your document library', el);
   if(ok) closeSheet(); else { el.disabled=false; el.textContent='Save to library'; }
 });
@@ -580,7 +591,7 @@ function readContractor(prefix){
 on('toggle-new-contractor', (el)=>{ document.getElementById(el.dataset.prefix+'NewContractor').style.display = el.value==='__new' ? '' : 'none'; });
 /* ---- requirement starter packs ---- */
 let packsCache = null;
-async function loadPacks(){
+export async function loadPacks(){
   if(!packsCache) packsCache = deepEscape((await api.get('/api/requirement-templates')).packs);
   return packsCache;
 }
@@ -601,19 +612,26 @@ function packPicker(packs, checked, existingNames){
 const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
 const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
 
-function renderNewSiteSheet(packs){
+function renderNewSiteSheet(packs, prefill){
+  const pf = prefill || {};
   const templates = Object.values(S.state.sites).filter(s=>(S.state.requirements[s.id]||[]).length);
-  return sheetHead('Add a site')
-    +'<label class="field-label" for="newSiteName">Site / project name</label><input type="text" id="newSiteName" placeholder="e.g. Tweefontein Shaft — Pump Station Upgrade">'
-    +'<label class="field-label" for="newSiteLocation">Location</label><input type="text" id="newSiteLocation" placeholder="e.g. North Pit, Tweefontein">'
+  const extras = S.newSiteExtras || [];
+  return sheetHead('Add a site', pf.fromAssistant ? 'Prepared by the assistant — check everything before creating' : '')
+    +'<label class="field-label" for="newSiteName">Site / project name</label><input type="text" id="newSiteName" value="'+escapeHtml(pf.name||'')+'" placeholder="e.g. Tweefontein Shaft — Pump Station Upgrade">'
+    +'<label class="field-label" for="newSiteLocation">Location</label><input type="text" id="newSiteLocation" value="'+escapeHtml(pf.location||'')+'" placeholder="e.g. North Pit, Tweefontein">'
     + contractorFields('ns')
     +'<div class="section-title">Documents required from the contractor</div>'
-    + packPicker(packs, ['baseline'], []) + PACK_NOTE
+    + packPicker(packs, pf.packIds && pf.packIds.length ? pf.packIds : ['baseline'], []) + PACK_NOTE
+    +(extras.length ? '<div class="section-title">Also required for this site</div><div class="card">'
+      + extras.map((x,i)=>'<label class="flexbetween" style="gap:10px;padding:6px 0;cursor:pointer;"><span><span class="qa-title" style="font-size:14px;">'+escapeHtml(x.name)+'</span><span class="site-card-sub" style="display:block;">'+escapeHtml(x.category)+(x.why?' — '+escapeHtml(x.why):'')+'</span></span><input type="checkbox" class="extra-req-box" value="'+i+'" checked aria-label="'+escapeHtml(x.name)+'"></label>').join('')
+      +'</div>' : '')
     +(templates.length ? '<label class="field-label" for="newSiteTemplate">Also copy from an existing site</label><select id="newSiteTemplate" class="field"><option value="">Don\'t copy</option>'+templates.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('')+'</select>' : '')
     +'<button class="btn orange block" style="margin-top:12px;" data-action="save-site">Create site and invite contractor</button>';
 }
-async function openNewSite(){
-  try{ openSheet(renderNewSiteSheet(await loadPacks())); }
+/** Opens the Add a site sheet, optionally prefilled (e.g. from an assistant proposal). */
+export async function openNewSite(prefill){
+  S.newSiteExtras = (prefill && prefill.extraRequirements) || [];
+  try{ openSheet(renderNewSiteSheet(await loadPacks(), prefill)); }
   catch(e){ showToast(e.message); }
 }
 on('new-site', ()=>openNewSite());
@@ -621,7 +639,9 @@ on('save-site', async (el)=>{
   const name = val('newSiteName');
   if(!name){ document.getElementById('newSiteName').focus(); return; }
   const c = readContractor('ns'); if(!c) return;
-  const r = await act(()=>api.post('/api/sites', { name, location: val('newSiteLocation'), templateSiteId: val('newSiteTemplate') || undefined, templatePackIds: checkedPacks(), ...c }), 'Site created — invitation sent', el);
+  const extras = [...document.querySelectorAll('.extra-req-box:checked')].map(b=>(S.newSiteExtras||[])[Number(b.value)]).filter(Boolean)
+    .map(x=>({ category:x.category, name:x.name, source:x.source||'site', why:x.why||'' }));
+  const r = await act(()=>api.post('/api/sites', { name, location: val('newSiteLocation'), templateSiteId: val('newSiteTemplate') || undefined, templatePackIds: checkedPacks(), requirements: extras.length ? extras : undefined, ...c }), 'Site created — invitation sent', el);
   if(r){ closeSheet(); S.activeSiteId = r.id; S.nav='sites'; S.siteTab='compliance'; render(); }
 });
 on('apply-packs', async (el)=>{
@@ -847,7 +867,7 @@ function renderNewToolboxSheet(siteId){
     +'<label class="field-label" for="ttTopic">Topic</label><input type="text" id="ttTopic" placeholder="e.g. Isolation and lock-out before work on the drive station">'
     +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="ttPresenter">Presented by</label><input type="text" id="ttPresenter" value="'+myName()+'"></div></div>'
     +'<label class="field-label" for="ttContent">Talk content / key points</label><textarea id="ttContent" style="min-height:110px;" placeholder="What was covered"></textarea>'
-    +(S.boot.features.ai?'<button class="btn secondary small" style="margin-top:6px;" data-action="draft-toolbox">'+ICONS.sparkle+' Draft content with AI</button>':'')
+    +'<button class="btn secondary small" style="margin-top:6px;" data-action="draft-toolbox">'+ICONS.sparkle+(S.boot.features.ai?' Draft content with AI':' Draft talk from topic')+'</button>'
     +'<button class="btn orange block" style="margin-top:12px;" data-action="save-toolbox" data-site="'+siteId+'">Save and collect signatures</button>';
 }
 on('new-toolbox-talk', (el)=>openSheet(renderNewToolboxSheet(el.dataset.site)));

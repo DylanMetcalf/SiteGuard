@@ -42,6 +42,8 @@ const schema = z.object({
   ANTHROPIC_MODEL: z.string().default('claude-opus-5'),
   /** Monthly AI request allowance per organisation on plans that include AI. */
   AI_MONTHLY_REQUEST_LIMIT: z.coerce.number().int().positive().default(300),
+  /** Let the assistant search the web when researching site requirements. */
+  AI_WEB_SEARCH: bool(true),
 
   // Billing. Unset → billing is disabled and every organisation is treated as in good standing.
   STRIPE_SECRET_KEY: z.string().optional(),

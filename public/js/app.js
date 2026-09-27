@@ -5,6 +5,7 @@ import { S, ICONS, actions, reload, setRender, showToast, closeSheet } from './c
 import { handleDeepLink, renderAuth, renderNoOrg } from './auth.js';
 import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
+import './assistant.js';
 
 const app = document.getElementById('app');
 
@@ -59,6 +60,7 @@ document.addEventListener('input', (e)=>{
 document.addEventListener('keydown', (e)=>{
   if(e.key==='Escape') closeSheet();
   if((e.key==='Enter' || e.key===' ') && e.target.matches('[role="button"][data-action]')){ e.preventDefault(); e.target.click(); }
+  if(e.key==='Enter' && e.target.matches('#askDash')){ e.preventDefault(); const b = document.querySelector('[data-action="ask-dashboard"]'); if(b) b.click(); }
   if(e.key==='Enter' && e.target.matches('#siPassword, #siEmail')){ const b = document.querySelector('[data-action="signin"]'); if(b) b.click(); }
 });
 

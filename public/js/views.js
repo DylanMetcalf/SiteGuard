@@ -19,6 +19,7 @@ export function topbar(){
     +'<div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard'+(isDemoMode()?' <span class="demo-tag">DEMO</span>':'')+'</div>'
     +'<div class="brand-tag"><span class="live-dot'+(S.live?'':' off')+'" title="'+(S.live?'Live — changes from colleagues appear automatically':'Reconnecting…')+'"></span>'+org().name+'</div></div></div>'
     +'<div class="identity">'
+    +'<button class="identity-avatar" data-action="open-assistant" aria-label="Ask the SiteGuard Assistant" title="Ask the SiteGuard Assistant" style="background:var(--orange-bg); color:var(--orange-ink);">'+ICONS.sparkle+'</button>'
     +'<button class="identity-avatar" data-action="open-search" aria-label="Search" style="background:var(--paper-raised); color:var(--ink);">'+ICONS.search+'</button>'
     +'<button class="identity-avatar" data-action="open-tasks" data-filter="all" aria-label="Tasks" style="background:var(--paper-raised); color:var(--ink); position:relative;">'+ICONS.bell+(highCount?'<span class="bell-dot"></span>':'')+'</button>'
     +(personas && personas.length ? '<select class="persona-select" id="personaSel" aria-label="Demo persona" title="Demo persona — switches to another sample user (their real permissions apply)">'
@@ -67,14 +68,14 @@ function greeting(){
 }
 
 export const DASHBOARD_WIDGETS = {
-  contractor: [['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
-  host: [['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
+  contractor: [['assistant','Ask SiteGuard'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
+  host: [['assistant','Ask SiteGuard'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
 };
 const DEFAULT_WIDGETS = {
-  contractor: ['invitations','focus','allSites','workforce','company'],
-  admin: ['safety','organisation','portfolio','invitations','workforce'],
-  reviewer: ['safety','attention','portfolio','workforce'],
-  viewer: ['safety','attention','portfolio'],
+  contractor: ['assistant','invitations','focus','allSites','workforce','company'],
+  admin: ['safety','assistant','organisation','portfolio','invitations','workforce'],
+  reviewer: ['safety','assistant','attention','portfolio','workforce'],
+  viewer: ['safety','assistant','attention','portfolio'],
 };
 export function dashboardLayout(){
   const all = DASHBOARD_WIDGETS[isContractor()?'contractor':'host'].map(w=>w[0]);
@@ -85,6 +86,13 @@ export function dashboardLayout(){
   }
   const defaults = DEFAULT_WIDGETS[role()] || all;
   return { order: defaults.concat(all.filter(id=>!defaults.includes(id))), hidden: all.filter(id=>!defaults.includes(id)) };
+}
+
+function assistantWidget(){
+  const hint = isContractor() ? 'e.g. What do I need for welding inside a tank at a gold mine?' : 'e.g. Safety file for electrical work on a conveyor at a coal mine';
+  return '<div class="section-title">Ask SiteGuard</div><div class="card">'
+    +'<div class="site-card-sub">'+(isContractor()?'Find out what a site or job needs, check your sites, or get a document drafted.':'Describe a site or job to get its safety-file requirements and start it in one tap, or ask how your sites are doing.')+'</div>'
+    +'<div class="ask-card"><input type="text" id="askDash" placeholder="'+hint+'" aria-label="Ask SiteGuard"><button class="btn orange small" data-action="ask-dashboard">Ask</button></div></div>';
 }
 
 /** First-run checklist for site owners; disappears once the core loop has happened once. */
@@ -111,7 +119,7 @@ function renderDashboard(){
   const head = '<div class="view-head"><div class="flexbetween"><h1>'+greeting()+'</h1><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div>'
     +'<p class="greeting">'+(isContractor() ? org().name : org().name+' · '+(role()==='admin'?org().kindLabel:'portfolio overview'))+'</p></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
-  const parts = order.filter(id=>!hidden.includes(id)).map(id=> (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
+  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
   const start = gettingStarted();
   if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
   return head + start + parts.join('');
@@ -567,6 +575,7 @@ function renderMore(){
   if(S.moreView) return '<div style="margin-bottom:14px;"><button class="btn secondary small" data-action="goto-more" data-view="">← More</button></div>' + (MORE_VIEWS[S.moreView] ? MORE_VIEWS[S.moreView]() : '');
   const item = (view, icon, title, sub) => '<button class="menu-row" data-action="goto-more" data-view="'+view+'"><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
   let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div><div class="card">';
+  html += '<button class="menu-row" data-action="open-assistant"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">SiteGuard Assistant</div><div class="qa-sub">Ask what a site or job needs, or how your sites are doing</div></div>'+ICONS.chevron+'</button>';
   if(isHost()) html += item('safety', ICONS.alert, 'Safety Centre', 'Open incidents and permits across every site');
   html += item('workforce', ICONS.hardhat, 'Workforce', isContractor()?'Your workers\' medicals, inductions and training':'Contractor workers assigned to your sites');
   html += item('appointments', ICONS.passport, 'Appointments register', 'Statutory appointments and their letters');
@@ -805,7 +814,7 @@ function renderSettings(){
   html += '<div class="section-title">AI drafting</div><div class="card"><div class="site-card-sub">'
     +(S.boot.features.ai ? 'AI drafting and expiry-date detection are on. Requests go through SiteGuard\'s server — no API key is ever stored in your browser.'
       : S.boot.features.aiConfigured ? 'AI drafting is included in '+(isContractor()?'Contractor Pro':'Site Professional')+'. Upgrade under Plan &amp; billing to turn it on.'
-      : 'AI drafting isn\'t configured on this server.')+'</div></div>';
+      : 'No AI key is configured, so drafting and the assistant use SiteGuard\'s built-in templates and rules. Add ANTHROPIC_API_KEY on the server to switch on AI.')+'</div></div>';
   return html;
 }
 

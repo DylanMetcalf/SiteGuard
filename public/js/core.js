@@ -121,6 +121,7 @@ export const isOrgAdmin = () => ['owner','admin'].includes(S.boot.org.role);
 export const canReview = () => isHost() && ['owner','admin','reviewer'].includes(S.boot.org.role);
 export const canEdit = () => !(isHost() && S.boot.org.role === 'member');
 export const readOnly = () => S.boot.org.standing === 'lapsed';
+export const canCreateSite = () => isHost() && isOrgAdmin() && !readOnly();
 export const myName = () => S.boot.me.name;
 export const myRoleLabel = () => S.boot.me.roleLabel;
 export const myContractorId = () => S.boot.myContractorId;

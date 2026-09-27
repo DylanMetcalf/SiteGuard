@@ -56,7 +56,7 @@ export const api = {
   },
 
   /** POSTs JSON and streams a text/plain response, calling onText with the accumulated text. */
-  async stream(url, body, onText, signal) {
+  async stream(url, body, onText, signal, onHeaders) {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}) },
@@ -65,6 +65,7 @@ export const api = {
       signal,
     });
     if (!res.ok) return handle(res);
+    if (onHeaders) onHeaders(res.headers);
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let text = '';
