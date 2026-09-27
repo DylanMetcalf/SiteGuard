@@ -5,6 +5,7 @@
 import { api } from './api.js';
 import { S, ICONS, escapeHtml, on, openSheet, closeSheet, sheetEl, render, showToast, isContractor, canCreateSite } from './core.js';
 import { openNewSite, openDraft, loadPacks } from './sheets.js';
+import { openStudioForm } from './studio.js';
 
 const chat = () => (S.chat ??= { items: [], busy: false });
 
@@ -150,7 +151,14 @@ on('chat-card-site', (el)=>{
   if(!canCreateSite()){ showToast('Only admins can add sites'); return; }
   openNewSite({ name: card.name, location: card.location, packIds: card.packIds, extraRequirements: card.extraRequirements, fromAssistant: true });
 });
-on('chat-card-draft', (el)=>{ const card = cardOf(el); if(card) openDraft(card.docType, card.brief); });
+/** Draft types that have a full Document Studio blueprint get the branded version. */
+const DRAFT_TO_BLUEPRINT = { 'Site-specific risk assessment':'risk-assessment', 'Method statement':'method-statement', 'Toolbox talk record':'toolbox', 'Emergency response plan':'erp' };
+on('chat-card-draft', (el)=>{
+  const card = cardOf(el); if(!card) return;
+  const bp = DRAFT_TO_BLUEPRINT[card.docType];
+  if(bp) openStudioForm(bp, { values: { scope: card.brief, topic: card.brief } });
+  else openDraft(card.docType, card.brief);
+});
 on('chat-card-open', (el)=>{
   const card = cardOf(el); if(!card) return;
   if(!S.state.sites[card.siteId]){ showToast('That site isn\'t available to you any more'); return; }

@@ -10,6 +10,8 @@ import { features } from '../config.js';
 import { actorRole, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
 import { aiAllowed, planOf, standing } from '../lib/plans.js';
 import { openFindings } from '../lib/agent.js';
+import { blueprintForRequirement } from '../lib/studio/blueprints.js';
+import { brandingOf } from '../lib/studio/generate.js';
 import { auditFor } from './org.js';
 import { personasFor } from './demo.js';
 import { workforceState } from './workforce.js';
@@ -135,7 +137,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
   if (activeIds.length) {
     // ---- requirements ----
     for (const r of await many(db, `select * from requirements where site_id = any($1::uuid[]) order by position, created_at`, [activeIds])) {
-      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why });
+      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, blueprint: blueprintForRequirement(r.name)?.id ?? null });
     }
 
     // ---- documents (site requirements) ----
@@ -325,6 +327,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         plan: plan.id, planName: plan.name, subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
         currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo,
         siteLimit: plan.siteLimit,
+        branding: brandingOf(c),
       },
       features: { ...baseFeatures, ai: aiAllowed(c.org) },
       personas: await personasFor(pool, c),

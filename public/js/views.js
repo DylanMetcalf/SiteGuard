@@ -10,6 +10,7 @@ import {
   libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq,
 } from './core.js';
 import { computeTasks } from './sheets.js';
+import { renderStudio } from './studio.js';
 
 /* ============ SHELL ============ */
 export function topbar(){
@@ -68,12 +69,12 @@ function greeting(){
 }
 
 export const DASHBOARD_WIDGETS = {
-  contractor: [['agent','Compliance agent'],['assistant','Ask SiteGuard'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
-  host: [['agent','Compliance agent'],['assistant','Ask SiteGuard'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
+  contractor: [['agent','Compliance agent'],['assistant','Ask SiteGuard'],['studio','Document Studio'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
+  host: [['agent','Compliance agent'],['assistant','Ask SiteGuard'],['studio','Document Studio'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
 };
 const DEFAULT_WIDGETS = {
-  contractor: ['agent','assistant','invitations','focus','allSites','workforce','company'],
-  admin: ['safety','agent','assistant','organisation','portfolio','invitations','workforce'],
+  contractor: ['agent','assistant','studio','invitations','focus','allSites','workforce','company'],
+  admin: ['safety','agent','assistant','studio','organisation','portfolio','invitations','workforce'],
   reviewer: ['safety','agent','assistant','attention','portfolio','workforce'],
   viewer: ['safety','agent','assistant','attention','portfolio'],
 };
@@ -125,6 +126,12 @@ function renderAgent(){
     +(f.length ? '<div class="card">'+f.map(findingRow).join('')+'</div>' : '<div class="empty"><h3>All clear</h3><p>Nothing needs attention right now.</p></div>');
 }
 
+function studioWidget(){
+  return '<div class="section-title">Document Studio</div><div class="card" data-action="goto-more" data-view="studio" role="button" tabindex="0" style="cursor:pointer;display:flex;gap:14px;align-items:center;">'
+    +'<div class="qa-icon" style="width:48px;height:48px;border-radius:14px;">'+ICONS.passport+'</div>'
+    +'<div style="flex:1;"><div class="site-card-title">Create a professional document</div><div class="site-card-sub">Risk assessments, SHE plans, procedures, appointments and more — branded with your logo, as PDF and Word.</div></div>'+ICONS.chevron+'</div>';
+}
+
 function assistantWidget(){
   const hint = isContractor() ? 'e.g. What do I need for welding inside a tank at a gold mine?' : 'e.g. Safety file for electrical work on a conveyor at a coal mine';
   return '<div class="section-title">Ask SiteGuard</div><div class="card ask-hero">'
@@ -164,7 +171,7 @@ function renderDashboard(){
     +'<button class="btn secondary small" data-action="customise-dashboard">Customise</button></div>'
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
-  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
+  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
   const start = gettingStarted();
   if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
   return head + start + parts.join('');
@@ -545,6 +552,7 @@ function renderPassport(){
   let html = '<div class="view-head"><div class="flexbetween"><h1>Your Documents</h1>'
     +'<button class="btn secondary small" data-action="toggle-select">'+(S.docSelectMode?'Cancel':'Select')+'</button></div>'
     +'<p>'+org().name+'</p></div>';
+  if(!S.docSelectMode) html += studioWidget().replace('<div class="section-title">Document Studio</div>','');
   if(S.docSelectMode){
     html += '<div class="card checkpoint" style="display:flex;align-items:center;justify-content:space-between;">'
       +'<span class="site-card-sub">'+S.selectedDocs.length+' selected</span>'
@@ -620,6 +628,7 @@ function renderMore(){
   if(S.moreView) return '<div style="margin-bottom:14px;"><button class="btn secondary small" data-action="goto-more" data-view="">← More</button></div>' + (MORE_VIEWS[S.moreView] ? MORE_VIEWS[S.moreView]() : '');
   const item = (view, icon, title, sub) => '<button class="menu-row" data-action="goto-more" data-view="'+view+'"><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
   let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div><div class="card">';
+  html += item('studio', ICONS.passport, 'Document Studio', 'Branded safety documents as PDF and Word');
   const nf = (S.boot.agent||{findings:[]}).findings.length;
   html += item('agent', ICONS.verify, 'Compliance agent', nf ? nf+' item'+(nf===1?'':'s')+' need attention' : 'Continuous checks across every site');
   html += '<button class="menu-row" data-action="open-assistant"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">SiteGuard Assistant</div><div class="qa-sub">Ask what a site or job needs, or how your sites are doing</div></div>'+ICONS.chevron+'</button>';
@@ -651,6 +660,7 @@ const MORE_VIEWS = {
   billing: () => renderBilling(),
   settings: renderSettings,
   agent: renderAgent,
+  studio: renderStudio,
 };
 
 /* ---- Safety Centre (cross-site incidents & permits) ---- */
@@ -851,6 +861,7 @@ function renderSettings(){
     +'<label class="field-label" for="orgAddress">Physical address</label><input type="text" id="orgAddress" value="'+o.address+'">'
     +(isContractor()?'<label class="field-label" for="orgTrade">Trade</label><input type="text" id="orgTrade" value="'+o.trade+'">':'')
     +(ro?'':'<button class="btn primary block" style="margin-top:12px;" data-action="save-org">Save company details</button>')+'</div>';
+  html += brandingCard(ro);
   html += '<div class="section-title">Notifications</div><div class="card">'
     +'<div class="toggle-row"><label for="digestToggle">Email reminder digests (expiring documents &amp; certificates, open incidents, overdue requests)</label><input type="checkbox" id="digestToggle" '+(s.reminderDigest===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-digest"')+'></div>'
     +'<div class="toggle-row"><label for="weeklyToggle">Monday compliance summary for admins (from the compliance agent)</label><input type="checkbox" id="weeklyToggle" '+(s.weeklySummary===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-weekly"')+'></div>'
@@ -867,6 +878,29 @@ function renderSettings(){
       : 'No AI key is configured, so drafting and the assistant use SiteGuard\'s built-in templates and rules. Add ANTHROPIC_API_KEY on the server to switch on AI.')+'</div></div>';
   return html;
 }
+
+const BRAND_SWATCHES = [['#16325C','Navy'],['#3F6E55','Sage'],['#0F6B6B','Teal'],['#B8430F','Safety orange'],['#A51C24','Red'],['#5B2A86','Purple'],['#1C1C1C','Black']];
+function brandingCard(ro){
+  const b = org().branding || {};
+  const color = b.brandColor || '#16325C';
+  return '<div class="section-title">Document branding</div><div class="card">'
+    +'<div class="site-card-sub">Applied to every document created in Document Studio: your logo on the cover and every page header, your colour on headings and tables, and your document numbers.</div>'
+    +'<label class="field-label">Logo</label><div class="logo-preview">'+(b.logoFileId ? '<img src="/api/files/'+b.logoFileId+'" alt="Company logo">' : '<span class="site-card-sub">No logo yet — documents show your company name instead.</span>')+'</div>'
+    +(ro?'':'<div class="row-actions"><label class="btn secondary small" for="logoInput" style="cursor:pointer;">'+(b.logoFileId?'Replace logo':'Upload logo')+'</label><input type="file" id="logoInput" accept="image/png,image/jpeg" class="sr-only" data-action-change="upload-logo">'
+      +(b.logoFileId?'<button class="btn danger small" data-action="remove-logo">Remove</button>':'')+'</div><div class="site-card-sub" style="margin-top:6px;">PNG or JPG, under 2 MB. A wide logo on a transparent background looks best.</div>')
+    +'<label class="field-label">Brand colour</label><div class="swatch-row">'+BRAND_SWATCHES.map(([c,n])=>'<button class="swatch'+(c.toLowerCase()===color.toLowerCase()?' active':'')+'" style="background:'+c+';" data-action="pick-swatch" data-color="'+c+'" aria-label="'+n+'" title="'+n+'"'+(ro?' disabled':'')+'></button>').join('')
+    +'<input type="color" id="brandColor" value="'+color+'" aria-label="Custom colour" style="width:40px;height:32px;padding:0;border:none;background:none;"'+(ro?' disabled':'')+'></div>'
+    +'<label class="field-label" for="docPrefix">Document number prefix</label><input type="text" id="docPrefix" value="'+(b.docPrefix||'')+'" maxlength="12" style="text-transform:uppercase;" placeholder="e.g. ABC"'+(ro?' disabled':'')+'>'
+    +'<div class="site-card-sub" style="margin-top:4px;">Documents are numbered like '+(b.docPrefix||'ABC')+'-RA-001, '+(b.docPrefix||'ABC')+'-SHEP-001.</div>'
+    +(ro?'':'<button class="btn primary block" style="margin-top:12px;" data-action="save-branding">Save branding</button>')+'</div>';
+}
+on('pick-swatch', (el)=>{ document.getElementById('brandColor').value = el.dataset.color; document.querySelectorAll('.swatch').forEach(s=>s.classList.toggle('active', s===el)); });
+on('save-branding', (el)=>act(()=>api.patch('/api/org/branding', { brandColor: document.getElementById('brandColor').value, docPrefix: document.getElementById('docPrefix').value.trim() }), 'Branding saved', el));
+on('upload-logo', async (el)=>{
+  const f = el.files && el.files[0]; if(!f) return;
+  await act(()=>api.upload('/api/org/logo', f), 'Logo uploaded');
+});
+on('remove-logo', (el)=>act(()=>api.del('/api/org/logo'), 'Logo removed', el));
 
 /* ============ EXPORTS ============ */
 export function exportSafetyFile(siteId){
@@ -1035,6 +1069,7 @@ on('agent-go', (el)=>{
   } else if(a.kind==='workforce'){ S.nav='more'; S.moreView='workforce'; }
   else if(a.kind==='library'){ S.nav='passport'; }
   else if(a.kind==='safety'){ S.nav='more'; S.moreView='safety'; }
+  else if(a.kind==='studio'){ S.nav='more'; S.moreView='studio'; }
   else { showToast('That item is no longer available'); return; }
   render(); window.scrollTo(0,0);
 });

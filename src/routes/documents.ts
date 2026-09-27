@@ -122,6 +122,26 @@ export default async function documentRoutes(app: FastifyInstance) {
     return { fileId: stored.id, fileName: stored.filename, detectedExpiry };
   });
 
+  /** Puts a Document Studio PDF into a slot as the pending attachment, ready to submit. */
+  app.post('/api/documents/:slot/attach-generated', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const { generatedId } = z.object({ generatedId: z.string() }).parse(req.body);
+    if (!isUuid(generatedId)) throw notFound();
+    const s = await resolveSlot(pool, ctx, slotParam(req));
+    requireSubmitter(s);
+    return withTx(async (db) => {
+      const g = await one<{ pdf_file_id: string | null; doc_number: string; revision: number; review_due: string }>(
+        db, `select pdf_file_id, doc_number, revision, to_char(review_due, 'YYYY-MM-DD') as review_due from generated_documents where id = $1 and org_id = $2`, [generatedId, ctx.org.id]);
+      if (!g || !g.pdf_file_id) throw notFound();
+      const doc = await docFor(db, s);
+      if (doc.status === 'awaiting_review') throw conflict('This document is waiting on review. You can replace it if the reviewer asks for a correction.');
+      await db.query('update documents set pending_file_id = $2 where id = $1', [doc.id, g.pdf_file_id]);
+      await publishChange(db, [ctx.org.id]);
+      return { fileId: g.pdf_file_id, note: `${g.doc_number} Rev ${g.revision}, prepared in SiteGuard Document Studio`, reviewDue: g.review_due };
+    });
+  });
+
   app.post('/api/documents/:slot/submit', async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);

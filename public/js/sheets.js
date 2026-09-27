@@ -9,6 +9,7 @@ import {
   on, actions, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
 } from './core.js';
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
+import { studioBlueprintFor } from './studio.js';
 
 const refreshSheet = (html) => { const el = sheetEl(); if(el) el.innerHTML = html; };
 
@@ -129,6 +130,7 @@ function renderQuickActions(){
     items.push({icon:ICONS.audit, title:'Log site diary', sub:'Crew, conditions, work done', action:'diary'});
     items.push({icon:ICONS.verify, title:'Verify a record', sub:'Check a Site Ready verification', action:'verify'});
   }
+  items.unshift({icon:ICONS.passport, title:'Create a document', sub:'Document Studio: branded PDF and Word safety documents', action:'studio'});
   items.unshift({icon:ICONS.sparkle, title:'Ask the assistant', sub:isContractor()?'What a site needs, your sites\' status, drafts':'Site requirements, start a site, portfolio status', action:'assistant'});
   if(readOnly()) return sheetHead('Quick actions') + '<div class="notice">Your organisation is read-only until a plan is chosen.</div>';
   return sheetHead('Quick actions') + items.map(it=>'<button class="qa-item" data-action="qa" data-qa="'+it.action+'"><div class="qa-icon">'+it.icon+'</div><div><div class="qa-title">'+it.title+'</div><div class="qa-sub">'+it.sub+'</div></div></button>').join('');
@@ -155,6 +157,7 @@ on('qa', (el)=>{
   const a = el.dataset.qa;
   if(a==='ai-draft'){ openSheet(renderAIDraftSheet()); return; }
   if(a==='assistant'){ actions['open-assistant'](); return; }
+  if(a==='studio'){ actions['open-studio'](); return; }
   if(a==='verify'){ closeSheet(); S.nav='more'; S.moreView='verify'; render(); return; }
   if(a==='add-site'){ openNewSite(); return; }
   pickSite(a);
@@ -204,6 +207,11 @@ function renderReqSheet(reqId){
     else if(eff==='complete' && !reqId.startsWith('lib:')){ body += '<p class="site-card-sub">This requirement is complete.</p>'; }
     else {
       const renewing = eff==='expiring' || (eff==='complete' && reqId.startsWith('lib:'));
+      const bpId = studioBlueprintFor(reqId);
+      if(bpId) body += '<div class="card" style="background:var(--sage-bg);border-color:var(--sage-soft);margin-bottom:6px;"><div class="chat-card-title">'+ICONS.sparkle+' Document Studio</div>'
+        +'<div class="site-card-sub" style="color:var(--ink-soft);">Don\'t have this document yet? Create a professional, branded version in a few minutes and submit it straight from here.</div>'
+        +'<button class="btn sage small" style="margin-top:10px;" data-action="studio-for-req" data-req="'+reqId+'" data-bp="'+bpId+'">Create it in Document Studio</button></div>'
+        +'<div class="site-card-sub" style="text-align:center;margin:6px 0;">or upload your own</div>';
       body += '<label class="field-label" for="fileInput">'+(renewing?'Upload the renewed document':'Attach file')+'</label>'
         +'<input type="file" id="fileInput" accept="application/pdf,image/*,.docx,.xlsx,.txt" data-action-change="attach-file" data-req="'+reqId+'" style="font-size:12.5px;">'
         +'<div class="site-card-sub" id="attachStatus" style="margin-top:4px;">'+(doc.pendingFileName?'Attached: '+doc.pendingFileName+' (not yet submitted)':'PDF, photo, Word or Excel, up to 20MB.'+(S.boot.features.ai?' Photos and PDFs of certificates are scanned for an expiry date.':''))+'</div>'

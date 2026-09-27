@@ -16,7 +16,7 @@ import { appUrl, queueToOrg } from './email.js';
 
 export type Severity = 'high' | 'medium' | 'low';
 export interface FindingAction {
-  kind: 'site' | 'workforce' | 'safety' | 'library';
+  kind: 'site' | 'workforce' | 'safety' | 'library' | 'studio';
   siteId?: string;
   tab?: string;
 }
@@ -212,11 +212,28 @@ async function contractorFindings(db: Db, orgId: string): Promise<Finding[]> {
   return out;
 }
 
+/** Document Studio documents due for their periodic review (both kinds of organisation). */
+async function reviewFindings(db: Db, orgId: string): Promise<Finding[]> {
+  const rows = await many<{ overdue: number; due: number; first: string | null }>(
+    db,
+    `select count(*) filter (where review_due < current_date)::int as overdue,
+            count(*) filter (where review_due between current_date and current_date + 30)::int as due,
+            min(doc_number || ' ' || title) filter (where review_due < current_date + 30) as first
+       from generated_documents where org_id = $1 and superseded_at is null`,
+    [orgId],
+  );
+  const r = rows[0];
+  const out: Finding[] = [];
+  if (r?.overdue) out.push({ key: 'studio-review-overdue', siteId: null, severity: 'high', title: `${plural(r.overdue, 'document')} past its review date`, detail: 'Controlled documents must be reviewed at least yearly. Open Document Studio and create a new revision.', action: { kind: 'studio' } });
+  if (r?.due) out.push({ key: 'studio-review-due', siteId: null, severity: 'low', title: `${plural(r.due, 'document')} due for review within 30 days`, detail: `Starting with ${r.first}. A new revision keeps the same document number.`, action: { kind: 'studio' } });
+  return out;
+}
+
 const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 
 /** Reviews one organisation and stores the result. Returns whether anything changed. */
 export async function runAgentForOrg(db: Db, org: { id: string; kind: string }): Promise<boolean> {
-  const findings = org.kind === 'host' ? await hostFindings(db, org.id) : await contractorFindings(db, org.id);
+  const findings = [...(org.kind === 'host' ? await hostFindings(db, org.id) : await contractorFindings(db, org.id)), ...(await reviewFindings(db, org.id))];
   let changed = false;
   for (const f of findings) {
     const r = await db.query<{ inserted: boolean; was_resolved: boolean; old_title: string }>(

@@ -135,7 +135,7 @@ export const WORK_PROFILES: WorkProfile[] = [
   {
     id: 'underground',
     label: 'Underground work',
-    keywords: /\b(underground|shaft\w*|stope\w*|decline\w*|level \d+|development end|winder\w*|cage)\b/i,
+    keywords: /\b(underground|stope\w*|decline\w*|development end|winder\w*|shaft sinking|in the shaft|down the shaft|below ground)\b/i,
     packIds: ['heights-lifting'],
     permits: [],
     hazards: ['Fall of ground', 'Poor ventilation and heat', 'Flammable gas', 'Emergency escape and self-rescue'],
@@ -169,6 +169,56 @@ const GENERAL_CONTROLS = [
   'PPE as a minimum: hard hat, safety boots, reflective vest, eye and hearing protection',
   'Housekeeping maintained and work area barricaded',
 ];
+
+/**
+ * The specific controls for each hazard, so a risk register never pairs a
+ * hazard with an unrelated control.
+ */
+export const HAZARD_CONTROLS: Record<string, string> = {
+  'Electric shock and electrocution': 'Isolate, lock out and test for dead before work; only authorised persons switch; insulated tools; earth leakage protection on portable supplies.',
+  'Arc flash and burns': 'De-energise wherever possible; arc-rated PPE and face shield for the fault level; keep a safe approach distance; switching by authorised persons only.',
+  'Unexpected re-energisation': 'Personal lock and danger tag for every worker at each isolation point; isolation permit; try-start before work.',
+  'Stored energy in capacitors and cables': 'Discharge and earth capacitors and cables; test for dead; wait the rated discharge time.',
+  'Falls from height': 'Fall protection plan; guardrails or scaffold as first choice; full-body harness with double lanyards, 100% tie-off above 2 m; trained workers.',
+  'Falling objects striking people below': 'Barricade and sign the drop zone; toe boards; tools tethered; no work directly above others.',
+  'Scaffold or platform collapse': 'Scaffold erected by competent erectors on firm ground; inspected and tagged before use and weekly; load limits displayed.',
+  'Suspension trauma after a fall arrest': 'Rescue plan and rescue kit at the work area; trained rescuer on site; rescue within minutes; never work at height alone.',
+  'Dropped or swinging loads': 'Lift plan; exclusion zone under the load; tag lines; nobody under suspended loads.',
+  'Crane overturning': 'Ground bearing checked; outriggers fully extended on pads; load charts followed; wind speed monitored.',
+  'Failure of slings or lifting gear': 'Load-tested and tagged lifting gear; pre-use inspection; correct SWL and sling angles; damaged gear removed from use.',
+  'Contact with overhead power lines': 'Survey for power lines; safe clearance distances; spotter; isolation of the line where clearance cannot be kept.',
+  'Fire and explosion': 'Hot work permit; combustibles removed or covered within 11 m; gas test where flammables may be present; extinguisher and fire watch.',
+  'Burns and eye injuries from sparks and UV': 'Welding screens; welding helmet, gauntlets and flame-retardant clothing; people nearby shielded.',
+  'Welding fumes': 'Local exhaust ventilation or work in open air; respirator where ventilation is inadequate.',
+  'Gas cylinder failure': 'Cylinders upright and chained; flashback arrestors fitted; hoses inspected; valves closed when not in use.',
+  'Oxygen-deficient or toxic atmosphere': 'Confined space permit; atmosphere tested with a calibrated gas detector before and during entry; forced ventilation.',
+  'Engulfment by material': 'All inflows isolated, blanked and locked; material levels controlled; no entry above bridged material.',
+  'Difficult rescue of an injured person': 'Rescue plan and equipment (tripod, winch, lifeline) in place before entry; trained standby person at the entrance.',
+  'Heat stress': 'Work-rest cycles; drinking water available; heat-stress monitoring; acclimatised workers.',
+  'Collapse of excavation sides': 'Sides shored, battered or benched as designed by a competent person; daily inspection; spoil kept 1 m from the edge.',
+  'Striking buried services': 'Services located and marked before breaking ground; hand-dig near services; excavation permit.',
+  'People or plant falling into the excavation': 'Barricades and signage around the excavation; stop blocks for plant; safe access ladders.',
+  'Water ingress': 'Dewatering pumps; monitor weather; inspect after rain before re-entry.',
+  'Pedestrians struck by vehicles or plant': 'Traffic management plan; separate pedestrian routes; flag person; high-visibility clothing.',
+  'Rollover': 'Operators trained and licensed; seat belts worn; slopes and edges assessed; ROPS fitted.',
+  'Collisions in poor visibility or blind spots': 'Reverse alarms and lights; spotter when reversing; site speed limits.',
+  'Unauthorised operation': 'Only authorised operators; keys controlled; pre-use inspection signed each shift.',
+  'Entanglement in moving parts': 'Machine isolated and locked out before guards are removed; guards refitted before restart; no loose clothing.',
+  'Crushing and pinch points': 'Blocking or chocking against movement; hands-free tools where possible; clear communication between workers.',
+  'Release of stored mechanical or hydraulic energy': 'Bleed pressure and release tension before work; block suspended parts; test for zero energy.',
+  'Manual handling injuries': 'Mechanical lifting aids; team lifts for heavy items; training in safe lifting.',
+  'Fall of ground': 'Barring down and support checked before work; entry examination by a competent person.',
+  'Poor ventilation and heat': 'Ventilation and gas readings recorded before entry; work stopped if limits are exceeded.',
+  'Flammable gas': 'Continuous gas monitoring; flameproof equipment; withdraw people when limits are reached.',
+  'Emergency escape and self-rescue': 'Self-contained self-rescuers issued and trained; escape routes known and signposted.',
+  'Skin, eye and inhalation exposure': 'Safety data sheet at the work area; chemical-resistant PPE and respiratory protection as specified.',
+  'Spills to the environment': 'Bunded storage; spill kit on hand; spills reported and cleaned up immediately.',
+  'Fire from flammable substances': 'Flammables stored away from ignition sources; no smoking; extinguisher on hand.',
+  'Slips, trips and falls on uneven ground': 'Good housekeeping; walkways kept clear; adequate lighting.',
+  'Manual handling': 'Mechanical aids for heavy loads; team lifts; safe lifting training.',
+  'Heat, dust and noise exposure': 'Drinking water and shade; dust suppression; hearing protection above 85 dB(A).',
+  'Fatigue': 'Shift length and rest breaks managed; supervisors watch for fatigue; no driving when fatigued.',
+};
 
 /** The work profiles that match a free-text description, most specific first. */
 export function matchProfiles(text: string): WorkProfile[] {

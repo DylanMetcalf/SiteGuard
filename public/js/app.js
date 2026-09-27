@@ -6,6 +6,7 @@ import { handleDeepLink, renderAuth, renderNoOrg } from './auth.js';
 import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
 import './assistant.js';
+import './studio.js';
 
 const app = document.getElementById('app');
 
