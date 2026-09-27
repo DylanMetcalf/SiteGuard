@@ -121,20 +121,22 @@ on('studio-revise', async (el)=>{
 });
 
 on('studio-generate', async (el)=>{
-  const f = S.studioForm; if(!f) return;
-  const cat = await loadCatalog();
+  const f = S.studioForm; if(!f || el.disabled) return;
+  el.disabled = true;
+  const cat = await loadCatalog().catch(()=>null);
+  if(!cat){ el.disabled = false; showToast('Couldn\'t load the document types — check your connection'); return; }
   const bp = cat.blueprints.find(b=>b.id===f.bpId);
   const values = {};
   for(const fld of bp.fields){
     const node = document.getElementById('sf_'+fld.id);
     if(!node) continue;
     values[fld.id] = node.value.trim();
-    if(fld.required && !values[fld.id]){ node.focus(); showToast(fld.label+' is required'); return; }
+    if(fld.required && !values[fld.id]){ el.disabled = false; node.focus(); showToast(fld.label+' is required'); return; }
   }
   const siteSel = document.getElementById('sf_siteId');
   const siteId = f.siteId || (siteSel ? siteSel.value : '');
   const out = document.getElementById('studioOut');
-  el.disabled = true; el.textContent = S.boot.features.ai ? 'Writing your document… this can take a minute' : 'Writing your document…';
+  el.textContent = S.boot.features.ai ? 'Writing your document… this can take a minute' : 'Writing your document…';
   out.innerHTML = '';
   try{
     const r = await api.post('/api/studio/documents', {

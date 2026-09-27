@@ -162,6 +162,9 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (doc.status === 'awaiting_review') throw conflict('Already submitted — waiting on review.');
       const version = bumpVersion(doc.version);
       const expiry = body.expiryDate ?? null;
+      // A common slip is typing last year; an already-expired document can never count.
+      if (expiry && expiry < new Date().toISOString().slice(0, 10)) throw badRequest('That expiry date has already passed — check the date (especially the year) and try again.', 'expired_date');
+      if (expiry && expiry > `${new Date().getFullYear() + 25}-12-31`) throw badRequest('That expiry date is too far in the future — check the year.', 'bad_date');
       await db.query(
         `insert into document_versions (document_id, version, file_id, note, expiry_date, ai_drafted, submitted_by, submitted_by_name)
          values ($1, $2, $3, $4, $5, $6, $7, $8)`,

@@ -327,7 +327,7 @@ function renderSiteDetail(siteId){
     return '<div style="margin-bottom:14px;"><button class="btn secondary small" data-action="back-sites">← Sites</button></div>'
       +'<div class="view-head"><h1>You\'re invited</h1><p>'+site.name+'</p></div>'
       +'<div class="card checkpoint"><div class="site-card-title">'+site.name+'</div>'
-      +'<div class="site-card-sub" style="margin-top:6px;">'+site.hostName+' · '+site.location+'</div>'
+      +'<div class="site-card-sub" style="margin-top:6px;">'+[site.hostName, site.location].filter(Boolean).join(' · ')+'</div>'
       +'<div class="site-card-sub" style="margin-top:10px;">'+site.hostName+' has invited '+org().name+' to work this site and submit a safety file. Accepting shows you the requirements and starts tracking readiness; declining removes it from your list.</div>'
       +(isOrgAdmin() && invite ? '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn primary" style="flex:1;" data-action="invitation-decide" data-id="'+invite.id+'" data-decision="accept">Accept</button>'
         +'<button class="btn secondary" style="flex:1;" data-action="invitation-decide" data-id="'+invite.id+'" data-decision="decline">Decline</button></div>'
@@ -343,7 +343,7 @@ function renderSiteDetail(siteId){
     +(isHost() && isOrgAdmin() && !readOnly() ? '<button class="btn secondary small" data-action="edit-site" data-site="'+siteId+'">Edit</button>' : '')
     +(canShare && site.status!=='declined' ? '<button class="btn secondary small" data-action="new-share-link" data-site="'+siteId+'">Share</button>' : '')
     +'<button class="btn secondary small" data-action="export-site" data-site="'+siteId+'">Export</button></div></div>'
-    +'<div class="view-head"><h1>'+site.name+'</h1><p>'+site.location+' · '+(isContractor()?site.hostName:contractor.name)+'</p></div>'
+    +'<div class="view-head"><h1>'+site.name+'</h1><p>'+[site.location, isContractor()?site.hostName:contractor.name].filter(Boolean).join(' · ')+'</p></div>'
     +'<div class="subtabs" role="tablist">'
       +['compliance','activity','people'].map(t=>'<button role="tab" data-action="site-tab" data-tab="'+t+'" class="'+(S.siteTab===t?'active':'')+'" aria-selected="'+(S.siteTab===t)+'">'+({compliance:'Compliance',activity:'Site activity',people:'People'})[t]+'</button>').join('')
     +'</div>';

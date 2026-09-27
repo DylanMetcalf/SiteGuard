@@ -15,7 +15,15 @@ function go(view, extra){
   S.authContext = Object.assign({}, S.authContext, { error:'', ok:'' }, extra || {});
   render();
 }
-function fail(e){ S.authContext.error = e.message || 'Something went wrong'; render(); }
+/** Keeps what the person typed when the form re-renders (e.g. after an error). */
+function keepTyped(fn){
+  const kept = {};
+  document.querySelectorAll('#app input[id], #app select[id], #app textarea[id]').forEach(el=>{ if(el.type!=='file') kept[el.id] = el.value; });
+  fn();
+  for(const [id, v] of Object.entries(kept)){ const el = document.getElementById(id); if(el && el.type!=='file' && !el.readOnly && v) el.value = v; }
+}
+function fail(e){ S.authContext.error = e.message || 'Something went wrong'; keepTyped(render); }
+function need(msg, id){ S.authContext.error = msg; keepTyped(render); const el = document.getElementById(id); if(el) el.focus(); }
 function finish(){
   S.authView = null;
   S.authContext = {};
@@ -196,8 +204,10 @@ on('signin', async (el)=>{
 on('signup', async (el)=>{
   const mode = el.dataset.mode;
   const body = { name: val('suName'), email: val('suEmail'), password: document.getElementById('suPassword').value };
-  if(!body.name){ document.getElementById('suName').focus(); return; }
-  if(mode === 'new'){ body.orgName = val('suOrgName'); body.orgKind = val('suOrgKind'); if(!body.orgName){ document.getElementById('suOrgName').focus(); return; } }
+  if(!body.name) return need('Enter your name.', 'suName');
+  if(!body.email) return need('Enter your email address.', 'suEmail');
+  if(body.password.length < 10) return need('Choose a password of at least 10 characters.', 'suPassword');
+  if(mode === 'new'){ body.orgName = val('suOrgName'); body.orgKind = val('suOrgKind'); if(!body.orgName) return need('Enter your company or organisation name.', 'suOrgName'); }
   if(mode === 'invite') body.inviteToken = S.authContext.token;
   if(mode === 'site-invite'){ body.siteInviteToken = S.authContext.token; body.orgName = val('suOrgName'); body.orgKind = 'contractor'; }
   el.disabled = true;

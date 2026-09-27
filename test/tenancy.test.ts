@@ -93,7 +93,7 @@ describe('role enforcement', () => {
     assert.equal((await hostA.get(`/api/files/${fileId}`)).status, 404, 'host must not see an unsubmitted draft');
     assert.equal((await contractor.get(`/api/files/${fileId}`)).status, 200);
 
-    const sub = await contractor.post(`/api/documents/${reqIds[0]}/submit`, { note: 'current letter', expiryDate: '2099-01-01' });
+    const sub = await contractor.post(`/api/documents/${reqIds[0]}/submit`, { note: 'current letter', expiryDate: '2040-01-01' });
     assert.equal(sub.status, 200, JSON.stringify(sub.body));
     assert.equal((await hostA.get(`/api/files/${fileId}`)).status, 200, 'host sees the submitted version');
     assert.equal((await hostB.get(`/api/files/${fileId}`)).status, 404, 'other tenants never do');

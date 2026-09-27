@@ -1,7 +1,7 @@
 // SiteGuard web app entry point: boot, render, event delegation and live sync.
 
 import { api } from './api.js';
-import { S, ICONS, actions, reload, setRender, showToast, closeSheet } from './core.js';
+import { S, ICONS, actions, reload, setRender, showToast, closeSheet, consumeSkippedPop, afterPendingBack } from './core.js';
 import { handleDeepLink, renderAuth, renderNoOrg } from './auth.js';
 import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
@@ -9,6 +9,33 @@ import './assistant.js';
 import './studio.js';
 
 const app = document.getElementById('app');
+
+/* ---- Phone back button: each screen gets a history entry; Back returns to the previous screen. ---- */
+let restoring = false;
+const navOf = () => ({ nav: S.nav || 'dashboard', moreView: S.moreView || null, activeSiteId: S.activeSiteId || null, siteTab: S.siteTab || null });
+const sameNav = (a, b) => a.nav === b.nav && (a.moreView || null) === (b.moreView || null) && (a.activeSiteId || null) === (b.activeSiteId || null) && (a.siteTab || null) === (b.siteTab || null);
+function syncHistory(){
+  if(restoring || !S.boot || !S.boot.authenticated) return;
+  afterPendingBack(()=>{
+    const st = navOf(), cur = history.state;
+    if(!cur || !cur.nav){ history.replaceState(st, ''); return; }
+    if(cur.sheet) return;
+    if(!sameNav(cur, st)) history.pushState(st, '');
+  });
+}
+window.addEventListener('popstate', (e)=>{
+  if(consumeSkippedPop()) return;
+  if(document.querySelector('.overlay:not(.tutorial)')){ closeSheet(true); return; }
+  const st = e.state;
+  if(!st || !st.nav || st.sheet || !S.boot || !S.boot.authenticated || sameNav(st, navOf())) return;
+  S.nav = st.nav; S.moreView = st.moreView; S.activeSiteId = st.activeSiteId; if(st.siteTab) S.siteTab = st.siteTab;
+  restoring = true; render(); restoring = false; window.scrollTo(0,0);
+});
+window.addEventListener('sg:signed-out', ()=>{
+  if(!S.boot || !S.boot.authenticated) return;
+  closeSheet(true);
+  reload().then(()=>showToast('You were signed out — sign in again to carry on.')).catch(()=>{});
+});
 
 // Send unexpected browser errors to the server log (a few per page load), so bugs surface without a user report.
 let reported = 0;
@@ -37,6 +64,7 @@ function render(){
   }
   const y = window.scrollY;
   app.innerHTML = topbar() + '<main class="view">'+renderView()+'</main>' + bottomNav();
+  syncHistory();
   if(S.keepScroll) window.scrollTo(0, y);
   startLive();
   maybeShowTutorial();

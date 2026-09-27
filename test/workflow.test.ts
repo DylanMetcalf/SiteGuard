@@ -49,14 +49,14 @@ describe('site lifecycle', () => {
 
   it('document review loop with versioning', async () => {
     await contractor.upload(`/api/documents/${reqIds[0]}/file`, 'coid.pdf', PDF);
-    assert.equal((await contractor.post(`/api/documents/${reqIds[0]}/submit`, { expiryDate: '2099-12-31' })).status, 200);
+    assert.equal((await contractor.post(`/api/documents/${reqIds[0]}/submit`, { expiryDate: '2040-12-31' })).status, 200);
     assert.equal((await host.post(`/api/documents/${reqIds[0]}/correction`, { text: 'Wrong entity name' })).status, 200);
     let st = await contractor.state();
     assert.equal(st.state.documents[reqIds[0]].status, 'correction_required');
     assert.equal(st.state.reviews[reqIds[0]][0].text, 'Wrong entity name');
 
     await contractor.upload(`/api/documents/${reqIds[0]}/file`, 'coid-v2.pdf', PDF);
-    const r = await contractor.post(`/api/documents/${reqIds[0]}/submit`, { expiryDate: '2099-12-31' });
+    const r = await contractor.post(`/api/documents/${reqIds[0]}/submit`, { expiryDate: '2040-12-31' });
     assert.equal(r.body.version, 'v1.1');
     assert.equal((await host.post(`/api/documents/${reqIds[0]}/approve`)).status, 200);
     st = await host.state();

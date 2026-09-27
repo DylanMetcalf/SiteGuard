@@ -15,6 +15,10 @@ export class ApiError extends Error {
 async function handle(res) {
   let body = null;
   try { body = await res.json(); } catch { /* empty or non-JSON */ }
+  if (res.status === 401 && !/\/api\/auth\//.test(res.url)) {
+    // Signed out elsewhere or the session expired: send the person back to sign in.
+    window.dispatchEvent(new CustomEvent('sg:signed-out'));
+  }
   if (!res.ok) {
     const message = (body && body.message) || (res.status === 0 ? 'Network error' : 'Request failed (' + res.status + ')');
     throw new ApiError(res.status, body && body.error, message);

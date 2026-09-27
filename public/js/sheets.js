@@ -590,7 +590,7 @@ function readContractor(prefix){
   const email = val(prefix+'CEmail');
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
     // Without an address nobody is invited and the site waits forever.
-    showToast('Enter the contractor\'s email — that\'s where the invitation goes');
+    showToast(email ? 'That email address doesn\'t look right — check it and try again' : 'Enter the contractor\'s email — that\'s where the invitation goes');
     document.getElementById(prefix+'CEmail').focus();
     return null;
   }
@@ -686,8 +686,8 @@ on('save-site-edit', async (el)=>{
 on('add-requirement', (el)=>{
   const cats = [...new Set(Object.values(S.state.requirements).flat().map(r=>r.category))];
   openSheet(sheetHead('Add a requirement', S.state.sites[el.dataset.site].name)
-    +'<label class="field-label" for="arCategory">Category</label><input type="text" id="arCategory" list="arCats" placeholder="e.g. Personnel"><datalist id="arCats">'+cats.map(c=>'<option value="'+c+'">').join('')+'</datalist>'
-    +'<label class="field-label" for="arName">Document required</label><input type="text" id="arName" placeholder="e.g. Working at heights training">'
+    +'<label class="field-label" for="arCategory">Category</label><input type="text" id="arCategory" maxlength="80" list="arCats" placeholder="e.g. Personnel"><datalist id="arCats">'+cats.map(c=>'<option value="'+c+'">').join('')+'</datalist>'
+    +'<label class="field-label" for="arName">Document required</label><input type="text" id="arName" maxlength="200" placeholder="e.g. Working at heights training">'
     +'<label class="field-label" for="arSource">Why it\'s required</label><select id="arSource" class="field">'+Object.entries(SOURCE_LABEL).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('')+'</select>'
     +'<label class="field-label" for="arWhy">Explanation for the contractor</label><textarea id="arWhy" placeholder="e.g. Required for any crew working above 1.8m, per the MHSA Code of Practice."></textarea>'
     +'<button class="btn primary block" style="margin-top:12px;" data-action="save-requirement" data-site="'+el.dataset.site+'">Add requirement</button>');

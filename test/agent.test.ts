@@ -44,7 +44,7 @@ describe('compliance agent', () => {
     const state = await host.state();
     reqIds = state.state.requirements[siteId].map((r: { id: string }) => r.id);
     await contractor.upload(`/api/documents/${reqIds[0]}/file`, 'coid.pdf', PDF);
-    await contractor.post(`/api/documents/${reqIds[0]}/submit`, { expiryDate: '2099-12-31' });
+    await contractor.post(`/api/documents/${reqIds[0]}/submit`, { expiryDate: '2040-12-31' });
     // Fresh submissions aren't nagged about; ones waiting more than two days are.
     assert.ok(!has(await findings(host), /waiting for your review/));
     await pool.query(`update documents set updated_at = now() - interval '6 days' where requirement_id = $1`, [reqIds[0]]);
@@ -58,7 +58,7 @@ describe('compliance agent', () => {
     await pool.query(`update documents set expiry_date = current_date - 3 where requirement_id = $1`, [reqIds[0]]);
     assert.ok(has(await findings(host), /1 document expired on Vent Shaft 2/));
     assert.ok(has(await findings(contractor), /1 document expired on Vent Shaft 2/));
-    await pool.query(`update documents set expiry_date = '2099-12-31' where requirement_id = $1`, [reqIds[0]]);
+    await pool.query(`update documents set expiry_date = '2040-12-31' where requirement_id = $1`, [reqIds[0]]);
     assert.ok(!has(await findings(host), /expired on/));
   });
 
