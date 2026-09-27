@@ -21,3 +21,7 @@ Ideas we are deliberately **not** building yet. Each gets revisited when there i
 | Background research agent that refreshes blueprints from new legislation | Legal content changes need a person's review, not automatic edits | A monthly reviewed routine proposes changes as a pull request |
 | Custom fonts in generated documents | Standard PDF fonts render everywhere and keep files small | A customer's brand guide requires it |
 | Customer-editable template library (org-level templates) | Built-in packs + "copy from existing site" cover the need | Customers keep rebuilding the same custom lists |
+| Phone push notifications for the inbox | In-app inbox and email cover it; push needs a service worker and user permission prompts | People use SiteGuard daily on site and miss updates |
+| Word files merged into the bound safety file | Converting .docx to PDF needs LibreOffice on the server; a placeholder page points to the file | Customers upload many Word documents |
+| Tracked changes (redlines) in the review workspace | Section status + comments + revision history cover the need | Reviewers ask to see word-level changes |
+| Guest reviewers editing a document | Only the author edits, which keeps ownership clear | Clients ask to co-author |

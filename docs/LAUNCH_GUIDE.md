@@ -223,8 +223,14 @@ mine and three contractors, deleted automatically after three days.
    Studio**. Describe the job, tap **Create document**, and open the PDF: a numbered, branded risk
    assessment with a risk register and sign-off blocks. Tap **Attach and submit for review**. (Upload
    a logo under More → Organisation settings first to show the company's own branding.)
-5. **Review and Site Ready (2 min).** Switch back to the mine persona, approve a document, and show
-   the Site Ready verification and a share link a safety auditor can open without an account.
+   Even faster: on the contractor's site page tap **Build my safety file**, answer the questions
+   once, and watch SiteGuard write every missing document it can, then **Submit all for review**.
+5. **Review and Site Ready (2 min).** Switch back to the mine persona and open the bell: the new
+   submissions are there. Open one, approve a section, highlight a sentence and tap **Needs
+   changes** with a note, then **Send back**. Switch to the contractor: the bell shows the feedback;
+   edit the section, save, resubmit. Back as the mine: only the edited section needs review.
+   Finish with **Download the safety file** (one PDF with cover and contents), the Site Ready
+   verification and a share link a safety auditor can open without an account.
 6. **Close (2 min).** "Contractors use it free. You pay per user after a 14-day trial. Can we set up
    your first site together now?" Create a real account on the spot and use **Ask SiteGuard** to
    start their first site.
@@ -250,6 +256,14 @@ branding**: logo (PNG or JPG), brand colour and document number prefix (e.g. `AB
 controlled documents: the compliance agent reminds the company when a review is due, and **New
 revision** re-issues it under the same number.
 
+## Connecting a contractor to a site
+
+Two ways, both from the site's page on the mine side: the **email invitation** (sent when the site
+is created) or **Get a join code**, an 8-character code valid for 14 days that you can read out,
+WhatsApp or print for the site office. The contractor taps **Join a site with a code** in the app.
+Either way the contractor then sees the site's document list, and the mine is notified when they
+join.
+
 ## When something goes wrong
 
 | Symptom | Likely cause | Fix |
@@ -260,3 +274,5 @@ revision** re-issues it under the same number.
 | Assistant says the AI service is busy | Anthropic rate limit or outage | It falls back to built-in rules automatically; try again later |
 | Site shows an error page | Deploy failed | Render → siteguard → Events shows the failed deploy and its log |
 | Custom domain stuck on *Verifying* | DNS still spreading, or a typo in the CNAME | Re-check the record in domains.co.za; wait a few hours |
+| "That code isn't valid or has expired" | Code older than 14 days, a newer code was made, or the contractor already joined | Tap **Get a join code** again on the site and give them the new one |
+| A document in the bound safety file shows "not merged" | It's a Word file or a password-protected PDF | Upload a PDF version, or open the original in SiteGuard |

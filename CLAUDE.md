@@ -29,6 +29,8 @@ haven't built.
   (template/rules fallback).
 - Document Studio: new document types go through the `add-document-blueprint` skill in
   `.claude/skills/`; every blueprint must render with empty answers (tested).
+- Review workspace visibility lives in `resolveForUser` (`src/lib/review.ts`); section approvals are keyed by
+  content hash. Notify the other side with `notifyOrg` (`src/lib/notify.ts`) inside the write's transaction.
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and

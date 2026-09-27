@@ -17,7 +17,7 @@ that MVP. What's new is the backend underneath them.
 
 | Brief item | Status |
 |---|---|
-| **Data model & backend.** Organisations are the tenant; everything is scoped to one. | Postgres, 4 SQL migrations, Node/TypeScript/Fastify API |
+| **Data model & backend.** Organisations are the tenant; everything is scoped to one. | Postgres with numbered SQL migrations, Node/TypeScript/Fastify API |
 | **Real authentication.** Email/password, invite-by-email, password reset, sessions. | Built in: scrypt hashes, httpOnly cookies, CSRF tokens, email confirmation, lockout, rate limits. The role switcher is now a demo-only persona picker. |
 | **Server-enforced permissions.** | Every read and write is checked against the caller's organisation and role. Another tenant's records return 404. Covered by tests. |
 | **File storage.** | S3-compatible (AWS S3, Cloudflare R2, MinIO), private objects, 60-second presigned downloads, magic-byte type checks |
@@ -49,6 +49,31 @@ tailors each document to the job and can research the site's published requireme
 requirement that a blueprint can produce shows **Create it in Document Studio**, and the result is
 attached and submitted for review in one step. Documents due for review are flagged by the
 compliance agent. See `src/lib/studio/`.
+
+**Safety File Builder**: on a contractor's site page, *Build my safety file* writes every
+document the site still needs that Document Studio can produce (typically 7 of the 14 in the
+baseline pack) in one go. Tick the documents, answer the shared questions once, watch each one
+being written, then submit them all for review with one tap. What it can't write (COID letter,
+insurance, CIPC and tax certificates, medicals) is listed so the contractor knows what to upload.
+
+**Review workspace**: the site reads a submitted document on screen, section by section, and
+approves each section or asks for changes (with a note, optionally quoting highlighted text).
+Either side can comment. The author edits the flagged sections in the app, saves a new revision
+(same number, Rev 1, 2, …) and resubmits; sections that didn't change keep their approval, so the
+reviewer only re-checks what changed. The author can also send a **review link** to someone
+without an account (e.g. the client's SHE manager), who can read, comment and approve sections
+until the link expires or is withdrawn.
+
+**Inbox**: the bell shows in-app notifications for new submissions, section feedback, comments,
+approvals, corrections and contractors joining a site. Tapping one opens the exact document.
+
+**Join codes**: besides the email invitation, a site can give a contractor an 8-character code
+(valid 14 days). The contractor taps *Join a site with a code*, and the site is connected.
+
+**Bound safety file**: *Download the safety file* on a site (both sides, and on safety-file share
+links) produces one PDF: branded cover, contents with each requirement's status and page number,
+then every submitted document merged in order. Photos become pages; Word files and protected PDFs
+get a page saying where to find them; every page is stamped with the site and page number.
 
 **Compliance agent**: a background check every 15 minutes across every organisation's sites.
 It keeps a prioritised list of what needs attention (expired or expiring documents, reviews
@@ -121,10 +146,12 @@ src/
   db/                      Pool, migration runner, SQL migrations
   lib/                     authz (permission model), sessions, security, plans, storage,
                            email outbox, AI proxy, assistant, compliance agent, work-type
-                           knowledge + template drafts, realtime, readiness rules, audit
+                           knowledge + template drafts, realtime, readiness rules, audit,
+                           review workspace, notifications, bound safety file (bundle)
   routes/                  auth, org/team, bootstrap (per-user view), sites, documents,
                            safety (incidents/permits/diary/inspections), requests, files,
-                           workforce, share links, billing, ai, events (SSE), demo
+                           workforce, share links, billing, ai, events (SSE), demo,
+                           studio, review (+ review links, inbox), join codes
   jobs/                    Email delivery, reminder digests, housekeeping
   demo/seed.ts             Demo sandbox data
 public/                    The web app: original design system + ES modules, no build step

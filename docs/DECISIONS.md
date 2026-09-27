@@ -5,6 +5,26 @@ Newest first.
 
 ---
 
+**DECISION** Section approvals are keyed by a hash of the section's content, not by revision.
+**REASON** When an author fixes one section, the reviewer should only re-read that section. Hashing the content means unchanged sections keep their approval automatically, with no diffing or manual carry-over.
+**DATE** 2026-09-27
+
+**DECISION** Notifications are in-app only (plus the existing emails); no push notifications yet.
+**REASON** The inbox covers "the person on site knows" without app-store apps or push-service accounts. Browser push can be added once people use the app daily on site.
+**DATE** 2026-09-27
+
+**DECISION** Join codes live on the site's invitation, not as a separate way to link companies.
+**REASON** One acceptance path (email link or code) means the same checks, audit and notifications, and a code can't connect a contractor to a site that never invited anyone.
+**DATE** 2026-09-27
+
+**DECISION** The Safety File Builder runs in the browser, calling the existing endpoints one document at a time.
+**REASON** No new server surface to secure; every rule (roles, limits, tenancy) still applies, and one failed document never undoes the others.
+**DATE** 2026-09-27
+
+**DECISION** The bound safety file uses pdf-lib to merge PDFs.
+**REASON** Small, dependency-free, MIT-licensed and widely used; pdfmake can create PDFs but not merge existing ones.
+**DATE** 2026-09-27
+
 **DECISION** Rebrand to deep navy and sage with softer, card-based UI and self-hosted fonts (Onest, JetBrains Mono).
 **REASON** Orange/grey is common among competitors; navy signals trust and professionalism to mining buyers, sage gives a distinctive, calm accent. Self-hosting fonts removes a third-party request (privacy, speed, reliability). Colours are tokens, so the palette can still change in one place.
 **DATE** 2026-09-27

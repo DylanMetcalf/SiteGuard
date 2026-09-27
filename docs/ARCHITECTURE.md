@@ -11,6 +11,7 @@
 | Email | SMTP via nodemailer, through a transactional outbox | Works with Postmark, SES, Resend, Mailgun or others. A rolled-back action never sends mail. |
 | Billing | Stripe Checkout, Customer Portal and webhooks | Stripe is the source of truth. The webhook mirrors it onto the organisation. |
 | AI | Claude API (`@anthropic-ai/sdk`), server-side only | The key never reaches a browser. Usage is plan-gated and metered per organisation. |
+| Documents | pdfmake (PDF), docx (Word), pdf-lib (merging the bound safety file) | Pure JavaScript, no system binaries; standard PDF fonts, no network or disk access while rendering. |
 | Web app | The MVP's HTML/CSS/JS, split into ES modules, no build step | Reuses the existing UI and design system as-is. |
 
 ## Tenancy model
@@ -81,6 +82,12 @@ refuse.
 | Assign workers to a site | | | | ✓ | ✓ |
 | Accept or decline site invitations | | | | ✓ | |
 | Create external share links | ✓ | ✓ | | ✓ | |
+| Approve or ask for changes on document sections (review workspace) | ✓ | ✓ | | | |
+| Comment in the review workspace | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Edit, save revisions of, and send review links for the company's own Studio documents | | | | ✓ | ✓ |
+| Create a site join code | ✓ | | | | |
+| Join a site with a code | | | | ✓ | ✓ |
+| Download the bound safety file of a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Appointments register | ✓ | | | ✓ | |
 | Team, roles, billing, organisation settings | ✓ | | | ✓ | |
 
@@ -184,6 +191,33 @@ storage), and routes in `routes/studio.ts`.
   the rest, with the review date as the expiry date.
 - Branding (logo file, colour, number prefix) lives in the organisation's `settings`.
 
+## Review workspace, inbox, join codes and the bound safety file
+
+- **Review workspace** (`lib/review.ts`, `routes/review.ts`, `public/js/review.js`). A Studio
+  document is visible to its author, and to the host only once a revision has been submitted to one
+  of the host's sites (joined through `document_versions` → `requirements` → `sites`); anyone else
+  gets 404. Section decisions (`doc_section_reviews`) are keyed by a hash of the section's
+  canonical JSON, so an unchanged section keeps its approval across revisions and an edited one
+  needs review again. Comments (`doc_comments`) belong to the document number, not a revision.
+  Saving edits creates the next revision through the normal Studio pipeline (same number, new PDF
+  and Word files). Only the author edits; only host owners/admins/reviewers decide.
+- **Review links** (`review_links`) store only a SHA-256 of the token, expire (1–60 days), can be
+  withdrawn, always show the latest revision, and let a named guest comment or decide on sections.
+  Guests get the PDF through the link, never a file id.
+- **Notifications** (`notifications`, `lib/notify.ts`) are one row per user, written in the same
+  transaction as the event, sent in `/api/bootstrap` (latest 40) and refreshed by the usual live
+  sync.
+- **Join codes** (`routes/join.ts`, migration 009) are 8 characters from an unambiguous alphabet,
+  stored hashed on the site's pending invitation, valid 14 days; a new code replaces the old one.
+  Redeeming one runs the same acceptance as the email link. Codes are rate-limited.
+- **Safety File Builder** (`public/js/builder.js`) is client-side only: it calls the same
+  `POST /api/studio/documents`, `attach-generated` and `submit` endpoints one document at a time,
+  so a failure on one never loses the others and every server rule still applies.
+- **Bound safety file** (`lib/bundle.ts`): pdfmake renders the cover and contents (twice: once to
+  count pages, once with page numbers), pdf-lib merges the documents and stamps page footers. It
+  includes only documents the other side can already see (complete, expiring, awaiting review),
+  the same rule as safety-file share links, and caps merged content at 80 MB.
+
 ## Known limits and next steps
 
 These are deliberate scope boundaries, not hidden gaps:
@@ -204,7 +238,9 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 69 integration tests, including every Document Studio blueprint rendered to PDF and
+- `npm test`: 81 integration tests, including the review workspace (visibility, section
+  decisions, approvals carried across revisions, review links, notifications), join codes and the
+  bound safety file, plus including every Document Studio blueprint rendered to PDF and
   Word, numbering and revisions, branding, attach-and-submit and tenant isolation, against real Postgres, covering the assistant's offline mode and
   scoping, template drafting, the compliance agent's findings and tenant isolation, requirement starter packs, tenant isolation (cross-tenant
   reads and writes all 404), the role matrix, CSRF, draft-file privacy, share-link scope, expiry
