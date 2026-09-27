@@ -69,7 +69,12 @@ const numbered = (items: string[]): Block => ({ type: 'numbered', items });
 const note = (text: string): Block => ({ type: 'note', text });
 const sec = (heading: string, ...blocks: Block[]): Section => ({ heading, blocks });
 /** "Name, Location", without repeating a location the name already contains. */
-export const joinSite = (name: string, location?: string) => (location && !name.toLowerCase().includes(location.toLowerCase()) ? `${name}, ${location}` : name);
+export function joinSite(name: string, location?: string): string {
+  if (!location) return name;
+  const words = (t: string) => t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const inName = new Set(words(name));
+  return words(location).every((w) => inName.has(w)) ? name : `${name}, ${location}`;
+}
 const siteLabel = (i: BuildInput) => (i.site ? joinSite(i.site.name, i.site.location) : v(i, 'site', 'the site'));
 const clientLabel = (i: BuildInput) => i.site?.clientName || v(i, 'client', 'the client');
 const scopeText = (i: BuildInput) => v(i, 'scope', v(i, 'task', 'the work described in this document'));
