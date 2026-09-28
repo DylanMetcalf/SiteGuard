@@ -67,7 +67,9 @@ const schema = z.object({
   RUN_JOBS_IN_WEB: bool(true),
 });
 
-const parsed = schema.safeParse(process.env);
+// A setting saved as an empty box (e.g. left blank in Render) means "not set", so defaults apply.
+const env = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== undefined && v.trim() !== ''));
+const parsed = schema.safeParse(env);
 if (!parsed.success) {
   console.error('Invalid configuration:', parsed.error.flatten().fieldErrors);
   process.exit(1);
