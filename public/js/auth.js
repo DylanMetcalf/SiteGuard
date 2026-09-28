@@ -3,8 +3,10 @@
 import { api } from './api.js';
 import { S, on, reload, render, showToast, escapeHtml, val } from './core.js';
 
-const brand = '<div class="brand" style="justify-content:center;margin-bottom:18px;"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div><div class="brand-tag">Site Operations &amp; Compliance</div></div></div>';
-const wrap = (inner) => '<div class="onboard-wrap">'+brand+inner+'</div>';
+const brand = '<div class="auth-hero"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div></div></div>'
+  +'<p class="auth-tagline">Safety files, contractor compliance and site safety — in one place.</p>'
+  +'<div class="auth-points"><span>Starter packs for SA mines</span><span>Live contractor readiness</span><span>Branded documents in minutes</span></div></div>';
+const wrap = (inner) => '<div class="auth-shell">'+brand+'<div class="onboard-wrap">'+inner+'</div></div>';
 const errorBox = () => S.authContext.error ? '<div class="form-error" role="alert">'+escapeHtml(S.authContext.error)+'</div>' : '';
 const okBox = () => S.authContext.ok ? '<div class="form-ok" role="status">'+escapeHtml(S.authContext.ok)+'</div>' : '';
 
@@ -13,7 +15,15 @@ function go(view, extra){
   S.authContext = Object.assign({}, S.authContext, { error:'', ok:'' }, extra || {});
   render();
 }
-function fail(e){ S.authContext.error = e.message || 'Something went wrong'; render(); }
+/** Keeps what the person typed when the form re-renders (e.g. after an error). */
+function keepTyped(fn){
+  const kept = {};
+  document.querySelectorAll('#app input[id], #app select[id], #app textarea[id]').forEach(el=>{ if(el.type!=='file') kept[el.id] = el.value; });
+  fn();
+  for(const [id, v] of Object.entries(kept)){ const el = document.getElementById(id); if(el && el.type!=='file' && !el.readOnly && v) el.value = v; }
+}
+function fail(e){ S.authContext.error = e.message || 'Something went wrong'; keepTyped(render); }
+function need(msg, id){ S.authContext.error = msg; keepTyped(render); const el = document.getElementById(id); if(el) el.focus(); }
 function finish(){
   S.authView = null;
   S.authContext = {};
@@ -66,7 +76,7 @@ export function renderAuth(){
     const head = '<div class="view-head" style="text-align:center;"><h1>Join '+escapeHtml(inv.org_name)+'</h1><p>You\'ve been invited as '+escapeHtml(inv.role)+' · '+escapeHtml(inv.email)+'</p></div>';
     if(signedIn){
       return wrap(head+'<div class="card"><div class="site-card-sub">Signed in as '+S.boot.me.email+'.</div>'
-        +'<button class="btn orange block" style="margin-top:12px;" data-action="accept-user-invite">Accept and join</button>'
+        +'<button class="btn primary block" style="margin-top:12px;" data-action="accept-user-invite">Accept and join</button>'
         +'<button class="btn secondary block" style="margin-top:8px;" data-action="auth-signout">Use a different account</button>'+errorBox()+'</div>');
     }
     if(inv.has_account){
@@ -77,7 +87,7 @@ export function renderAuth(){
       +'<label class="field-label" for="suEmail">Email</label><input type="email" id="suEmail" value="'+escapeHtml(inv.email)+'" readonly>'
       +'<label class="field-label" for="suPassword">Choose a password</label><input type="password" id="suPassword" autocomplete="new-password" minlength="10">'
       +'<div class="site-card-sub" style="margin-top:4px;">At least 10 characters. A short phrase works well.</div>'
-      +'<button class="btn orange block" style="margin-top:14px;" data-action="signup" data-mode="invite">Create account and join</button>'+errorBox()+'</div>');
+      +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="invite">Create account and join</button>'+errorBox()+'</div>');
   }
 
   if(v === 'site-invite'){
@@ -95,7 +105,7 @@ export function renderAuth(){
       let body = '<div class="card">';
       if(kind === 'contractor'){
         body += '<div class="site-card-sub">You\'ll accept on behalf of <strong>'+S.boot.org.name+'</strong>.</div>'
-          +'<div style="display:flex;gap:8px;margin-top:12px;"><button class="btn orange" style="flex:1;" data-action="site-invite-decide" data-decision="accept">Accept</button>'
+          +'<div style="display:flex;gap:8px;margin-top:12px;"><button class="btn primary" style="flex:1;" data-action="site-invite-decide" data-decision="accept">Accept</button>'
           +'<button class="btn secondary" style="flex:1;" data-action="site-invite-decide" data-decision="decline">Decline</button></div>';
       } else if(contractorOrgs.length){
         body += '<div class="site-card-sub">Switch to your contractor organisation to respond:</div>'
@@ -103,7 +113,7 @@ export function renderAuth(){
       } else {
         body += '<div class="site-card-sub">You\'re signed in to a site-owner organisation. Create a contractor organisation to accept this invitation:</div>'
           +'<label class="field-label" for="newOrgName">Contractor company name</label><input type="text" id="newOrgName" value="'+escapeHtml(si.contractor_name)+'">'
-          +'<button class="btn orange block" style="margin-top:10px;" data-action="create-org" data-kind="contractor" data-then="site-invite">Create and continue</button>';
+          +'<button class="btn primary block" style="margin-top:10px;" data-action="create-org" data-kind="contractor" data-then="site-invite">Create and continue</button>';
       }
       return wrap(head+body+errorBox()+'</div>');
     }
@@ -116,7 +126,7 @@ export function renderAuth(){
       +'<label class="field-label" for="suOrgName">Company name</label><input type="text" id="suOrgName" value="'+escapeHtml(si.contractor_name)+'">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email" value="'+escapeHtml(si.email||'')+'">'
       +'<label class="field-label" for="suPassword">Choose a password</label><input type="password" id="suPassword" autocomplete="new-password">'
-      +'<button class="btn orange block" style="margin-top:14px;" data-action="signup" data-mode="site-invite">Create account and accept</button>'+errorBox()
+      +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="site-invite">Create account and accept</button>'+errorBox()
       +'<div class="auth-links"><button class="linkish" data-action="auth-show-signin" data-show="1">Already have an account? Sign in</button></div></div>');
   }
 
@@ -124,13 +134,13 @@ export function renderAuth(){
     return wrap('<div class="view-head" style="text-align:center;"><h1>Choose a new password</h1><p>This signs you out on every other device.</p></div><div class="card">'
       +'<label class="field-label" for="rpPassword">New password</label><input type="password" id="rpPassword" autocomplete="new-password" autofocus>'
       +'<div class="site-card-sub" style="margin-top:4px;">At least 10 characters.</div>'
-      +'<button class="btn orange block" style="margin-top:14px;" data-action="reset-password">Save and sign in</button>'+errorBox()+'</div>');
+      +'<button class="btn primary block" style="margin-top:14px;" data-action="reset-password">Save and sign in</button>'+errorBox()+'</div>');
   }
 
   if(v === 'forgot'){
     return wrap('<div class="view-head" style="text-align:center;"><h1>Reset your password</h1><p>We\'ll email you a link that works once, for an hour.</p></div><div class="card">'
       +'<label class="field-label" for="fpEmail">Email</label><input type="email" id="fpEmail" autocomplete="email" autofocus>'
-      +'<button class="btn orange block" style="margin-top:14px;" data-action="forgot">Send reset link</button>'+errorBox()+okBox()
+      +'<button class="btn primary block" style="margin-top:14px;" data-action="forgot">Send reset link</button>'+errorBox()+okBox()
       +'<div class="auth-links"><button class="linkish" data-action="auth-go" data-view="signin">Back to sign in</button></div></div>');
   }
 
@@ -143,7 +153,7 @@ export function renderAuth(){
       +'<label class="field-label" for="suOrgName">Organisation name</label><input type="text" id="suOrgName" placeholder="e.g. Riverside Mining Group, or your own company name">'
       +'<label class="field-label" for="suOrgKind">What best describes your organisation?</label>'
       +'<select id="suOrgKind" class="field"><option value="host">A site / mining company that hosts contractors and needs safety files from them</option><option value="contractor">A contractor company that submits safety files to sites</option></select>'
-      +'<button class="btn orange block" style="margin-top:14px;" data-action="signup" data-mode="new">Create my organisation</button>'+errorBox()
+      +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="new">Create my organisation</button>'+errorBox()
       +'<div class="auth-links"><button class="linkish" data-action="auth-go" data-view="signin">Already have an account? Sign in</button></div></div>'
       + demoCard(features));
   }
@@ -157,7 +167,7 @@ function signInCard(note, email){
   return '<div class="card">'+(note?'<div class="site-card-sub" style="margin-bottom:4px;">'+note+'</div>':'')
     +'<label class="field-label" for="siEmail">Email</label><input type="email" id="siEmail" autocomplete="email" value="'+escapeHtml(email)+'"'+(email?'':' autofocus')+'>'
     +'<label class="field-label" for="siPassword">Password</label><input type="password" id="siPassword" autocomplete="current-password"'+(email?' autofocus':'')+'>'
-    +'<button class="btn orange block" style="margin-top:14px;" data-action="signin">Sign in</button>'+errorBox()+okBox()
+    +'<button class="btn primary block" style="margin-top:14px;" data-action="signin">Sign in</button>'+errorBox()+okBox()
     +'<div class="auth-links"><button class="linkish" data-action="auth-go" data-view="forgot">Forgot password?</button>'
     +(S.authView==='invite' ? '' : '<button class="linkish" data-action="auth-go" data-view="signup">Create an account</button>')+'</div></div>';
 }
@@ -173,7 +183,7 @@ export function renderNoOrg(){
   return wrap('<div class="view-head" style="text-align:center;"><h1>Set up an organisation</h1><p>Signed in as '+S.boot.me.email+'. You\'re not part of an organisation yet — create one, or ask a colleague to invite you.</p></div>'
     +'<div class="card"><label class="field-label" for="newOrgName">Organisation name</label><input type="text" id="newOrgName">'
     +'<label class="field-label" for="newOrgKind">Type</label><select id="newOrgKind" class="field"><option value="host">Site / mining company</option><option value="contractor">Contractor company</option></select>'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="create-org">Create organisation</button></div>'
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="create-org">Create organisation</button></div>'
     +'<button class="btn secondary block" data-action="auth-signout">Sign out</button>');
 }
 
@@ -194,8 +204,10 @@ on('signin', async (el)=>{
 on('signup', async (el)=>{
   const mode = el.dataset.mode;
   const body = { name: val('suName'), email: val('suEmail'), password: document.getElementById('suPassword').value };
-  if(!body.name){ document.getElementById('suName').focus(); return; }
-  if(mode === 'new'){ body.orgName = val('suOrgName'); body.orgKind = val('suOrgKind'); if(!body.orgName){ document.getElementById('suOrgName').focus(); return; } }
+  if(!body.name) return need('Enter your name.', 'suName');
+  if(!body.email) return need('Enter your email address.', 'suEmail');
+  if(body.password.length < 10) return need('Choose a password of at least 10 characters.', 'suPassword');
+  if(mode === 'new'){ body.orgName = val('suOrgName'); body.orgKind = val('suOrgKind'); if(!body.orgName) return need('Enter your company or organisation name.', 'suOrgName'); }
   if(mode === 'invite') body.inviteToken = S.authContext.token;
   if(mode === 'site-invite'){ body.siteInviteToken = S.authContext.token; body.orgName = val('suOrgName'); body.orgKind = 'contractor'; }
   el.disabled = true;

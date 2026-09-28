@@ -15,6 +15,10 @@ export class ApiError extends Error {
 async function handle(res) {
   let body = null;
   try { body = await res.json(); } catch { /* empty or non-JSON */ }
+  if (res.status === 401 && !/\/api\/auth\//.test(res.url)) {
+    // Signed out elsewhere or the session expired: send the person back to sign in.
+    window.dispatchEvent(new CustomEvent('sg:signed-out'));
+  }
   if (!res.ok) {
     const message = (body && body.message) || (res.status === 0 ? 'Network error' : 'Request failed (' + res.status + ')');
     throw new ApiError(res.status, body && body.error, message);
@@ -56,7 +60,7 @@ export const api = {
   },
 
   /** POSTs JSON and streams a text/plain response, calling onText with the accumulated text. */
-  async stream(url, body, onText, signal) {
+  async stream(url, body, onText, signal, onHeaders) {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}) },
@@ -65,6 +69,7 @@ export const api = {
       signal,
     });
     if (!res.ok) return handle(res);
+    if (onHeaders) onHeaders(res.headers);
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let text = '';

@@ -13,6 +13,7 @@ import { sniffType, storage } from '../lib/storage.js';
 import { aiAllowed } from '../lib/plans.js';
 import { extractExpiryDate } from '../lib/ai.js';
 import { rl } from './auth.js';
+import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 
 export interface Slot {
   kind: 'site' | 'library';
@@ -122,6 +123,26 @@ export default async function documentRoutes(app: FastifyInstance) {
     return { fileId: stored.id, fileName: stored.filename, detectedExpiry };
   });
 
+  /** Puts a Document Studio PDF into a slot as the pending attachment, ready to submit. */
+  app.post('/api/documents/:slot/attach-generated', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const { generatedId } = z.object({ generatedId: z.string() }).parse(req.body);
+    if (!isUuid(generatedId)) throw notFound();
+    const s = await resolveSlot(pool, ctx, slotParam(req));
+    requireSubmitter(s);
+    return withTx(async (db) => {
+      const g = await one<{ pdf_file_id: string | null; doc_number: string; revision: number; review_due: string }>(
+        db, `select pdf_file_id, doc_number, revision, to_char(review_due, 'YYYY-MM-DD') as review_due from generated_documents where id = $1 and org_id = $2`, [generatedId, ctx.org.id]);
+      if (!g || !g.pdf_file_id) throw notFound();
+      const doc = await docFor(db, s);
+      if (doc.status === 'awaiting_review') throw conflict('This document is waiting on review. You can replace it if the reviewer asks for a correction.');
+      await db.query('update documents set pending_file_id = $2 where id = $1', [doc.id, g.pdf_file_id]);
+      await publishChange(db, [ctx.org.id]);
+      return { fileId: g.pdf_file_id, note: `${g.doc_number} Rev ${g.revision}, prepared in SiteGuard Document Studio`, reviewDue: g.review_due };
+    });
+  });
+
   app.post('/api/documents/:slot/submit', async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
@@ -142,6 +163,9 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (doc.status === 'awaiting_review') throw conflict('Already submitted — waiting on review.');
       const version = bumpVersion(doc.version);
       const expiry = body.expiryDate ?? null;
+      // A common slip is typing last year; an already-expired document can never count.
+      if (expiry && expiry < new Date().toISOString().slice(0, 10)) throw badRequest('That expiry date has already passed — check the date (especially the year) and try again.', 'expired_date');
+      if (expiry && expiry > `${new Date().getFullYear() + 25}-12-31`) throw badRequest('That expiry date is too far in the future — check the year.', 'bad_date');
       await db.query(
         `insert into document_versions (document_id, version, file_id, note, expiry_date, ai_drafted, submitted_by, submitted_by_name)
          values ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -164,6 +188,12 @@ export default async function documentRoutes(app: FastifyInstance) {
       }
       const resubmit = eff === 'correction_required' || eff === 'expired' || eff === 'expiring';
       await audit(db, ctx, body.aiDrafted ? 'Saved AI-drafted document' : resubmit ? 'Resubmitted document' : 'Submitted document', `${s.name} (${version})`, s.siteId);
+      if (s.kind === 'site' && s.hostOrgId) {
+        await notifyOrg(db, s.hostOrgId, REVIEWERS, {
+          kind: 'submitted', title: `${resubmit ? 'Resubmitted' : 'New'} for review: ${s.name}`,
+          body: `${ctx.org.name} · ${s.siteName}${body.note ? ` — ${body.note}` : ''}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! },
+        });
+      }
       await publishChange(db, s.parties);
       return { version, status };
     });
@@ -183,6 +213,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       }
       await db.query(`update documents set status = 'complete', updated_at = now() where id = $1`, [doc.id]);
       await audit(db, ctx, 'Approved document', `${s.name} (${doc.version})`, s.siteId);
+      if (s.contractorOrgId) await notifyOrg(db, s.contractorOrgId, null, { kind: 'approved', title: `Approved: ${s.name}`, body: `${s.siteName} · approved by ${ctx.user.name}, ${ctx.org.name}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
       await publishChange(db, s.parties);
       return { ok: true };
     });
@@ -205,6 +236,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       );
       await audit(db, ctx, 'Requested correction', `${s.name} — "${clip(text)}"`, s.siteId);
       if (s.contractorOrgId) {
+        await notifyOrg(db, s.contractorOrgId, null, { kind: 'correction', title: `Correction requested: ${s.name}`, body: `${s.siteName} — ${text}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
         await queueToOrg(db, s.contractorOrgId, null, (to) => ({
           to: to.email,
           subject: `Correction requested: ${s.name}`,

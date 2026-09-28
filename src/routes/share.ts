@@ -17,6 +17,8 @@ import { planOf } from '../lib/plans.js';
 import { computeReadiness, effectiveStatus } from '../lib/readiness.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
+import { buildSafetyFile } from '../lib/bundle.js';
+import { contentDisposition } from '../lib/storage.js';
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -34,17 +36,17 @@ function page(title: string, body: string): string {
 <meta name="robots" content="noindex,nofollow"><title>${esc(title)} · SiteGuard</title>
 <link rel="icon" type="image/png" href="/icons/icon-32.png">
 <style>
-:root{--ink:#15181B;--grey:#6B7178;--line:#C7CABC;--paper:#E3E5DB;--raised:#F1F2EA;--orange:#C85417;--green:#2C6B44;--red:#A23A2D}
-@media (prefers-color-scheme: dark){:root{--ink:#ECEEE8;--grey:#82877E;--line:#2E322A;--paper:#16181A;--raised:#1D2022;--orange:#EE7B3F;--green:#7BBE93;--red:#DE8776}}
+:root{--ink:#0E1A2B;--grey:#5E6A7A;--line:#E2E7E4;--paper:#F3F6F4;--raised:#FFFFFF;--brand:#16325C;--sage:#6E9C80;--green:#12805A;--red:#C0362C}
+@media (prefers-color-scheme: dark){:root{--ink:#E9EEF5;--grey:#8C99AB;--line:#243249;--paper:#0A1322;--raised:#111D31;--brand:#8FB2F2;--sage:#8FC0A2;--green:#6CD3A2;--red:#F28B80}}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 .wrap{max-width:760px;margin:0 auto;padding:20px 16px 40px}.brand{font-weight:700;font-size:16px;margin-bottom:16px}
-.brand span{display:inline-block;width:18px;height:18px;background:var(--ink);border-radius:5px;vertical-align:-3px;margin-right:7px}
-.card{background:var(--raised);border:1px solid var(--line);border-radius:3px;padding:14px;margin-bottom:12px}
-h1{font-size:20px;margin:0 0 4px}.sub{color:var(--grey);font-size:12.5px}.big{font:600 34px/1 ui-monospace,monospace}
+.brand span{display:inline-block;width:20px;height:20px;background:var(--brand);border-radius:6px;vertical-align:-4px;margin-right:8px;box-shadow:inset 0 0 0 5px var(--brand),inset 0 0 0 20px var(--sage)}
+.card{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 2px rgba(14,26,43,.05)}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--grey);font-size:12.5px}.big{font:700 36px/1 system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:-.02em}
 table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey)}.pill{font-size:11px;font-weight:600;white-space:nowrap}
-.stamp{display:inline-block;border:2px solid var(--green);color:var(--green);padding:3px 10px;font-size:11px;letter-spacing:.08em;border-radius:3px;font-weight:700}
-.warn{border-color:var(--red);color:var(--red)}a{color:var(--orange)}.foot{font-size:11px;color:var(--grey);margin-top:18px}
+.stamp{display:inline-block;border:2px solid var(--green);color:var(--green);padding:4px 12px;font-size:11px;letter-spacing:.08em;border-radius:999px;font-weight:700}
+.warn{border-color:var(--red);color:var(--red)}a{color:var(--brand)}.foot{font-size:11px;color:var(--grey);margin-top:18px}
 .scroll{overflow-x:auto}
 </style></head><body><div class="wrap"><div class="brand"><span></span>SiteGuard</div>${body}
 <div class="foot">Shared from SiteGuard. This view reflects the live record at the time you opened it and is read-only. It does not itself constitute a guarantee of legal compliance.</div></div></body></html>`;
@@ -156,7 +158,7 @@ export default async function shareRoutes(app: FastifyInstance) {
           where r.site_id = $1 order by r.position, r.created_at`,
         [site.id],
       );
-      body += `<div class="card scroll"><h1 style="font-size:16px">Safety file</h1><table><tr><th>Requirement</th><th>Status</th><th>Version</th><th>Expiry</th><th>File</th></tr>${reqs
+      body += `<div class="card scroll"><h1 style="font-size:16px">Safety file <a href="/share/${esc(token)}/safety-file.pdf" style="font-size:13px;font-weight:600;margin-left:8px">Download the whole file (PDF)</a></h1><table><tr><th>Requirement</th><th>Status</th><th>Version</th><th>Expiry</th><th>File</th></tr>${reqs
         .map((q) => {
           const st = effectiveStatus(q.status ? { status: q.status, expiry_date: q.expiry_date } : null);
           const canView = q.current_file_id && ['complete', 'expiring', 'awaiting_review'].includes(st);
@@ -185,6 +187,28 @@ export default async function shareRoutes(app: FastifyInstance) {
     }
     reply.header('cache-control', 'no-store').header('referrer-policy', 'no-referrer');
     return reply.type('text/html').send(page(site.name, body));
+  });
+
+  /** The whole safety file as one PDF, for either side of the site. */
+  app.get('/api/sites/:id/safety-file.pdf', rl(10), async (req, reply) => {
+    const ctx = requireOrg(req.ctx);
+    const { id } = req.params as { id: string };
+    if (!isUuid(id)) throw notFound();
+    await loadSite(pool, ctx, id);
+    const { pdf, filename } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`);
+    reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, false));
+    return reply.type('application/pdf').send(pdf);
+  });
+
+  app.get('/share/:token/safety-file.pdf', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const { token } = req.params as { token: string };
+    const link = await resolveLink(token);
+    if (!link || link.revoked_at || new Date(link.expires_at) < new Date() || link.kind !== 'safety_file') {
+      return gone(reply, 'This link has expired or was revoked.');
+    }
+    const { pdf, filename } = await buildSafetyFile(pool, link.site_id, `external link from ${link.org_name}`);
+    reply.header('cache-control', 'no-store').header('referrer-policy', 'no-referrer').header('content-disposition', contentDisposition(filename, false));
+    return reply.type('application/pdf').send(pdf);
   });
 
   app.get('/share/:token/files/:fileId', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {

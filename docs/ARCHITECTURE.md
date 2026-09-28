@@ -11,6 +11,7 @@
 | Email | SMTP via nodemailer, through a transactional outbox | Works with Postmark, SES, Resend, Mailgun or others. A rolled-back action never sends mail. |
 | Billing | Stripe Checkout, Customer Portal and webhooks | Stripe is the source of truth. The webhook mirrors it onto the organisation. |
 | AI | Claude API (`@anthropic-ai/sdk`), server-side only | The key never reaches a browser. Usage is plan-gated and metered per organisation. |
+| Documents | pdfmake (PDF), docx (Word), pdf-lib (merging the bound safety file) | Pure JavaScript, no system binaries; standard PDF fonts, no network or disk access while rendering. |
 | Web app | The MVP's HTML/CSS/JS, split into ES modules, no build step | Reuses the existing UI and design system as-is. |
 
 ## Tenancy model
@@ -81,6 +82,12 @@ refuse.
 | Assign workers to a site | | | | ✓ | ✓ |
 | Accept or decline site invitations | | | | ✓ | |
 | Create external share links | ✓ | ✓ | | ✓ | |
+| Approve or ask for changes on document sections (review workspace) | ✓ | ✓ | | | |
+| Comment in the review workspace | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Edit, save revisions of, and send review links for the company's own Studio documents | | | | ✓ | ✓ |
+| Create a site join code | ✓ | | | | |
+| Join a site with a code | | | | ✓ | ✓ |
+| Download the bound safety file of a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Appointments register | ✓ | | | ✓ | |
 | Team, roles, billing, organisation settings | ✓ | | | ✓ | |
 
@@ -133,8 +140,83 @@ More rules the server enforces:
 - **Reminder digests** hourly, under an advisory lock. Each item (such as "COID letter expires in 7
   days") is recorded in `reminder_log`, so it's emailed once per threshold (30 days, 7 days,
   expired) rather than daily. Each person gets a single digest.
+- **Compliance agent** every 15 minutes, under an advisory lock (see below).
 - **Housekeeping:** expired sessions and tokens, and demo sandboxes older than 3 days (including
   their stored files).
+
+## Assistant and compliance agent
+
+**Assistant** (`lib/assistant.ts`, `POST /api/assistant`). The browser sends the conversation; the
+server returns a reply plus *cards* (start a site, checklist, draft, open a site).
+- With an API key and a plan that includes AI, it runs a manual Claude tool-use loop (adaptive
+  thinking, server-side refusal fallback, handling `tool_use`, `pause_turn` and `refusal`). Its
+  tools are read-only and scoped to the caller's organisation: starter packs, own sites, one
+  site's status (through `loadSite`, so cross-tenant ids return an error), plus
+  `propose_site` / `prepare_checklist` / `suggest_draft`, which only produce cards.
+  Web search (`AI_WEB_SEARCH`) supplies site-specific research, and citations are returned as
+  sources.
+- Without a key, or when the AI is rate-limited or the monthly allowance is spent, the same
+  endpoint answers from rules in `lib/knowledge.ts` and the starter packs.
+- Cards hand off to the normal endpoints (e.g. the Add a site sheet, prefilled), so every write
+  stays under the permission matrix and audit trail. Conversations are not stored.
+
+**Compliance agent** (`lib/agent.ts`). Every 15 minutes (and on demand) it computes findings per
+organisation with plain SQL rules and upserts them into `agent_findings` keyed by
+`(org_id, key)`. Findings not seen on a run are marked resolved, and a run that changes anything
+sends a live-update event. Findings are delivered in `/api/bootstrap` and are only ever
+selected by the viewer's own `org_id`. The assistant reads them (`get_attention_items`), and the
+hourly job emails owners and admins a Monday summary (`weeklySummary` org setting, deduplicated per
+ISO week).
+
+**Support signals.** `POST /api/feedback` stores in-app problem reports (`feedback` table) and emails
+`SUPPORT_EMAIL`; `POST /api/client-errors` writes browser errors to the server log without storing
+them.
+
+## Document Studio
+
+`src/lib/studio/`: `blueprints.ts` (document types, questions and template content), `model.ts`
+(the document model and its validation), `render-pdf.ts` (pdfmake, standard fonts, no network or
+disk access) and `render-docx.ts` (docx), `generate.ts` (numbering, revisions, AI tailoring and
+storage), and routes in `routes/studio.ts`.
+
+- Generation reads context and runs the AI **outside** any transaction, then allocates the
+  document number (under a lock on the organisation row), renders both formats and stores them in
+  one short transaction.
+- The AI returns the document through a `submit_document` tool whose input is validated against
+  the same zod schema; invalid output is sent back once or twice to be fixed, and any failure falls
+  back to the complete template draft, so generation never fails because of the AI.
+- Generated files are ordinary files owned by the organisation, so downloads use the existing
+  permission-checked `/api/files/:id`. `POST /api/documents/:slot/attach-generated` puts a generated
+  PDF into a requirement or library slot as the pending attachment; the normal submit endpoint does
+  the rest, with the review date as the expiry date.
+- Branding (logo file, colour, number prefix) lives in the organisation's `settings`.
+
+## Review workspace, inbox, join codes and the bound safety file
+
+- **Review workspace** (`lib/review.ts`, `routes/review.ts`, `public/js/review.js`). A Studio
+  document is visible to its author, and to the host only once a revision has been submitted to one
+  of the host's sites (joined through `document_versions` → `requirements` → `sites`); anyone else
+  gets 404. Section decisions (`doc_section_reviews`) are keyed by a hash of the section's
+  canonical JSON, so an unchanged section keeps its approval across revisions and an edited one
+  needs review again. Comments (`doc_comments`) belong to the document number, not a revision.
+  Saving edits creates the next revision through the normal Studio pipeline (same number, new PDF
+  and Word files). Only the author edits; only host owners/admins/reviewers decide.
+- **Review links** (`review_links`) store only a SHA-256 of the token, expire (1–60 days), can be
+  withdrawn, always show the latest revision, and let a named guest comment or decide on sections.
+  Guests get the PDF through the link, never a file id.
+- **Notifications** (`notifications`, `lib/notify.ts`) are one row per user, written in the same
+  transaction as the event, sent in `/api/bootstrap` (latest 40) and refreshed by the usual live
+  sync.
+- **Join codes** (`routes/join.ts`, migration 009) are 8 characters from an unambiguous alphabet,
+  stored hashed on the site's pending invitation, valid 14 days; a new code replaces the old one.
+  Redeeming one runs the same acceptance as the email link. Codes are rate-limited.
+- **Safety File Builder** (`public/js/builder.js`) is client-side only: it calls the same
+  `POST /api/studio/documents`, `attach-generated` and `submit` endpoints one document at a time,
+  so a failure on one never loses the others and every server rule still applies.
+- **Bound safety file** (`lib/bundle.ts`): pdfmake renders the cover and contents (twice: once to
+  count pages, once with page numbers), pdf-lib merges the documents and stamps page footers. It
+  includes only documents the other side can already see (complete, expiring, awaiting review),
+  the same rule as safety-file share links, and caps merged content at 80 MB.
 
 ## Known limits and next steps
 
@@ -156,7 +238,11 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 41 integration tests against real Postgres, covering requirement starter packs, tenant isolation (cross-tenant
+- `npm test`: 81 integration tests, including the review workspace (visibility, section
+  decisions, approvals carried across revisions, review links, notifications), join codes and the
+  bound safety file, plus including every Document Studio blueprint rendered to PDF and
+  Word, numbering and revisions, branding, attach-and-submit and tenant isolation, against real Postgres, covering the assistant's offline mode and
+  scoping, template drafting, the compliance agent's findings and tenant isolation, requirement starter packs, tenant isolation (cross-tenant
   reads and writes all 404), the role matrix, CSRF, draft-file privacy, share-link scope, expiry
   and revocation, audit scoping and immutability, the Site Ready gates, permit/defect/request
   workflows, workforce visibility, password reset and lockout, demo isolation, and billing (signed
@@ -168,7 +254,10 @@ These are deliberate scope boundaries, not hidden gaps:
   - The S3 driver against MinIO.
   - SMTP delivery through the outbox, against a local SMTP sink.
   - The AI proxy against a mock of the Messages API: streaming, PDF input, structured output,
-    refusal-fallback request, usage metering.
+    refusal-fallback request, usage metering, and the assistant's multi-step tool loop (tool
+    errors, citations, per-role tools, contractor scoping).
+  - The production build started the way the Render blueprint runs it, checked with
+    `scripts/smoke.mjs`.
   - The Docker image builds and boots.
 - **Not verified here, because it needs your accounts:** live Claude API calls, live Stripe
   Checkout and Customer Portal, and a real email provider's deliverability.

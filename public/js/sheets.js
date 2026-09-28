@@ -6,9 +6,10 @@ import {
   org, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId,
   computeReadiness, effectiveStatus, certStatus, badge, timeAgo, dateTime, todayStr, daysUntil, incidentTypeInfo, permitTypeInfo,
   permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml, deepEscape,
-  on, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
+  on, actions, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
 } from './core.js';
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
+import { studioBlueprintFor } from './studio.js';
 
 const refreshSheet = (html) => { const el = sheetEl(); if(el) el.innerHTML = html; };
 
@@ -117,7 +118,7 @@ function renderQuickActions(){
   if(isContractor()){
     items.push({icon:ICONS.sites, title:'Work on a safety file', sub:'Open the requirements for one of your sites', action:'safetyfile'});
     items.push({icon:ICONS.passport, title:'Upload to your documents', sub:'Attach a file to a requirement or your company library', action:'upload'});
-    items.push({icon:ICONS.sparkle, title:'Draft a document with AI', sub:'Risk assessment, method statement, toolbox talk…', action:'ai-draft'});
+    items.push({icon:ICONS.sparkle, title:S.boot.features.ai?'Draft a document with AI':'Draft a document', sub:'Risk assessment, method statement, toolbox talk…', action:'ai-draft'});
     items.push({icon:ICONS.audit, title:'Log today\'s site diary', sub:'Crew, conditions, work done', action:'diary'});
     items.push({icon:ICONS.hardhat, title:'Record a toolbox talk', sub:'Capture attendance with signatures', action:'toolbox'});
     items.push({icon:ICONS.alert, title:'Report an incident', sub:'Near miss to fatality', action:'incident'});
@@ -129,6 +130,9 @@ function renderQuickActions(){
     items.push({icon:ICONS.audit, title:'Log site diary', sub:'Crew, conditions, work done', action:'diary'});
     items.push({icon:ICONS.verify, title:'Verify a record', sub:'Check a Site Ready verification', action:'verify'});
   }
+  if(isContractor() && isOrgAdmin()) items.push({icon:ICONS.link, title:'Join a site with a code', sub:'Type the code the site gave you', action:'join'});
+  items.unshift({icon:ICONS.passport, title:'Create a document', sub:'Document Studio: branded PDF and Word safety documents', action:'studio'});
+  items.unshift({icon:ICONS.sparkle, title:'Ask the assistant', sub:isContractor()?'What a site needs, your sites\' status, drafts':'Site requirements, start a site, portfolio status', action:'assistant'});
   if(readOnly()) return sheetHead('Quick actions') + '<div class="notice">Your organisation is read-only until a plan is chosen.</div>';
   return sheetHead('Quick actions') + items.map(it=>'<button class="qa-item" data-action="qa" data-qa="'+it.action+'"><div class="qa-icon">'+it.icon+'</div><div><div class="qa-title">'+it.title+'</div><div class="qa-sub">'+it.sub+'</div></div></button>').join('');
 }
@@ -153,6 +157,9 @@ on('pick-site', (el)=>{ closeSheet(); PURPOSE[el.dataset.purpose](el.dataset.sit
 on('qa', (el)=>{
   const a = el.dataset.qa;
   if(a==='ai-draft'){ openSheet(renderAIDraftSheet()); return; }
+  if(a==='assistant'){ actions['open-assistant'](); return; }
+  if(a==='studio'){ actions['open-studio'](); return; }
+  if(a==='join'){ actions['join-site'](); return; }
   if(a==='verify'){ closeSheet(); S.nav='more'; S.moreView='verify'; render(); return; }
   if(a==='add-site'){ openNewSite(); return; }
   pickSite(a);
@@ -185,6 +192,11 @@ function renderReqSheet(reqId){
       +'<span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;">📎 '+doc.assetName+(doc.aiDrafted?' <span class="srctag">AI draft</span>':'')+'</span>'
       +'<a class="btn secondary small" href="'+doc.assetUrl+'" target="_blank" rel="noopener">View</a></div>';
   }
+  if(doc.studioDocId){
+    body += '<div class="card" style="margin-top:10px;background:var(--brand-bg);border-color:transparent;"><div class="chat-card-title" style="color:var(--brand);">'+ICONS.passport+' Document Studio document</div>'
+      +'<div class="site-card-sub" style="color:var(--ink-soft);">'+(canReview() && (eff==='awaiting_review'||eff==='correction_required') ? 'Review it section by section: approve each part, highlight text and leave comments.' : isContractor() ? 'Read the feedback section by section, edit it in the app and resubmit.' : 'Read it section by section, with all comments.')+'</div>'
+      +'<button class="btn primary small" style="margin-top:10px;" data-action="open-review" data-id="'+doc.studioDocId+'">'+(canReview() && eff==='awaiting_review' ? 'Review section by section' : 'Open in review workspace')+'</button></div>';
+  }
   if(doc.history && doc.history.length){
     body += '<details style="margin-top:8px;"><summary style="font-size:12.5px;color:var(--grey);cursor:pointer;">Version history ('+doc.history.length+' earlier)</summary>'
       + doc.history.slice().reverse().map(h=>'<div class="reqrow" style="padding:8px 0;"><div class="reqrow-main"><div class="reqrow-name" style="font-size:13px;">'+h.version+'</div>'
@@ -202,17 +214,22 @@ function renderReqSheet(reqId){
     else if(eff==='complete' && !reqId.startsWith('lib:')){ body += '<p class="site-card-sub">This requirement is complete.</p>'; }
     else {
       const renewing = eff==='expiring' || (eff==='complete' && reqId.startsWith('lib:'));
+      const bpId = studioBlueprintFor(reqId);
+      if(bpId) body += '<div class="card" style="background:var(--sage-bg);border-color:var(--sage-soft);margin-bottom:6px;"><div class="chat-card-title">'+ICONS.sparkle+' Document Studio</div>'
+        +'<div class="site-card-sub" style="color:var(--ink-soft);">Don\'t have this document yet? Create a professional, branded version in a few minutes and submit it straight from here.</div>'
+        +'<button class="btn sage small" style="margin-top:10px;" data-action="studio-for-req" data-req="'+reqId+'" data-bp="'+bpId+'">Create it in Document Studio</button></div>'
+        +'<div class="site-card-sub" style="text-align:center;margin:6px 0;">or upload your own</div>';
       body += '<label class="field-label" for="fileInput">'+(renewing?'Upload the renewed document':'Attach file')+'</label>'
         +'<input type="file" id="fileInput" accept="application/pdf,image/*,.docx,.xlsx,.txt" data-action-change="attach-file" data-req="'+reqId+'" style="font-size:12.5px;">'
         +'<div class="site-card-sub" id="attachStatus" style="margin-top:4px;">'+(doc.pendingFileName?'Attached: '+doc.pendingFileName+' (not yet submitted)':'PDF, photo, Word or Excel, up to 20MB.'+(S.boot.features.ai?' Photos and PDFs of certificates are scanned for an expiry date.':''))+'</div>'
         +'<label class="field-label" for="expiryInput">Expiry date'+(S.boot.features.ai?' (auto-detected where possible)':'')+'</label><input type="date" id="expiryInput" value="'+(doc.expiryDate&&eff!=='expired'&&!renewing?doc.expiryDate:'')+'">'
         +'<label class="field-label" for="submitNote">Notes (optional)</label><textarea id="submitNote" placeholder="Add any context for the reviewer…"></textarea>'
-        +'<button class="btn orange block" style="margin-top:10px;" data-action="submit-req" data-req="'+reqId+'"'+(doc.pendingFileId?'':' disabled')+' id="submitReqBtn">'+(reqId.startsWith('lib:')?'Save to library':eff==='missing'?'Submit for review':'Resubmit for review')+'</button>';
+        +'<button class="btn primary block" style="margin-top:10px;" data-action="submit-req" data-req="'+reqId+'"'+(doc.pendingFileId?'':' disabled')+' id="submitReqBtn">'+(reqId.startsWith('lib:')?'Save to library':eff==='missing'?'Submit for review':'Resubmit for review')+'</button>';
       if(reqId.startsWith('lib:') && doc.assetUrl) body += '<button class="btn danger block" style="margin-top:8px;" data-action="withdraw-doc" data-req="'+reqId+'">Remove from library</button>';
     }
   } else if(canReview() && !ro){
     if((eff==='awaiting_review' || eff==='correction_required') && doc.assetUrl){
-      body += '<button class="btn orange block" data-action="approve-req" data-req="'+reqId+'" style="margin-bottom:8px;">Approve</button>'
+      body += '<button class="btn primary block" data-action="approve-req" data-req="'+reqId+'" style="margin-bottom:8px;">Approve</button>'
         +'<label class="field-label" for="correctionNote">Request correction</label><textarea id="correctionNote" placeholder="What needs to change?"></textarea>'
         +'<button class="btn secondary block" style="margin-top:8px;" data-action="correct-req" data-req="'+reqId+'">Request correction</button>';
     } else if(eff==='missing') body += '<p class="site-card-sub">Not yet submitted by the contractor.</p>';
@@ -297,7 +314,7 @@ function renderNewDiarySheet(siteId){
     +'<label class="field-label" for="diarySummary">Work summary</label><textarea id="diarySummary" placeholder="What happened on site today?"></textarea>'
     +'<div class="toggle-row"><label for="diaryIncidentFlag">Incident or near-miss to report?</label><input type="checkbox" id="diaryIncidentFlag" data-action-change="diary-flag"></div>'
     +'<div id="diaryIncidentWrap" style="display:none;"><label class="field-label" for="diaryIncidentNote">Incident note</label><textarea id="diaryIncidentNote" placeholder="What happened, and what was done about it? (Serious events should also be reported in the incident register.)"></textarea></div>'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-diary" data-site="'+siteId+'">Save entry</button>';
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-diary" data-site="'+siteId+'">Save entry</button>';
 }
 on('new-diary', (el)=>openSheet(renderNewDiarySheet(el.dataset.site)));
 on('diary-flag', (el)=>{ document.getElementById('diaryIncidentWrap').style.display = el.checked ? 'block' : 'none'; });
@@ -313,7 +330,7 @@ function renderNewInspectionSheet(siteId){
     +'<label class="field-label" for="inspTitle">Title</label><input type="text" id="inspTitle" placeholder="e.g. Weekly PPE spot check">'
     +'<label class="field-label" for="inspType">Type</label><input type="text" id="inspType" value="Scheduled inspection">'
     +((S.state.settings||{}).inspectxEnabled?'<label class="field-label" for="inspRef">InspectX reference (optional)</label><input type="text" id="inspRef">':'')
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-inspection" data-site="'+siteId+'">Save inspection</button>';
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-inspection" data-site="'+siteId+'">Save inspection</button>';
 }
 on('new-inspection', (el)=>openSheet(renderNewInspectionSheet(el.dataset.site)));
 on('save-inspection', async (el)=>{
@@ -328,7 +345,7 @@ on('new-defect', (el)=>{
     +'<label class="field-label" for="defSev">Severity</label><select id="defSev" class="field"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>'
     +'<label class="field-label" for="defAssignee">Assigned to</label><input type="text" id="defAssignee" value="'+contractorOf(site).name+'">'
     +'<label class="field-label" for="defDue">Due date</label><input type="date" id="defDue">'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-defect" data-id="'+el.dataset.id+'">Log defect</button>');
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-defect" data-id="'+el.dataset.id+'">Log defect</button>');
 });
 on('save-defect', async (el)=>{
   const description = val('defDesc');
@@ -371,7 +388,7 @@ function renderIncidentDetailSheet(siteId, incidentId){
     body += '<label class="field-label" for="incRootCause">Root cause</label><textarea id="incRootCause" placeholder="What actually caused this?">'+(inc.rootCause||'')+'</textarea>'
       +'<label class="field-label" for="incCorrective">Corrective actions</label><textarea id="incCorrective" placeholder="What will prevent it happening again?">'+(inc.correctiveActions||'')+'</textarea>'
       +'<div style="display:flex;gap:8px;margin-top:10px;"><button class="btn secondary" style="flex:1;" data-action="save-investigation" data-id="'+incidentId+'">Save notes</button>'
-      +'<button class="btn orange" style="flex:1;" data-action="save-investigation" data-id="'+incidentId+'" data-close="1">Close out</button></div>';
+      +'<button class="btn primary" style="flex:1;" data-action="save-investigation" data-id="'+incidentId+'" data-close="1">Close out</button></div>';
   } else body += '<p class="site-card-sub">Investigation in progress — the site team closes this out.</p>';
   return body;
 }
@@ -393,7 +410,7 @@ function renderNewPermitSheet(siteId){
     +'<label class="field-label" for="permitIssuedTo">Issued to (person/crew)</label><input type="text" id="permitIssuedTo" placeholder="e.g. Crew supervisor name">'
     +'<label class="field-label" for="permitFrom">Valid from</label><input type="datetime-local" id="permitFrom">'
     +'<label class="field-label" for="permitTo">Valid to</label><input type="datetime-local" id="permitTo">'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-permit" data-site="'+siteId+'">'+(requesting?'Submit request':'Issue permit')+'</button>';
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-permit" data-site="'+siteId+'">'+(requesting?'Submit request':'Issue permit')+'</button>';
 }
 const localToIso = (v) => v ? new Date(v).toISOString() : '';
 on('new-permit', (el)=>openSheet(renderNewPermitSheet(el.dataset.site)));
@@ -418,7 +435,7 @@ function renderPermitDetailSheet(siteId, permitId){
   if(eff==='pending' && canReview()){
     body += '<label class="field-label" for="permitIssueFrom">Valid from</label><input type="datetime-local" id="permitIssueFrom">'
       +'<label class="field-label" for="permitIssueTo">Valid to</label><input type="datetime-local" id="permitIssueTo">'
-      +'<button class="btn orange block" style="margin-top:10px;" data-action="issue-permit" data-id="'+permitId+'">Issue this permit</button>'
+      +'<button class="btn primary block" style="margin-top:10px;" data-action="issue-permit" data-id="'+permitId+'">Issue this permit</button>'
       +'<button class="btn secondary block" style="margin-top:8px;" data-action="close-permit" data-id="'+permitId+'" data-refuse="1">Refuse request</button>';
   } else if(eff==='pending'){
     body += '<p class="site-card-sub">Waiting on the site to issue this permit.</p>'
@@ -443,23 +460,31 @@ on('close-permit', async (el)=>{
 
 /* ============ AI DRAFTING (via the server proxy) ============ */
 const DRAFT_TYPES = ['Site-specific risk assessment','Method statement','Toolbox talk record','Emergency response plan','Daily site diary template'];
+function draftModeNote(){
+  if(S.boot.features.ai) return 'Your company details from Organisation settings go into the header. Drafting runs on SiteGuard\'s server — no API key in your browser.';
+  return 'Template mode: SiteGuard builds a structured draft from your description, with hazards and controls for the work you describe. '
+    +(S.boot.features.aiConfigured
+      ? 'AI-written drafts are included in '+(isContractor()?'Contractor Pro':'Site Professional')+'.'
+      : 'AI-written drafts switch on once your administrator adds an AI key.');
+}
 function renderAIDraftSheet(){
-  if(!S.boot.features.ai){
-    return sheetHead('Draft with AI') + '<p class="site-card-sub">'+(S.boot.features.aiConfigured
-      ? 'AI drafting is included in '+(isContractor()?'Contractor Pro':'Site Professional')+'.'+(isOrgAdmin()?' You can upgrade under More → Plan &amp; billing.':' Ask an admin to upgrade.')
-      : 'AI drafting isn\'t configured on this server.')+'</p>';
-  }
-  return sheetHead('Draft a document with AI')
+  return sheetHead(S.boot.features.ai?'Draft a document with AI':'Draft a document')
     +'<label class="field-label" for="draftType">Document type</label><select id="draftType" class="field">'+DRAFT_TYPES.map(t=>'<option>'+t+'</option>').join('')+'</select>'
     +'<label class="field-label" for="draftBrief">Tell it about the job</label><textarea id="draftBrief" placeholder="e.g. Rewiring the conveyor drive station at Shaft 3, live electrical work involved"></textarea>'
-    +'<div class="site-card-sub" style="margin-top:4px;">Your company details from Organisation settings go into the header. Drafting runs on SiteGuard\'s server — no API key in your browser.</div>'
-    +'<button class="btn orange block" style="margin-top:10px;" data-action="generate-draft">Generate draft</button>'
+    +'<div class="site-card-sub" style="margin-top:4px;">'+draftModeNote()+'</div>'
+    +'<button class="btn primary block" style="margin-top:10px;" data-action="generate-draft">Generate draft</button>'
     +'<div id="draftOutput"></div>';
+}
+export function openDraft(type, brief){
+  openSheet(renderAIDraftSheet());
+  const t = document.getElementById('draftType'), b = document.getElementById('draftBrief');
+  if(t && type && DRAFT_TYPES.includes(type)) t.value = type;
+  if(b && brief) b.value = brief;
 }
 let draftAbort = null;
 async function streamDraft(type, brief, onText){
   draftAbort = new AbortController();
-  return api.stream('/api/ai/draft', { type, brief }, onText, draftAbort.signal);
+  return api.stream('/api/ai/draft', { type, brief }, onText, draftAbort.signal, (h)=>{ S.lastDraftMode = h.get('x-draft-mode')||'ai'; });
 }
 on('ai-draft', ()=>openSheet(renderAIDraftSheet()));
 on('generate-draft', async (el)=>{
@@ -489,8 +514,9 @@ on('save-draft', async (el)=>{
   el.disabled = true; el.textContent = 'Saving…';
   const blob = new Blob([S.lastDraft||''], {type:'text/plain'});
   const ok = await act(async ()=>{
-    await api.upload(docUrl(slot,'file'), blob, unescapeHtml(t.name).replace(/[^\w\s()-]/g,'')+' (AI draft).txt');
-    await api.post(docUrl(slot,'submit'), { note:'AI draft — review before use', aiDrafted:true });
+    await api.upload(docUrl(slot,'file'), blob, unescapeHtml(t.name).replace(/[^\w\s()-]/g,'')+(S.lastDraftMode==='template'?' (draft).txt':' (AI draft).txt'));
+    const ai = S.lastDraftMode!=='template';
+    await api.post(docUrl(slot,'submit'), { note:(ai?'AI draft':'Template draft')+' — review before use', aiDrafted:ai });
   }, 'Saved to your document library', el);
   if(ok) closeSheet(); else { el.disabled=false; el.textContent='Save to library'; }
 });
@@ -505,7 +531,7 @@ function renderRequestSheet(siteId){
     +'<label class="field-label" for="reqTitle">Title</label><input type="text" id="reqTitle" placeholder="e.g. Updated Letter of Good Standing">'
     +'<label class="field-label" for="reqMessage">Message</label><textarea id="reqMessage" placeholder="What exactly do you need, and why?"></textarea>'
     +'<label class="field-label" for="reqDue">Due date</label><input type="date" id="reqDue" min="'+todayStr()+'">'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-request" data-site="'+siteId+'">Send request</button>'
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-request" data-site="'+siteId+'">Send request</button>'
     +'<div class="site-card-sub" style="margin-top:8px;">'+contractorOf(site).name+' is emailed straight away.</div>';
 }
 on('save-request', async (el)=>{
@@ -528,9 +554,9 @@ function renderRequestDetailSheet(requestId){
   if(readOnly()) return body;
   if(isContractor() && req.status!=='completed' && !req.linkedReqId){
     body += '<label class="field-label" for="requestResponse">Your response</label><textarea id="requestResponse" placeholder="Reply, or note how this was handled…"></textarea>'
-      +'<button class="btn orange block" style="margin-top:10px;" data-action="respond-request" data-id="'+requestId+'">Submit response</button>';
+      +'<button class="btn primary block" style="margin-top:10px;" data-action="respond-request" data-id="'+requestId+'">Submit response</button>';
   } else if(canReview() && req.status==='submitted'){
-    body += '<button class="btn orange block" data-action="complete-request" data-id="'+requestId+'">Mark completed</button>';
+    body += '<button class="btn primary block" data-action="complete-request" data-id="'+requestId+'">Mark completed</button>';
   } else if(!isContractor() && req.status!=='completed'){
     body += '<p class="site-card-sub">Waiting on '+contractorOf(site).name+'.</p>';
   } else if(isContractor() && req.linkedReqId && req.status!=='completed'){
@@ -571,7 +597,7 @@ function readContractor(prefix){
   const email = val(prefix+'CEmail');
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
     // Without an address nobody is invited and the site waits forever.
-    showToast('Enter the contractor\'s email — that\'s where the invitation goes');
+    showToast(email ? 'That email address doesn\'t look right — check it and try again' : 'Enter the contractor\'s email — that\'s where the invitation goes');
     document.getElementById(prefix+'CEmail').focus();
     return null;
   }
@@ -580,7 +606,7 @@ function readContractor(prefix){
 on('toggle-new-contractor', (el)=>{ document.getElementById(el.dataset.prefix+'NewContractor').style.display = el.value==='__new' ? '' : 'none'; });
 /* ---- requirement starter packs ---- */
 let packsCache = null;
-async function loadPacks(){
+export async function loadPacks(){
   if(!packsCache) packsCache = deepEscape((await api.get('/api/requirement-templates')).packs);
   return packsCache;
 }
@@ -601,19 +627,27 @@ function packPicker(packs, checked, existingNames){
 const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
 const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
 
-function renderNewSiteSheet(packs){
+function renderNewSiteSheet(packs, prefill){
+  const pf = prefill || {};
   const templates = Object.values(S.state.sites).filter(s=>(S.state.requirements[s.id]||[]).length);
-  return sheetHead('Add a site')
-    +'<label class="field-label" for="newSiteName">Site / project name</label><input type="text" id="newSiteName" placeholder="e.g. Tweefontein Shaft — Pump Station Upgrade">'
-    +'<label class="field-label" for="newSiteLocation">Location</label><input type="text" id="newSiteLocation" placeholder="e.g. North Pit, Tweefontein">'
+  const extras = S.newSiteExtras || [];
+  return sheetHead('Add a site', pf.fromAssistant ? 'Prepared by the assistant — check everything before creating' : '')
+    +(S.boot.me.verified ? '' : '<div class="notice">Confirm your email address first — the contractor\'s invitation can only be sent once it\'s confirmed. We sent a link to '+S.boot.me.email+'. <button class="linkish" data-action="resend-verification">Resend it</button></div>')
+    +'<label class="field-label" for="newSiteName">Site / project name</label><input type="text" id="newSiteName" value="'+escapeHtml(pf.name||'')+'" placeholder="e.g. Tweefontein Shaft — Pump Station Upgrade">'
+    +'<label class="field-label" for="newSiteLocation">Location</label><input type="text" id="newSiteLocation" value="'+escapeHtml(pf.location||'')+'" placeholder="e.g. North Pit, Tweefontein">'
     + contractorFields('ns')
     +'<div class="section-title">Documents required from the contractor</div>'
-    + packPicker(packs, ['baseline'], []) + PACK_NOTE
+    + packPicker(packs, pf.packIds && pf.packIds.length ? pf.packIds : ['baseline'], []) + PACK_NOTE
+    +(extras.length ? '<div class="section-title">Also required for this site</div><div class="card">'
+      + extras.map((x,i)=>'<label class="flexbetween" style="gap:10px;padding:6px 0;cursor:pointer;"><span><span class="qa-title" style="font-size:14px;">'+escapeHtml(x.name)+'</span><span class="site-card-sub" style="display:block;">'+escapeHtml(x.category)+(x.why?' — '+escapeHtml(x.why):'')+'</span></span><input type="checkbox" class="extra-req-box" value="'+i+'" checked aria-label="'+escapeHtml(x.name)+'"></label>').join('')
+      +'</div>' : '')
     +(templates.length ? '<label class="field-label" for="newSiteTemplate">Also copy from an existing site</label><select id="newSiteTemplate" class="field"><option value="">Don\'t copy</option>'+templates.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('')+'</select>' : '')
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-site">Create site and invite contractor</button>';
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-site">Create site and invite contractor</button>';
 }
-async function openNewSite(){
-  try{ openSheet(renderNewSiteSheet(await loadPacks())); }
+/** Opens the Add a site sheet, optionally prefilled (e.g. from an assistant proposal). */
+export async function openNewSite(prefill){
+  S.newSiteExtras = (prefill && prefill.extraRequirements) || [];
+  try{ openSheet(renderNewSiteSheet(await loadPacks(), prefill)); }
   catch(e){ showToast(e.message); }
 }
 on('new-site', ()=>openNewSite());
@@ -621,7 +655,9 @@ on('save-site', async (el)=>{
   const name = val('newSiteName');
   if(!name){ document.getElementById('newSiteName').focus(); return; }
   const c = readContractor('ns'); if(!c) return;
-  const r = await act(()=>api.post('/api/sites', { name, location: val('newSiteLocation'), templateSiteId: val('newSiteTemplate') || undefined, templatePackIds: checkedPacks(), ...c }), 'Site created — invitation sent', el);
+  const extras = [...document.querySelectorAll('.extra-req-box:checked')].map(b=>(S.newSiteExtras||[])[Number(b.value)]).filter(Boolean)
+    .map(x=>({ category:x.category, name:x.name, source:x.source||'site', why:x.why||'' }));
+  const r = await act(()=>api.post('/api/sites', { name, location: val('newSiteLocation'), templateSiteId: val('newSiteTemplate') || undefined, templatePackIds: checkedPacks(), requirements: extras.length ? extras : undefined, ...c }), 'Site created — invitation sent', el);
   if(r){ closeSheet(); S.activeSiteId = r.id; S.nav='sites'; S.siteTab='compliance'; render(); }
 });
 on('apply-packs', async (el)=>{
@@ -631,7 +667,7 @@ on('apply-packs', async (el)=>{
   const existing = (S.state.requirements[siteId]||[]).map(r=>unescapeHtml(r.name));
   openSheet(sheetHead('Add a starter pack', S.state.sites[siteId].name)
     + packPicker(packs, existing.length ? [] : ['baseline'], existing.map(escapeHtml)) + PACK_NOTE
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-packs" data-site="'+siteId+'">Add to this site</button>');
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-packs" data-site="'+siteId+'">Add to this site</button>');
 });
 on('save-packs', async (el)=>{
   const packIds = checkedPacks();
@@ -648,7 +684,7 @@ on('edit-site', (el)=>{
     +'<label class="field-label" for="esMuster">Muster point</label><input type="text" id="esMuster" value="'+(e.musterPoint||'')+'">'
     +'<label class="field-label" for="esContact">Emergency contact</label><input type="text" id="esContact" value="'+(e.contact||'')+'">'
     +'<label class="field-label" for="esHospital">Nearest medical facility</label><input type="text" id="esHospital" value="'+(e.hospital||'')+'">'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-site-edit" data-site="'+s.id+'">Save</button>');
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-site-edit" data-site="'+s.id+'">Save</button>');
 });
 on('save-site-edit', async (el)=>{
   const u = val;
@@ -657,11 +693,11 @@ on('save-site-edit', async (el)=>{
 on('add-requirement', (el)=>{
   const cats = [...new Set(Object.values(S.state.requirements).flat().map(r=>r.category))];
   openSheet(sheetHead('Add a requirement', S.state.sites[el.dataset.site].name)
-    +'<label class="field-label" for="arCategory">Category</label><input type="text" id="arCategory" list="arCats" placeholder="e.g. Personnel"><datalist id="arCats">'+cats.map(c=>'<option value="'+c+'">').join('')+'</datalist>'
-    +'<label class="field-label" for="arName">Document required</label><input type="text" id="arName" placeholder="e.g. Working at heights training">'
+    +'<label class="field-label" for="arCategory">Category</label><input type="text" id="arCategory" maxlength="80" list="arCats" placeholder="e.g. Personnel"><datalist id="arCats">'+cats.map(c=>'<option value="'+c+'">').join('')+'</datalist>'
+    +'<label class="field-label" for="arName">Document required</label><input type="text" id="arName" maxlength="200" placeholder="e.g. Working at heights training">'
     +'<label class="field-label" for="arSource">Why it\'s required</label><select id="arSource" class="field">'+Object.entries(SOURCE_LABEL).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('')+'</select>'
     +'<label class="field-label" for="arWhy">Explanation for the contractor</label><textarea id="arWhy" placeholder="e.g. Required for any crew working above 1.8m, per the MHSA Code of Practice."></textarea>'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-requirement" data-site="'+el.dataset.site+'">Add requirement</button>');
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-requirement" data-site="'+el.dataset.site+'">Add requirement</button>');
 });
 on('save-requirement', async (el)=>{
   const u = val;
@@ -673,7 +709,7 @@ on('save-requirement', async (el)=>{
   }
 });
 on('reassign-site', (el)=>openSheet(sheetHead('Assign a contractor', S.state.sites[el.dataset.site].name) + contractorFields('ra')
-  +'<button class="btn orange block" style="margin-top:12px;" data-action="save-reassign" data-site="'+el.dataset.site+'">Send invitation</button>'));
+  +'<button class="btn primary block" style="margin-top:12px;" data-action="save-reassign" data-site="'+el.dataset.site+'">Send invitation</button>'));
 on('save-reassign', async (el)=>{
   const c = readContractor('ra'); if(!c) return;
   if(await act(()=>api.post('/api/sites/'+el.dataset.site+'/reassign', c), 'Invitation sent', el)) closeSheet();
@@ -687,7 +723,7 @@ on('edit-contractor', (el)=>{
     +'<label class="field-label" for="ecEmail">Contact email</label><input type="email" id="ecEmail" value="'+(c.contactEmail||'')+'">'
     +'<label class="field-label" for="ecReg">Registration number</label><input type="text" id="ecReg" value="'+(c.reg||'')+'">'
     +'<label class="field-label" for="ecCoid">COID number</label><input type="text" id="ecCoid" value="'+(c.coid||'')+'">'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-contractor" data-id="'+c.id+'">Save</button>');
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-contractor" data-id="'+c.id+'">Save</button>');
 });
 on('save-contractor', async (el)=>{
   const u = val;
@@ -703,7 +739,7 @@ on('new-share-link', (el)=>{
       +'<option value="safety_file"'+(isContractor()?' selected':'')+'>Safety file — requirement register and the submitted documents</option></select>'
     +'<label class="field-label" for="shareDays">Link expires after</label><select id="shareDays" class="field"><option value="1">1 day</option><option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option><option value="90">90 days</option></select>'
     +'<label class="field-label" for="shareLabel">Who is it for? (optional, for your records)</label><input type="text" id="shareLabel" placeholder="e.g. DMRE inspector, principal contractor">'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="create-share-link" data-site="'+site.id+'">Create link</button>'
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="create-share-link" data-site="'+site.id+'">Create link</button>'
     +'<div id="shareResult"></div>'
     +'<div class="notice" style="margin-top:12px;">Anyone with the link can view it until it expires — no sign-in. You can revoke it any time under More → External share links, and you\'ll see how often it was opened.</div>');
 });
@@ -746,7 +782,7 @@ function renderWorkerSheet(workerId, siteId){
       +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="certIssued">Issued</label><input type="date" id="certIssued"></div><div style="flex:1;"><label class="field-label" for="certExpires">Expires</label><input type="date" id="certExpires"></div></div>'
       +'<label class="field-label" for="certRestrictions">Restrictions (optional)</label><input type="text" id="certRestrictions" placeholder="e.g. Not fit for work at heights">'
       +'<label class="field-label" for="certFile">Copy of the certificate (optional)</label><input type="file" id="certFile" accept="application/pdf,image/*" style="font-size:12.5px;">'
-      +'<button class="btn orange block" style="margin-top:10px;" data-action="save-cert" data-worker="'+w.id+'">Add certificate</button>'
+      +'<button class="btn primary block" style="margin-top:10px;" data-action="save-cert" data-worker="'+w.id+'">Add certificate</button>'
       +'<div class="divider"></div>'
       +(siteId && w.siteIds.includes(siteId) && isContractor() ? '<button class="btn secondary block" data-action="unassign-worker" data-worker="'+w.id+'" data-site="'+siteId+'">Remove from '+S.state.sites[siteId].name+'</button>' : '')
       +'<button class="btn secondary block" style="margin-top:8px;" data-action="edit-worker" data-worker="'+w.id+'">Edit details</button>'
@@ -765,14 +801,14 @@ function workerForm(w){
     +'<label class="field-label" for="wPhone">Phone (optional)</label><input type="tel" id="wPhone" value="'+(w.phone||'')+'">';
 }
 const readWorker = () => ({ fullName: (val('wName')), occupation: (val('wOcc')), employeeNo: (val('wEmp')), idLast4: val('wId'), phone: val('wPhone') });
-on('new-worker', ()=>openSheet(sheetHead('Add a worker') + workerForm() + '<button class="btn orange block" style="margin-top:12px;" data-action="save-worker">Add worker</button>'));
+on('new-worker', ()=>openSheet(sheetHead('Add a worker') + workerForm() + '<button class="btn primary block" style="margin-top:12px;" data-action="save-worker">Add worker</button>'));
 on('save-worker', async (el)=>{
   const b = readWorker();
   if(!b.fullName){ document.getElementById('wName').focus(); return; }
   const r = await act(()=>api.post('/api/workers', b), 'Worker added — now record their certificates', el);
   if(r) openSheet(renderWorkerSheet(r.id));
 });
-on('edit-worker', (el)=>{ const w = S.state.workers[el.dataset.worker]; openSheet(sheetHead('Edit worker') + workerForm(w) + '<button class="btn orange block" style="margin-top:12px;" data-action="update-worker" data-worker="'+w.id+'">Save</button>'); });
+on('edit-worker', (el)=>{ const w = S.state.workers[el.dataset.worker]; openSheet(sheetHead('Edit worker') + workerForm(w) + '<button class="btn primary block" style="margin-top:12px;" data-action="update-worker" data-worker="'+w.id+'">Save</button>'); });
 on('update-worker', async (el)=>{ if(await act(()=>api.patch('/api/workers/'+el.dataset.worker, readWorker()), 'Saved', el)) openSheet(renderWorkerSheet(el.dataset.worker)); });
 on('toggle-worker', async (el)=>{ if(await act(()=>api.patch('/api/workers/'+el.dataset.worker, { active: el.dataset.active==='1' }), 'Saved', el)) openSheet(renderWorkerSheet(el.dataset.worker)); });
 on('save-cert', async (el)=>{
@@ -795,7 +831,7 @@ on('assign-worker', (el)=>{
   const available = Object.values(S.state.workers).filter(w=>w.own && w.active && !assigned.has(w.id));
   openSheet(sheetHead('Assign workers', S.state.sites[siteId].name)
     + (available.length ? available.map(w=>{ const s = workerSummary(w); return '<label class="toggle-row" style="cursor:pointer;"><span>'+w.name+' <span class="site-card-sub">'+(w.occupation||'')+(s.noMedical?' · no medical':s.worst!=='complete'?' · certificate '+s.worst:'')+'</span></span><input type="checkbox" class="assign-box" value="'+w.id+'"></label>'; }).join('')
-        +'<button class="btn orange block" style="margin-top:12px;" data-action="save-assign" data-site="'+siteId+'">Assign selected</button>'
+        +'<button class="btn primary block" style="margin-top:12px;" data-action="save-assign" data-site="'+siteId+'">Assign selected</button>'
       : '<p class="site-card-sub">Everyone active is already on this site.</p>')
     +'<button class="btn secondary block" style="margin-top:8px;" data-action="new-worker">+ Add a new worker</button>');
 });
@@ -819,7 +855,7 @@ on('new-appointment', (el)=>{
     +'<label class="field-label" for="apSite">Applies to</label><select id="apSite" class="field"><option value="">Whole organisation</option>'+Object.values(S.state.sites).filter(s=>s.status!=='declined'&&s.status!=='invited').map(s=>'<option value="'+s.id+'"'+(s.id===siteId?' selected':'')+'>'+s.name+'</option>').join('')+'</select>'
     +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="apStart">From</label><input type="date" id="apStart" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="apEnd">Until (optional)</label><input type="date" id="apEnd"></div></div>'
     +'<label class="field-label" for="apFile">Signed appointment letter (optional)</label><input type="file" id="apFile" accept="application/pdf,image/*" style="font-size:12.5px;">'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-appointment">Record appointment</button>');
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-appointment">Record appointment</button>');
 });
 on('appointment-preset', (el)=>{ const p = APPOINTMENT_PRESETS[parseInt(el.value,10)]; document.getElementById('apType').value = p.type; document.getElementById('apRef').value = p.ref; });
 on('save-appointment', async (el)=>{
@@ -847,8 +883,8 @@ function renderNewToolboxSheet(siteId){
     +'<label class="field-label" for="ttTopic">Topic</label><input type="text" id="ttTopic" placeholder="e.g. Isolation and lock-out before work on the drive station">'
     +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="ttPresenter">Presented by</label><input type="text" id="ttPresenter" value="'+myName()+'"></div></div>'
     +'<label class="field-label" for="ttContent">Talk content / key points</label><textarea id="ttContent" style="min-height:110px;" placeholder="What was covered"></textarea>'
-    +(S.boot.features.ai?'<button class="btn secondary small" style="margin-top:6px;" data-action="draft-toolbox">'+ICONS.sparkle+' Draft content with AI</button>':'')
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-toolbox" data-site="'+siteId+'">Save and collect signatures</button>';
+    +'<button class="btn secondary small" style="margin-top:6px;" data-action="draft-toolbox">'+ICONS.sparkle+(S.boot.features.ai?' Draft content with AI':' Draft talk from topic')+'</button>'
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-toolbox" data-site="'+siteId+'">Save and collect signatures</button>';
 }
 on('new-toolbox-talk', (el)=>openSheet(renderNewToolboxSheet(el.dataset.site)));
 on('draft-toolbox', async (el)=>{
@@ -881,7 +917,7 @@ function renderToolboxSheet(siteId, talkId){
       +(workers.length ? '<label class="field-label" for="attWorker">Worker</label><select id="attWorker" class="field" data-action-change="att-worker"><option value="">Someone else (type name)</option>'+workers.filter(w=>!signed.has(w.id)).map(w=>'<option value="'+w.id+'">'+w.name+'</option>').join('')+'</select>' : '')
       +'<label class="field-label" for="attName">Name</label><input type="text" id="attName" placeholder="Attendee\'s full name">'
       +'<label class="field-label">Signature</label><canvas class="sigpad" id="sigpad" aria-label="Signature pad — sign with your finger or mouse"></canvas>'
-      +'<div style="display:flex;gap:8px;margin-top:8px;"><button class="btn secondary" style="flex:1;" data-action="sig-clear">Clear</button><button class="btn orange" style="flex:2;" data-action="save-signature" data-talk="'+t.id+'" data-site="'+siteId+'">Save signature</button></div>'
+      +'<div style="display:flex;gap:8px;margin-top:8px;"><button class="btn secondary" style="flex:1;" data-action="sig-clear">Clear</button><button class="btn primary" style="flex:2;" data-action="save-signature" data-talk="'+t.id+'" data-site="'+siteId+'">Save signature</button></div>'
       +'<div class="site-card-sub" style="margin-top:6px;">Pass the device to each attendee to sign in turn.</div>';
   }
   return body;
@@ -937,7 +973,7 @@ function renderProfileSheet(){
   body += '<label class="field-label" for="profileName">Your name</label><input type="text" id="profileName" value="'+me.name+'">'
     +'<label class="field-label" for="profileTitle">Your title / role (shown on records)</label><input type="text" id="profileTitle" value="'+me.title+'" placeholder="e.g. Mine SHE Officer">'
     +'<label class="field-label" for="profilePhone">Contact number</label><input type="tel" id="profilePhone" value="'+me.phone+'">'
-    +'<button class="btn orange block" style="margin-top:12px;" data-action="save-profile">Save</button>';
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="save-profile">Save</button>';
   if(!me.verified) body += '<button class="btn secondary block" style="margin-top:8px;" data-action="resend-verification">Resend confirmation email</button>';
   body += '<div class="section-title">Organisations</div>'
     + orgs.map(o=>'<button class="menu-row" '+(o.id===org().id?'disabled':'data-action="switch-org" data-org="'+o.id+'"')+'><div style="flex:1;"><div class="qa-title">'+o.name+'</div><div class="qa-sub">'+(o.kind==='host'?'Site owner':'Contractor')+' · '+o.role+'</div></div>'+(o.id===org().id?'<span class="badge approved">Current</span>':ICONS.chevron)+'</button>').join('')
@@ -1013,7 +1049,7 @@ function renderDashSheet(){
       +'<span><label for="dw-'+id+'">'+labels[id]+'</label></span>'
       +'<button class="btn secondary small icon" data-action="dash-move" data-i="'+i+'" data-dir="-1" aria-label="Move up"'+(i===0?' disabled':'')+'>'+ICONS.up+'</button>'
       +'<button class="btn secondary small icon" data-action="dash-move" data-i="'+i+'" data-dir="1" aria-label="Move down"'+(i===dashDraft.order.length-1?' disabled':'')+'>'+ICONS.down+'</button></div>').join('')
-    +'<div style="display:flex;gap:8px;margin-top:12px;"><button class="btn secondary" style="flex:1;" data-action="dash-reset">Reset to default</button><button class="btn orange" style="flex:2;" data-action="dash-save">Save</button></div>';
+    +'<div style="display:flex;gap:8px;margin-top:12px;"><button class="btn secondary" style="flex:1;" data-action="dash-reset">Reset to default</button><button class="btn primary" style="flex:2;" data-action="dash-save">Save</button></div>';
 }
 on('customise-dashboard', ()=>{ const l = dashboardLayout(); dashDraft = { order: l.order.slice(), hidden: l.hidden.slice() }; openSheet(renderDashSheet()); });
 on('dash-toggle', (el)=>{ const id = el.dataset.id; dashDraft.hidden = el.checked ? dashDraft.hidden.filter(x=>x!==id) : dashDraft.hidden.concat(id); });
@@ -1025,3 +1061,40 @@ on('dash-move', (el)=>{
 on('dash-save', async (el)=>{ if(await act(()=>api.put('/api/me/dashboard', dashDraft), 'Dashboard saved', el)) closeSheet(); });
 on('dash-reset', async (el)=>{ if(await act(()=>api.put('/api/me/dashboard', { order:[], hidden:[] }), 'Dashboard reset', el)) closeSheet(); });
 
+
+/* ============ FEEDBACK ============ */
+on('open-feedback', ()=>openSheet(sheetHead('Report a problem or suggest an idea')
+  +'<label class="field-label" for="fbKind">Type</label><select id="fbKind" class="field"><option value="problem">Something isn\'t working</option><option value="idea">An idea or request</option></select>'
+  +'<label class="field-label" for="fbMessage">What happened, or what would help?</label><textarea id="fbMessage" rows="5" placeholder="e.g. When I upload a photo of a certificate from my phone, the expiry date doesn\'t fill in."></textarea>'
+  +'<div class="site-card-sub" style="margin-top:4px;">We include which screen you were on and your browser type, nothing else.</div>'
+  +'<button class="btn primary block" style="margin-top:12px;" data-action="send-feedback">Send</button>'));
+on('send-feedback', async (el)=>{
+  const message = val('fbMessage');
+  if(message.length < 3){ document.getElementById('fbMessage').focus(); return; }
+  const view = [S.nav, S.moreView, S.siteTab].filter(Boolean).join('/');
+  if(await act(()=>api.post('/api/feedback', { kind: val('fbKind'), message, context: { view, userAgent: navigator.userAgent.slice(0,400) } }), 'Thanks — sent to the SiteGuard team', el)) closeSheet();
+});
+
+/* ============ JOIN CODES ============ */
+on('join-code', async (el)=>{
+  el.disabled = true;
+  try{
+    const r = await api.post('/api/sites/'+el.dataset.site+'/join-code');
+    openSheet(sheetHead('Join code', escapeHtml(r.siteName))
+      +'<div class="join-code" aria-label="Join code">'+escapeHtml(r.code)+'</div>'
+      +'<p class="site-card-sub" style="text-align:center;">Give this to the contractor. In SiteGuard they tap <strong>Join a site with a code</strong> and type it in — they\'re connected straight away. It works for '+r.expiresInDays+' days, and making a new code cancels this one.</p>'
+      +'<button class="btn secondary block" style="margin-top:12px;" data-action="copy-join-code" data-code="'+escapeHtml(r.code)+'">Copy code</button>');
+  }catch(e){ showToast(e.message); }
+  el.disabled = false;
+});
+on('copy-join-code', async (el)=>{ try{ await navigator.clipboard.writeText(el.dataset.code); showToast('Code copied'); }catch{ showToast('Write the code down: '+el.dataset.code); } });
+on('join-site', ()=>openSheet(sheetHead('Join a site', 'With the code the site gave you')
+  +'<label class="field-label" for="joinCode">Join code</label><input type="text" id="joinCode" class="join-input" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345" autofocus>'
+  +'<div class="site-card-sub" style="margin-top:6px;">Capitals, dashes and spaces don\'t matter.</div>'
+  +'<button class="btn primary block" style="margin-top:12px;" data-action="join-go">Join site</button>'));
+on('join-go', async (el)=>{
+  const code = val('joinCode');
+  if(code.replace(/[^A-Za-z0-9]/g,'').length < 8){ showToast('Join codes have 8 letters and numbers'); document.getElementById('joinCode').focus(); return; }
+  const r = await act(()=>api.post('/api/sites/join', { code }), 'You\'ve joined the site', el);
+  if(r){ closeSheet(); S.nav='sites'; S.activeSiteId=r.siteId; S.siteTab='compliance'; render(); window.scrollTo(0,0); }
+});

@@ -1,0 +1,23 @@
+name: Uptime check
+# Checks the live app every 30 minutes. Set the repository variable
+# SITEGUARD_URL (Settings → Secrets and variables → Actions → Variables) to
+# your app's address, e.g. https://app.siteguard.co.za. Until it is set, the
+# job is skipped. GitHub emails you when a scheduled run fails.
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    if: ${{ vars.SITEGUARD_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/smoke.mjs
+        env:
+          SITEGUARD_URL: ${{ vars.SITEGUARD_URL }}

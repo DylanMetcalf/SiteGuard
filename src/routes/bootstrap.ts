@@ -9,6 +9,9 @@ import { many, pool, type Db } from '../db/pool.js';
 import { features } from '../config.js';
 import { actorRole, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
 import { aiAllowed, planOf, standing } from '../lib/plans.js';
+import { openFindings } from '../lib/agent.js';
+import { blueprintForRequirement } from '../lib/studio/blueprints.js';
+import { brandingOf } from '../lib/studio/generate.js';
 import { auditFor } from './org.js';
 import { personasFor } from './demo.js';
 import { workforceState } from './workforce.js';
@@ -134,7 +137,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
   if (activeIds.length) {
     // ---- requirements ----
     for (const r of await many(db, `select * from requirements where site_id = any($1::uuid[]) order by position, created_at`, [activeIds])) {
-      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why });
+      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, blueprint: blueprintForRequirement(r.name)?.id ?? null });
     }
 
     // ---- documents (site requirements) ----
@@ -262,6 +265,12 @@ async function attachDocuments(db: Db, ctx: OrgCtx, state: Record<string, any>, 
   );
   const byDoc: Record<string, any[]> = {};
   for (const v of versions) (byDoc[v.document_id] ??= []).push(v);
+  // Which current files are Document Studio documents (opens the review workspace).
+  const fileIds = docs.map((x) => x.current_file_id).filter(Boolean);
+  const studio = fileIds.length
+    ? await many<{ id: string; pdf_file_id: string }>(db, 'select id, pdf_file_id from generated_documents where pdf_file_id = any($1::uuid[])', [fileIds])
+    : [];
+  const studioByFile = new Map(studio.map((g) => [g.pdf_file_id, g.id]));
   for (const x of docs) {
     const all = byDoc[x.id] ?? [];
     const current = all[all.length - 1];
@@ -277,6 +286,7 @@ async function attachDocuments(db: Db, ctx: OrgCtx, state: Record<string, any>, 
       assetUrl: fileUrl(x.current_file_id),
       assetName: x.current_name,
       assetType: x.current_type,
+      studioDocId: studioByFile.get(x.current_file_id) ?? null,
       aiDrafted: !!current?.ai_drafted,
       // A file attached but not yet submitted is visible only to the submitting side.
       pendingFileId: ownerSide ? x.pending_file_id : null,
@@ -287,6 +297,16 @@ async function attachDocuments(db: Db, ctx: OrgCtx, state: Record<string, any>, 
       })),
     };
   }
+}
+
+async function inboxFor(userId: string, orgId: string) {
+  const items = await many<{ id: string; kind: string; title: string; body: string; link: unknown; created_at: Date; read_at: Date | null }>(
+    pool,
+    `select id::int as id, kind, title, body, link, created_at, read_at from notifications where user_id = $1 and org_id = $2 order by created_at desc limit 40`,
+    [userId, orgId],
+  );
+  const unread = await many<{ n: number }>(pool, `select count(*)::int as n from notifications where user_id = $1 and org_id = $2 and read_at is null`, [userId, orgId]);
+  return { unread: unread[0]?.n ?? 0, items: items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, body: i.body, link: i.link, createdAt: i.created_at, read: !!i.read_at })) };
 }
 
 export default async function bootstrapRoutes(app: FastifyInstance) {
@@ -324,11 +344,14 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         plan: plan.id, planName: plan.name, subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
         currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo,
         siteLimit: plan.siteLimit,
+        branding: brandingOf(c),
       },
       features: { ...baseFeatures, ai: aiAllowed(c.org) },
       personas: await personasFor(pool, c),
       myContractorId: c.org.kind === 'contractor' ? c.org.id : null,
       state: await buildState(pool, c),
+      agent: await openFindings(c.org.id),
+      inbox: await inboxFor(c.user.id, c.org.id),
     };
   });
 }

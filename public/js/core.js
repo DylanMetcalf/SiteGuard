@@ -121,6 +121,7 @@ export const isOrgAdmin = () => ['owner','admin'].includes(S.boot.org.role);
 export const canReview = () => isHost() && ['owner','admin','reviewer'].includes(S.boot.org.role);
 export const canEdit = () => !(isHost() && S.boot.org.role === 'member');
 export const readOnly = () => S.boot.org.standing === 'lapsed';
+export const canCreateSite = () => isHost() && isOrgAdmin() && !readOnly();
 export const myName = () => S.boot.me.name;
 export const myRoleLabel = () => S.boot.me.roleLabel;
 export const myContractorId = () => S.boot.myContractorId;
@@ -193,7 +194,7 @@ export function statusLabelForSubmission(s){
 }
 export function gaugeColor(pct){
   if(pct>=90) return 'var(--green)';
-  if(pct>=60) return 'var(--orange)';
+  if(pct>=60) return 'var(--brand)';
   return 'var(--red)';
 }
 export function gauge(pct, size){
@@ -250,18 +251,41 @@ export function showToast(msg){
   clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>el.remove(), 3200);
 }
+/*
+ * Phone back button: an open sheet has its own history entry, so Back closes
+ * the sheet instead of leaving SiteGuard. Screens get entries too (app.js).
+ */
+let skipPops = 0;
+let afterBack = [];
+/** True (and runs anything waiting) when this popstate is one we triggered ourselves. */
+export function consumeSkippedPop(){
+  if(skipPops > 0){ skipPops--; if(!skipPops){ const q = afterBack; afterBack = []; q.forEach(fn=>fn()); } return true; }
+  return false;
+}
+/** Runs fn now, or after our own pending history.back() has landed, so entries stay in order. */
+export function afterPendingBack(fn){ if(skipPops > 0) afterBack.push(fn); else fn(); }
 export function openSheet(innerHtml){
-  closeSheet();
+  closeSheet(true);
   const overlay = document.createElement('div');
   overlay.className='overlay';
   overlay.innerHTML = '<div class="sheet" role="dialog" aria-modal="true">'+innerHtml+'</div>';
   overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeSheet(); });
   document.body.appendChild(overlay);
+  // Stop people typing past what the server accepts, instead of erroring afterwards.
+  overlay.querySelectorAll('input[type=text]:not([maxlength]),input[type=email]:not([maxlength])').forEach(i=>i.setAttribute('maxlength','300'));
+  overlay.querySelectorAll('textarea:not([maxlength])').forEach(t=>t.setAttribute('maxlength','2000'));
   const first = overlay.querySelector('[autofocus]');
   if(first) setTimeout(()=>first.focus(), 30);
+  if(S.boot && S.boot.authenticated && !(history.state && history.state.sheet)) history.pushState(Object.assign({}, history.state, { sheet:true }), '');
   return overlay;
 }
-export function closeSheet(){ document.querySelectorAll('.overlay:not(.tutorial)').forEach(o=>o.remove()); S.openReq = null; }
+/** Closes any open sheet. `fromHistory` is true when Back already removed its history entry. */
+export function closeSheet(fromHistory){
+  const open = document.querySelectorAll('.overlay:not(.tutorial)');
+  open.forEach(o=>o.remove());
+  S.openReq = null;
+  if(open.length && fromHistory !== true && history.state && history.state.sheet){ skipPops++; history.back(); }
+}
 export function sheetEl(){ return document.querySelector('.overlay .sheet'); }
 export function sheetHead(title, sub){
   return '<div class="sheet-head"><div><h3>'+title+'</h3>'+(sub?'<div class="site-card-sub">'+sub+'</div>':'')+'</div><button class="sheet-close" data-action="close-sheet" aria-label="Close">'+ICONS.cross+'</button></div>';

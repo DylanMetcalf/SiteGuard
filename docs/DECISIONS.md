@@ -5,6 +5,58 @@ Newest first.
 
 ---
 
+**DECISION** Section approvals are keyed by a hash of the section's content, not by revision.
+**REASON** When an author fixes one section, the reviewer should only re-read that section. Hashing the content means unchanged sections keep their approval automatically, with no diffing or manual carry-over.
+**DATE** 2026-09-27
+
+**DECISION** Notifications are in-app only (plus the existing emails); no push notifications yet.
+**REASON** The inbox covers "the person on site knows" without app-store apps or push-service accounts. Browser push can be added once people use the app daily on site.
+**DATE** 2026-09-27
+
+**DECISION** Join codes live on the site's invitation, not as a separate way to link companies.
+**REASON** One acceptance path (email link or code) means the same checks, audit and notifications, and a code can't connect a contractor to a site that never invited anyone.
+**DATE** 2026-09-27
+
+**DECISION** The Safety File Builder runs in the browser, calling the existing endpoints one document at a time.
+**REASON** No new server surface to secure; every rule (roles, limits, tenancy) still applies, and one failed document never undoes the others.
+**DATE** 2026-09-27
+
+**DECISION** The bound safety file uses pdf-lib to merge PDFs.
+**REASON** Small, dependency-free, MIT-licensed and widely used; pdfmake can create PDFs but not merge existing ones.
+**DATE** 2026-09-27
+
+**DECISION** Rebrand to deep navy and sage with softer, card-based UI and self-hosted fonts (Onest, JetBrains Mono).
+**REASON** Orange/grey is common among competitors; navy signals trust and professionalism to mining buyers, sage gives a distinctive, calm accent. Self-hosting fonts removes a third-party request (privacy, speed, reliability). Colours are tokens, so the palette can still change in one place.
+**DATE** 2026-09-27
+
+**DECISION** Document Studio writes documents from our own blueprints (original content) plus AI tailoring, not by copying published templates.
+**REASON** Other companies' templates are copyrighted and of unknown quality. Our blueprints follow the structure SHE departments expect, cite only legal references we are sure of, and are reviewed in code; the AI tailors them to the job and can research a site's published requirements at generation time.
+**DATE** 2026-09-27
+
+**DECISION** Documents are generated server-side as PDF (pdfmake, standard fonts) and Word (docx) from one document model.
+**REASON** PDF is what gets submitted and printed; Word lets SHE managers edit. One model keeps both identical, avoids a headless browser on the server, and lets the AI's output be validated before rendering.
+**DATE** 2026-09-27
+
+**DECISION** Launch on Render (Frankfurt) from the `render.yaml` blueprint, with uploads on an attached disk instead of S3/R2.
+**REASON** A non-technical founder can deploy it in one click with no code; one bill, daily disk snapshots and managed Postgres backups. The trade-off is a single app instance and no zero-downtime deploys, which is fine for a pilot. Move files to R2 (`STORAGE_DRIVER=s3`) and scale out when customers need it; Fly.io Johannesburg or AWS Cape Town remain the options for in-country hosting.
+**DATE** 2026-09-27
+
+**DECISION** AI features degrade to built-in rules and templates when no API key is set, instead of being hidden.
+**REASON** The product must be demo-able and sellable before the founder has an AI account, and must keep working during an AI outage or once an organisation's monthly allowance is used. The same starter packs and work-type knowledge (`src/lib/knowledge.ts`) back both modes.
+**DATE** 2026-09-27
+
+**DECISION** The assistant is read-only: it proposes (site, checklist, draft) and the user confirms through the normal, permission-checked endpoints. Its tools can only read the caller's own organisation's data.
+**REASON** Keeps every write under the existing authorisation and audit rules, and means a prompt injection in a web page can't change customer data.
+**DATE** 2026-09-27
+
+**DECISION** The compliance agent is rule-based and deterministic, not AI-driven.
+**REASON** Findings about expiries, reviews and incidents must be exact and explainable, cost nothing to run every 15 minutes, and work without an AI key.
+**DATE** 2026-09-27
+
+**DECISION** Assistant conversations are not stored on the server; the browser tab holds the conversation.
+**REASON** No new personal data to secure or retain under POPIA until customers show they want chat history.
+**DATE** 2026-09-27
+
 **DECISION** Requirement templates ship as built-in, editable starter packs; a site copies a pack at creation.
 **REASON** A new mine otherwise types every requirement by hand — the slowest step in onboarding. Copying (rather than linking) keeps each site's requirements stable when a pack changes.
 **DATE** 2026-09-24

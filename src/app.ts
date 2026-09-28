@@ -20,7 +20,14 @@ import documentRoutes from './routes/documents.js';
 import safetyRoutes from './routes/safety.js';
 import requestRoutes from './routes/requests.js';
 import fileRoutes from './routes/files.js';
+import { pool } from './db/pool.js';
 import aiRoutes from './routes/ai.js';
+import assistantRoutes from './routes/assistant.js';
+import agentRoutes from './routes/agent.js';
+import supportRoutes from './routes/support.js';
+import studioRoutes from './routes/studio.js';
+import reviewRoutes from './routes/review.js';
+import joinRoutes from './routes/join.js';
 import billingRoutes from './routes/billing.js';
 import shareRoutes from './routes/share.js';
 import eventRoutes from './routes/events.js';
@@ -38,6 +45,26 @@ const publicDir = path.resolve(here, '../public');
 
 /** Paths that authenticate some other way (e.g. Stripe signature) and skip CSRF checks. */
 const CSRF_EXEMPT = new Set(['/api/billing/webhook']);
+
+const FIELD_LABELS: Record<string, string> = {
+  email: 'Email address', password: 'Password', name: 'Name', orgName: 'Organisation name', orgKind: 'Organisation type',
+  location: 'Location', category: 'Category', why: 'Reason', note: 'Note', message: 'Message', title: 'Title', description: 'Description',
+  expiryDate: 'Expiry date', dueDate: 'Due date', date: 'Date', brandColor: 'Brand colour', docPrefix: 'Document number prefix',
+  contactEmail: 'Contact email', phone: 'Phone number', role: 'Role', type: 'Type', values: 'Answers', messages: 'Message',
+};
+/** Turns a validation issue into a sentence a site supervisor understands. */
+function humanIssue(issue: { path: PropertyKey[]; message: string; code?: string; minimum?: unknown; maximum?: unknown; format?: string } | undefined): string {
+  if (!issue) return 'Please check the form and try again.';
+  const key = [...issue.path].reverse().find((k) => typeof k === 'string') as string | undefined;
+  const label = (key && FIELD_LABELS[key]) || (key ? key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()) : 'This field');
+  if (issue.format === 'email' || /email/i.test(issue.message)) return 'Enter a valid email address, like name@company.co.za.';
+  if (issue.code === 'too_small') return Number(issue.minimum) <= 1 ? `${label} is required.` : `${label} must be at least ${String(issue.minimum)} characters.`;
+  if (issue.code === 'too_big') return `${label} is too long (${String(issue.maximum)} characters at most).`;
+  if (issue.code === 'invalid_value' || issue.code === 'invalid_enum_value') return `Choose a valid ${label.toLowerCase()}.`;
+  if (issue.code === 'invalid_type') return `${label} is required.`;
+  if (issue.code === 'invalid_format' || issue.code === 'invalid_string') return `${label} isn't in the right format.`;
+  return `${label}: ${issue.message}`;
+}
 
 export async function buildApp(opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
@@ -100,9 +127,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
       return reply.status(err.statusCode).send({ error: err.code, message: err.message });
     }
     if (err instanceof ZodError) {
-      const first = err.issues[0];
-      const field = first?.path.join('.') || 'input';
-      return reply.status(400).send({ error: 'invalid', message: `${field}: ${first?.message ?? 'invalid'}`, issues: err.issues });
+      return reply.status(400).send({ error: 'invalid', message: humanIssue(err.issues[0]), issues: err.issues });
     }
     const e = err as { statusCode?: number; code?: string; message: string };
     if (e.statusCode === 429) {
@@ -118,7 +143,15 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     return reply.status(500).send({ error: 'server_error', message: 'Something went wrong on our side. Try again.' });
   });
 
-  app.get('/healthz', async () => ({ ok: true }));
+  // Liveness plus a database round trip, for the host's health check and uptime monitoring.
+  app.get('/healthz', async (_req, reply) => {
+    try {
+      await pool.query('select 1');
+      return { ok: true };
+    } catch {
+      return reply.code(503).send({ ok: false, error: 'database_unavailable' });
+    }
+  });
 
   await app.register(authRoutes);
   await app.register(orgRoutes);
@@ -129,6 +162,12 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(requestRoutes);
   await app.register(fileRoutes);
   await app.register(aiRoutes);
+  await app.register(assistantRoutes);
+  await app.register(agentRoutes);
+  await app.register(supportRoutes);
+  await app.register(studioRoutes);
+  await app.register(reviewRoutes);
+  await app.register(joinRoutes);
   await app.register(billingRoutes);
   await app.register(shareRoutes);
   await app.register(eventRoutes);

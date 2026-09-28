@@ -1,6 +1,7 @@
-# Local development stack: Postgres, S3-compatible storage (MinIO) and a mail
-# catcher (Mailpit, UI on http://localhost:8025). Run the app with `npm run dev`
-# against it, or uncomment the `app` service to run the production image.
+# Local stack: Postgres, S3-compatible storage (MinIO), a mail catcher (Mailpit,
+# UI on http://localhost:8025) and the app itself.
+#   Full run-through:  docker compose up --build   → http://localhost:3000
+#   Development:       docker compose up -d postgres mailpit && npm run dev
 services:
   postgres:
     image: postgres:16-alpine
@@ -34,15 +35,26 @@ services:
     image: axllent/mailpit:latest
     ports: ["1025:1025", "8025:8025"]
 
-  # app:
-  #   build: .
-  #   env_file: .env
-  #   environment:
-  #     DATABASE_URL: postgres://siteguard:siteguard@postgres:5432/siteguard
-  #     S3_ENDPOINT: http://minio:9000
-  #     SMTP_URL: smtp://mailpit:1025
-  #   ports: ["3000:3000"]
-  #   depends_on: [postgres, minio-bucket, mailpit]
+  app:
+    build: .
+    environment:
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgres://siteguard:siteguard@postgres:5432/siteguard
+      STORAGE_DRIVER: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: siteguard-documents
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: siteguard
+      S3_SECRET_ACCESS_KEY: siteguard-secret
+      S3_FORCE_PATH_STYLE: "true"
+      SMTP_URL: smtp://mailpit:1025
+      # Optional: put your Claude API key in a .env file next to this one.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports: ["3000:3000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio-bucket: { condition: service_completed_successfully }
+      mailpit: { condition: service_started }
 
 volumes:
   pgdata:

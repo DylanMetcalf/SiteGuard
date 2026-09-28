@@ -10,14 +10,14 @@ import { one, pool } from '../db/pool.js';
 import { HttpError } from './errors.js';
 
 let client: Anthropic | null = null;
-function anthropic(): Anthropic {
+export function anthropic(): Anthropic {
   client ??= new Anthropic({ apiKey: config.ANTHROPIC_API_KEY, maxRetries: 2 });
   return client;
 }
 
 // Server-side refusal fallbacks: a declined request is re-run on Anthropic's
 // recommended fallback model instead of failing outright.
-const FALLBACK = { betas: ['server-side-fallback-2026-07-01'] as Anthropic.Beta.AnthropicBeta[], fallbacks: 'default' as const };
+export const FALLBACK = { betas: ['server-side-fallback-2026-07-01'] as Anthropic.Beta.AnthropicBeta[], fallbacks: 'default' as const };
 
 const month = () => new Date().toISOString().slice(0, 7);
 
@@ -36,7 +36,7 @@ export async function reserveAiRequest(orgId: string): Promise<void> {
   }
 }
 
-async function recordTokens(orgId: string, usage: { input_tokens?: number | null; output_tokens?: number | null } | undefined) {
+export async function recordTokens(orgId: string, usage: { input_tokens?: number | null; output_tokens?: number | null } | undefined) {
   if (!usage) return;
   await pool.query(
     `update ai_usage set input_tokens = input_tokens + $3, output_tokens = output_tokens + $4 where org_id = $1 and month = $2`,

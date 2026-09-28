@@ -11,7 +11,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default('0.0.0.0'),
   /** Public base URL, used in emails and share links, e.g. https://app.siteguard.co.za */
-  APP_URL: z.string().url().default('http://localhost:3000'),
+  // On Render, the service's own URL is used until a custom domain is set.
+  APP_URL: z.string().url().default(process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'),
   DATABASE_URL: z.string().default('postgres://siteguard:siteguard@localhost:5432/siteguard'),
   DATABASE_SSL: bool(false),
   /** Trust X-Forwarded-* headers (set when behind a load balancer / proxy). */
@@ -36,12 +37,16 @@ const schema = z.object({
   // Unset → emails are written to the log (and still recorded in the outbox).
   SMTP_URL: z.string().optional(),
   EMAIL_FROM: z.string().default('SiteGuard <no-reply@siteguard.local>'),
+  /** Where "Report a problem" messages are emailed (e.g. your own address). Unset → logged only. */
+  SUPPORT_EMAIL: z.string().email().optional(),
 
   // AI drafting via server-side proxy. Unset → AI features are hidden.
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default('claude-opus-5'),
   /** Monthly AI request allowance per organisation on plans that include AI. */
   AI_MONTHLY_REQUEST_LIMIT: z.coerce.number().int().positive().default(300),
+  /** Let the assistant search the web when researching site requirements. */
+  AI_WEB_SEARCH: bool(true),
 
   // Billing. Unset → billing is disabled and every organisation is treated as in good standing.
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -80,6 +85,10 @@ if (config.STORAGE_DRIVER === 's3' && !config.S3_BUCKET) {
 }
 
 export const isProd = config.NODE_ENV === 'production';
+if (isProd) {
+  if (config.APP_URL.startsWith('http://localhost')) console.warn('APP_URL is not set: links in emails will point at localhost.');
+  if (!config.SMTP_URL) console.warn('SMTP_URL is not set: emails are written to the log instead of being sent.');
+}
 export const features = {
   ai: !!config.ANTHROPIC_API_KEY,
   billing: !!config.STRIPE_SECRET_KEY,

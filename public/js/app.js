@@ -1,19 +1,68 @@
 // SiteGuard web app entry point: boot, render, event delegation and live sync.
 
 import { api } from './api.js';
-import { S, ICONS, actions, reload, setRender, showToast, closeSheet } from './core.js';
+import { S, ICONS, actions, on, reload, setRender, showToast, closeSheet, consumeSkippedPop, afterPendingBack } from './core.js';
 import { handleDeepLink, renderAuth, renderNoOrg } from './auth.js';
 import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
+import './assistant.js';
+import './studio.js';
+import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
+import './inbox.js';
+import './builder.js';
 
 const app = document.getElementById('app');
 
+/* ---- Phone back button: each screen gets a history entry; Back returns to the previous screen. ---- */
+let restoring = false;
+const navOf = () => ({ nav: S.nav || 'dashboard', moreView: S.moreView || null, activeSiteId: S.activeSiteId || null, siteTab: S.siteTab || null });
+const sameNav = (a, b) => a.nav === b.nav && (a.moreView || null) === (b.moreView || null) && (a.activeSiteId || null) === (b.activeSiteId || null) && (a.siteTab || null) === (b.siteTab || null);
+function syncHistory(){
+  if(restoring || !S.boot || !S.boot.authenticated) return;
+  afterPendingBack(()=>{
+    const st = navOf(), cur = history.state;
+    if(!cur || !cur.nav){ history.replaceState(st, ''); return; }
+    if(cur.sheet) return;
+    if(!sameNav(cur, st)) history.pushState(st, '');
+  });
+}
+window.addEventListener('popstate', (e)=>{
+  if(consumeSkippedPop()) return;
+  if(document.querySelector('.overlay:not(.tutorial)')){ closeSheet(true); return; }
+  const st = e.state;
+  if(!st || !st.nav || st.sheet || !S.boot || !S.boot.authenticated || sameNav(st, navOf())) return;
+  S.nav = st.nav; S.moreView = st.moreView; S.activeSiteId = st.activeSiteId; if(st.siteTab) S.siteTab = st.siteTab;
+  restoring = true; render(); restoring = false; window.scrollTo(0,0);
+});
+window.addEventListener('sg:signed-out', ()=>{
+  if(!S.boot || !S.boot.authenticated) return;
+  closeSheet(true);
+  reload().then(()=>showToast('You were signed out — sign in again to carry on.')).catch(()=>{});
+});
+
+// Send unexpected browser errors to the server log (a few per page load), so bugs surface without a user report.
+let reported = 0;
+function reportError(message, stack){
+  if(reported++ >= 5 || !message) return;
+  const view = [S.nav, S.moreView, S.siteTab].filter(Boolean).join('/');
+  api.post('/api/client-errors', { message: String(message).slice(0,2000), stack: stack ? String(stack).slice(0,4000) : undefined, url: location.pathname, view }).catch(()=>{});
+}
+window.addEventListener('error', (e)=>reportError(e.message, e.error && e.error.stack));
+window.addEventListener('unhandledrejection', (e)=>{ const r = e.reason || {}; if(r.name==='ApiError' || r.status!==undefined) return; reportError(r.message || String(r), r.stack); });
+
+let wasOutside = false;
 function render(){
   const b = S.boot;
   if(!b){ app.innerHTML = '<div class="empty"><p>Loading…</p></div>'; return; }
+  if(S.guestReviewToken){
+    // Someone opening a review link: no account needed, just the document.
+    app.innerHTML = '<div class="guest-top"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div><div class="brand-tag" style="display:block;">Document review</div></div></div></div><main class="view">'+renderReview()+'</main>';
+    return;
+  }
   if(!b.authenticated || S.authView){
     app.innerHTML = renderAuth();
     stopLive();
+    wasOutside = true;
     return;
   }
   if(!b.org){ app.innerHTML = renderNoOrg(); stopLive(); return; }
@@ -24,8 +73,10 @@ function render(){
     return;
   }
   const y = window.scrollY;
+  const arriving = wasOutside; wasOutside = false; // just signed in or up: start at the top, not where the form was scrolled
   app.innerHTML = topbar() + '<main class="view">'+renderView()+'</main>' + bottomNav();
-  if(S.keepScroll) window.scrollTo(0, y);
+  syncHistory();
+  if(arriving) window.scrollTo(0, 0); else if(S.keepScroll) window.scrollTo(0, y);
   startLive();
   maybeShowTutorial();
 }
@@ -59,6 +110,7 @@ document.addEventListener('input', (e)=>{
 document.addEventListener('keydown', (e)=>{
   if(e.key==='Escape') closeSheet();
   if((e.key==='Enter' || e.key===' ') && e.target.matches('[role="button"][data-action]')){ e.preventDefault(); e.target.click(); }
+  if(e.key==='Enter' && e.target.matches('#askDash')){ e.preventDefault(); const b = document.querySelector('[data-action="ask-dashboard"]'); if(b) b.click(); }
   if(e.key==='Enter' && e.target.matches('#siPassword, #siEmail')){ const b = document.querySelector('[data-action="signin"]'); if(b) b.click(); }
 });
 
@@ -80,7 +132,7 @@ function startLive(){
   es.addEventListener('open', ()=>{ if(!S.live){ S.live = true; updateLiveDot(); } });
   es.addEventListener('change', ()=>{
     clearTimeout(refetchTimer);
-    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
+    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>refreshReview()).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
   });
   es.addEventListener('error', ()=>{
     S.live = false; updateLiveDot();
@@ -114,7 +166,7 @@ function showTutorialStep(){
   overlay.className='overlay tutorial';
   overlay.innerHTML = '<div class="sheet tut-card" role="dialog" aria-modal="true"><div class="tut-icon">'+ICONS.sparkle+'</div><h2>'+step.title+'</h2><p>'+step.text+'</p>'
     +'<div class="tut-dots">'+TUTORIAL_STEPS.map((s,i)=>'<span class="'+(i===tutorialStep?'active':'')+'"></span>').join('')+'</div>'
-    +'<button class="btn orange block" id="tutNext">'+(isLast?'Get started':'Next')+'</button>'
+    +'<button class="btn primary block" id="tutNext">'+(isLast?'Get started':'Next')+'</button>'
     +(isLast?'':'<button class="btn secondary block" style="margin-top:8px;" id="tutSkip">Skip</button>')+'</div>';
   document.body.appendChild(overlay);
   overlay.querySelector('#tutNext').onclick = ()=>{ if(isLast) finishTutorial(); else { tutorialStep++; showTutorialStep(); } };
@@ -131,6 +183,8 @@ function finishTutorial(){
   try{
     // Fetch the session (and its CSRF token) first: some emailed links POST on arrival.
     await reload();
+    const rv = /^\/review\/([A-Za-z0-9_-]{20,100})$/.exec(location.pathname);
+    if(rv){ S.guestReviewToken = rv[1]; openGuestReview(rv[1]); return; }
     await handleDeepLink();
     await reload();
     if(S.pendingToast){ showToast(S.pendingToast); S.pendingToast = null; }
@@ -138,3 +192,5 @@ function finishTutorial(){
     app.innerHTML = '<div class="empty"><h3>Can\'t reach SiteGuard</h3><p>'+(e.message||'')+'</p><p>Refresh the page to try again.</p></div>';
   }
 })();
+
+on('open-review', (el)=>openReview(el.dataset.id));
