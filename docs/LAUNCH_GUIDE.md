@@ -23,6 +23,21 @@ The domain comes before email because email providers need to check you own the 
 
 ---
 
+## Free try-out first (optional, ≈ 15 minutes, R0)
+
+To click through SiteGuard before paying for anything, deploy the free demo version:
+
+1. Sign up at **render.com** with your GitHub account.
+2. Click **New → Blueprint** and choose the `SiteGuard` repository.
+3. In **Blueprint Path**, type `render.free.yaml`. There is nothing else to fill in.
+4. Click **Apply** and wait 5–10 minutes. Open the `https://siteguard-demo-xxxx.onrender.com` link
+   and tap **Explore the demo**.
+
+The free version is for trying it out only. It sleeps after 15 minutes without visitors (the next
+visit waits about a minute), Render deletes its database after 30 days, uploaded files are lost
+when it restarts, and it sends no emails. When you're ready for customers, delete it (Render →
+the blueprint → Settings → Delete) and follow Step 1 below.
+
 ## Step 1 — Hosting on Render (≈ 20 minutes)
 
 Render runs the app, the database and file storage for you, and redeploys automatically whenever the

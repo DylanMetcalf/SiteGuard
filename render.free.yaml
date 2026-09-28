@@ -1,0 +1,43 @@
+# FREE try-out of SiteGuard on Render, for demos and run-throughs only.
+# On Render: New → Blueprint → pick this repository → set "Blueprint Path" to
+# render.free.yaml → Apply. Nothing to fill in.
+#
+# Free-plan limits (fine for a demo, NOT for real customers):
+# - The app sleeps after 15 minutes without visitors; the next visit waits about a minute.
+# - The database is deleted by Render 30 days after it is created.
+# - Uploaded files are lost whenever the app restarts or sleeps (no disk on free plans).
+# - No emails are sent: use "Explore the demo", which needs no email.
+# For customers, use render.yaml (paid plans) instead. See docs/LAUNCH_GUIDE.md.
+services:
+  - type: web
+    name: siteguard-demo
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: siteguard-demo-db
+          property: connectionString
+      - key: TRUST_PROXY
+        value: "true"
+      - key: STORAGE_DRIVER
+        value: local
+      - key: DEMO_SANDBOX_ENABLED
+        value: "true"
+
+databases:
+  - name: siteguard-demo-db
+    region: frankfurt
+    plan: free
+    postgresMajorVersion: "16"
+    databaseName: siteguard
+    user: siteguard

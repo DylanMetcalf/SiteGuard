@@ -101,7 +101,7 @@ Product gaps from the last audit, also built:
 ## Going live
 
 Non-technical? Start with **[docs/LAUNCH_GUIDE.md](docs/LAUNCH_GUIDE.md)**: one-click deploy on
-Render with [`render.yaml`](render.yaml), email, domain, the AI key, costs in rands, and a demo
+Render with [`render.yaml`](render.yaml) (or a free try-out with [`render.free.yaml`](render.free.yaml)), email, domain, the AI key, costs in rands, and a demo
 script for selling on site.
 
 ## Quick start (local)
