@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { isUuid, requireAdmin, requireOrg, requireWritable } from '../lib/authz.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import { canAdminOrg, isUuid, requireAdmin, requireOrg, requireWritable } from '../lib/authz.js';
+import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { sniffType } from '../lib/storage.js';
 import { many, one, pool, withTx } from '../db/pool.js';
 import { audit } from '../lib/audit.js';
@@ -29,13 +29,51 @@ export default async function studioRoutes(app: FastifyInstance) {
       pool,
       `select g.id, g.blueprint, g.title, g.doc_number as "docNumber", g.revision, g.ai, g.site_id as "siteId", g.requirement_id as "requirementId",
               g.pdf_file_id as "pdfFileId", g.docx_file_id as "docxFileId", g.created_by_name as "createdBy", g.created_at as "createdAt",
-              to_char(g.review_due, 'YYYY-MM-DD') as "reviewDue", s.name as "siteName"
-         from generated_documents g left join sites s on s.id = g.site_id
+              to_char(g.review_due, 'YYYY-MM-DD') as "reviewDue", s.name as "siteName",
+              sub.status as "submittedStatus", to_char(sub.expiry_date, 'YYYY-MM-DD') as "submittedExpiry",
+              (sub.current_file_id = g.pdf_file_id) as "latestSubmitted", (sub.status is not null) as "everSubmitted",
+              r.name as "requirementName"
+         from generated_documents g left join sites s on s.id = g.site_id left join requirements r on r.id = g.requirement_id
+         -- Where any revision of this document is the live file of a requirement, that requirement's status.
+         left join lateral (
+           select d.status, d.expiry_date, d.current_file_id from documents d
+             join generated_documents g2 on g2.pdf_file_id = d.current_file_id and g2.org_id = g.org_id and g2.doc_number = g.doc_number
+            order by d.updated_at desc limit 1
+         ) sub on true
         where g.org_id = $1 and g.superseded_at is null
         order by g.created_at desc limit 300`,
       [ctx.org.id],
     );
     return { documents: rows };
+  });
+
+  /** Deletes a document (all revisions) that has never been submitted to a site. Submitted ones are part of the record. */
+  app.delete('/api/studio/documents/:id', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const { id } = req.params as { id: string };
+    if (!isUuid(id)) throw notFound();
+    await withTx(async (db) => {
+      const g = await one<{ doc_number: string; title: string; created_by: string | null; site_id: string | null }>(
+        db, 'select doc_number, title, created_by, site_id from generated_documents where id = $1 and org_id = $2 for update', [id, ctx.org.id]);
+      if (!g) throw notFound();
+      if (g.created_by !== ctx.user.id && !canAdminOrg(ctx)) throw forbidden('Only the person who created this document, or an admin, can delete it.');
+      const used = await one(
+        db,
+        `select 1 from generated_documents g join document_versions v on v.file_id = g.pdf_file_id where g.org_id = $1 and g.doc_number = $2 limit 1`,
+        [ctx.org.id, g.doc_number]);
+      if (used) throw conflict('This document has been submitted to a site, so it is part of the site\'s record and can\'t be deleted. Make a new revision instead.');
+      // Unhook it from any requirement where it is attached but not yet submitted.
+      await db.query(
+        `update documents set pending_file_id = null where pending_file_id in (select pdf_file_id from generated_documents where org_id = $1 and doc_number = $2)`,
+        [ctx.org.id, g.doc_number]);
+      await db.query('delete from review_links where org_id = $1 and doc_number = $2', [ctx.org.id, g.doc_number]);
+      await db.query('delete from doc_comments where org_id = $1 and doc_number = $2', [ctx.org.id, g.doc_number]);
+      await db.query('delete from generated_documents where org_id = $1 and doc_number = $2', [ctx.org.id, g.doc_number]);
+      await audit(db, ctx, 'Deleted document', `${g.doc_number} — ${g.title} (never submitted)`, g.site_id);
+      await publishChange(db, [ctx.org.id]);
+    });
+    return { ok: true };
   });
 
   app.get('/api/studio/documents/:id', async (req) => {

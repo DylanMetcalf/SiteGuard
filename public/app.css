@@ -581,3 +581,50 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .bundle-ic{width:40px; height:40px; border-radius:12px; background:var(--sage-bg); color:var(--sage-strong); display:flex; align-items:center; justify-content:center; flex:none;}
 .bundle-link svg{width:20px; height:20px; flex:none;}
 .qa-item.join-first{margin:0 0 14px; width:100%; padding:14px 16px; background:var(--paper-raised); border:1px solid var(--sage-soft); border-radius:16px;}
+/* ===== Page search ===== */
+.page-search{position:relative; margin:0 0 12px;}
+.page-search svg{position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--grey); pointer-events:none;}
+.page-search input{width:100%; padding:12px 14px 12px 42px; border-radius:14px; border:1px solid var(--grey-line); background:var(--paper-raised); font-size:15px;}
+.page-search input:focus{outline:none; border-color:var(--sage); box-shadow:0 0 0 3px var(--sage-bg);}
+.filter-chips{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 12px;}
+.filter-chips .site-picker-chip b{font-weight:700; margin-left:4px; opacity:.75;}
+.list-empty{padding:14px 4px; color:var(--grey); font-size:14px;}
+.group-head{display:flex; flex-direction:column; gap:1px; margin:16px 4px 8px; font-weight:700; font-size:14px; color:var(--ink);}
+.group-head .site-card-sub{font-weight:400;}
+.list-tools{display:flex; gap:10px; margin:0 0 12px; flex-wrap:wrap;}
+.list-tools label{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--grey); flex:1; min-width:140px;}
+.list-tools select{flex:1; min-width:0; padding:8px 10px; font-size:14px;}
+.avatar-sq{width:40px; height:40px; border-radius:12px; background:var(--sage-bg); color:var(--sage-strong); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex:none; margin-right:12px;}
+.kv{display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--grey-line); font-size:14px;}
+.kv:last-child{border-bottom:none;}
+.kv span{color:var(--grey);}
+.kv strong{text-align:right; font-weight:600; overflow-wrap:anywhere;}
+/* ===== Shared sites (mine side) ===== */
+.wp-card{cursor:pointer;}
+.wp-code-pill{font-size:12px; font-weight:700; padding:5px 9px; border-radius:999px; background:var(--sage-bg); color:var(--sage-strong); white-space:nowrap;}
+.wp-mini-stats{display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:10px; font-size:13px; color:var(--grey);}
+.wp-mini-stats b{color:var(--ink); font-weight:700;}
+.wp-mini-stats .hot b, .wp-mini-stats .hot{color:var(--amber);}
+.wp-code-card{display:flex; flex-direction:column; gap:10px; background:linear-gradient(135deg, var(--sage-bg), var(--paper-raised) 70%); border-color:var(--sage-soft);}
+.wp-code{font-size:34px; font-weight:800; letter-spacing:4px; color:var(--brand); margin:2px 0 6px;}
+@media (max-width:360px){ .wp-code{font-size:28px; letter-spacing:2px;} }
+/* ===== Safety file guide ===== */
+.guide-step{display:flex; gap:12px; padding:14px 0; border-bottom:1px solid var(--grey-line);}
+.guide-step:last-child{border-bottom:none;}
+.guide-num{width:30px; height:30px; flex:none; border-radius:50%; background:var(--brand); color:var(--on-brand); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;}
+.guide-step.done .guide-num{background:var(--green-bg); color:var(--green);}
+.guide-step.done .qa-title{color:var(--grey);}
+.guide-body{flex:1; min-width:0;}
+.guide-link{display:flex; width:100%; justify-content:space-between; align-items:center; gap:8px; padding:9px 0; border:none; border-top:1px dashed var(--grey-line); background:none; text-align:left; font-size:14px; color:var(--ink); cursor:pointer;}
+.guide-link:first-of-type{margin-top:8px;}
+.guide-link svg{width:16px; height:16px; color:var(--grey); flex:none;}
+/* ===== Sign-up: who are you? ===== */
+.role-cards{display:grid; gap:10px; margin:6px 0 4px;}
+.role-card{display:flex; gap:12px; align-items:flex-start; text-align:left; padding:14px; border-radius:16px; border:1.5px solid var(--grey-line); background:var(--paper-raised); color:var(--ink); cursor:pointer; font:inherit;}
+.role-card strong{display:block; font-size:15px; margin-bottom:2px;}
+.role-card span span{display:block; font-size:13px; color:var(--grey); line-height:1.4;}
+.role-card .role-dot{width:20px; height:20px; border-radius:50%; border:2px solid var(--grey-line); flex:none; margin-top:1px;}
+.role-card.on{border-color:var(--brand); background:var(--brand-bg);}
+.role-card.on .role-dot{border-color:var(--brand); background:radial-gradient(circle, var(--brand) 45%, transparent 50%);}
+.wp-code-line{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 16px;}
+.wp-code-sm{font-size:18px; font-weight:800; letter-spacing:2px; color:var(--brand); flex:1;}

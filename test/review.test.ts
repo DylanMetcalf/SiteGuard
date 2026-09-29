@@ -73,8 +73,10 @@ describe('review workspace', () => {
     assert.equal(c.summary.approved, 1);
     assert.ok(c.comments.some((x: { quote: string }) => x.quote.length > 0));
     const inbox = await unread(contractor);
-    assert.ok(inbox.unread >= 3);
+    assert.ok(inbox.unread >= 2);
     assert.ok(inbox.items.some((n: { title: string }) => /Changes requested/.test(n.title)));
+    // One approved section is not worth a message on its own.
+    assert.ok(!inbox.items.some((n: { title: string }) => /” approved$/.test(n.title)));
   });
 
   it('keeps approvals on unchanged sections when the author edits and resubmits', async () => {
@@ -104,6 +106,7 @@ describe('review workspace', () => {
     }
     const done = (await host.get(`/api/review/${h.doc.id}`)).body;
     assert.equal(done.summary.approved, done.summary.total);
+    assert.ok((await unread(contractor)).items.some((n: { title: string }) => /^All sections approved/.test(n.title)));
     assert.equal((await host.post(`/api/documents/${raReqId}/approve`)).status, 200);
     assert.equal((await host.state()).state.documents[raReqId].status, 'complete');
     assert.ok((await unread(contractor)).items.some((n: { title: string }) => /Approved: Baseline risk assessment/.test(n.title)));

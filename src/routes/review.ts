@@ -14,6 +14,11 @@ import { reviseWithContent } from '../lib/studio/generate.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
 
+async function allSectionsApproved(db: Parameters<typeof reviewPayload>[0], doc: GenRow, viewer: Parameters<typeof reviewPayload>[2], hostOrgId?: string) {
+  const p = await reviewPayload(db, doc, viewer, viewer.role === 'host' && hostOrgId ? { forHostOrgId: hostOrgId } : {});
+  return p.summary.total > 0 && p.summary.approved === p.summary.total;
+}
+
 const decisionBody = z.object({
   sectionHash: z.string().regex(/^[0-9a-f]{20}$/),
   decision: z.enum(['approved', 'changes']),
@@ -80,8 +85,9 @@ export default async function reviewRoutes(app: FastifyInstance) {
 
   app.get('/api/review/:id', async (req) => {
     const ctx = requireOrg(req.ctx);
-    const { doc, viewer } = await resolveForUser(pool, ctx, (req.params as { id: string }).id);
-    const payload = await reviewPayload(pool, doc, viewer, viewer.role === 'host' ? { forHostOrgId: ctx.org.id } : {});
+    const reqId = (req.query as { req?: string }).req;
+    const { doc, viewer } = await resolveForUser(pool, ctx, (req.params as { id: string }).id, reqId);
+    const payload = await reviewPayload(pool, doc, viewer, viewer.role === 'host' ? { forHostOrgId: ctx.org.id, requirementId: reqId } : {});
     const links = viewer.role === 'owner'
       ? await many(pool, `select id, label, created_by_name as "createdBy", created_at as "createdAt", expires_at as "expiresAt", revoked_at as "revokedAt", last_used_at as "lastUsedAt"
                             from review_links where org_id = $1 and doc_number = $2 order by created_at desc`, [doc.org_id, doc.doc_number])
@@ -98,10 +104,19 @@ export default async function reviewRoutes(app: FastifyInstance) {
       if (!viewer.canDecide) throw forbidden('Only reviewers at the site can approve or reject sections.');
       const s = await recordDecision(db, doc, b, { kind: 'host', orgId: ctx.org.id, userId: ctx.user.id, name: ctx.user.name });
       await audit(db, ctx, b.decision === 'approved' ? 'Approved section' : 'Requested section changes', `${doc.doc_number} Rev ${doc.revision} — ${s.heading}`);
-      await notifyOrg(db, doc.org_id, null, {
-        kind: 'review', title: b.decision === 'approved' ? `“${s.heading}” approved` : `Changes requested: “${s.heading}”`,
-        body: `${doc.title} (${doc.doc_number}) — ${ctx.org.name}${b.note ? `: ${b.note}` : ''}`, link: { kind: 'review', id: doc.id },
-      });
+      // Tell the author about changes straight away, but not about every single approved section:
+      // one message when the whole document has been approved section by section is enough.
+      if (b.decision === 'changes') {
+        await notifyOrg(db, doc.org_id, null, {
+          kind: 'review', title: `Changes requested: “${s.heading}”`,
+          body: `${doc.title} (${doc.doc_number}) — ${ctx.org.name}${b.note ? `: ${b.note}` : ''}`, link: { kind: 'review', id: doc.id },
+        });
+      } else if (await allSectionsApproved(db, doc, viewer, ctx.org.id)) {
+        await notifyOrg(db, doc.org_id, null, {
+          kind: 'review', title: `All sections approved: ${doc.title}`,
+          body: `${doc.doc_number} Rev ${doc.revision} — ${ctx.org.name}`, link: { kind: 'review', id: doc.id },
+        });
+      }
       await publishChange(db, [doc.org_id, ctx.org.id]);
       return { ok: true };
     });
@@ -217,10 +232,15 @@ export default async function reviewRoutes(app: FastifyInstance) {
     return withTx(async (db) => {
       const { doc } = await resolveForToken(db, tokenOf(req));
       const s = await recordDecision(db, doc, b, { kind: 'external', orgId: null, userId: null, name: b.name });
-      await notifyOrg(db, doc.org_id, null, {
-        kind: 'review', title: b.decision === 'approved' ? `${b.name} approved “${s.heading}”` : `${b.name} requested changes to “${s.heading}”`,
-        body: `${doc.title} (${doc.doc_number})${b.note ? `: ${b.note}` : ''}`, link: { kind: 'review', id: doc.id },
-      });
+      if (b.decision === 'changes') {
+        await notifyOrg(db, doc.org_id, null, {
+          kind: 'review', title: `${b.name} requested changes to “${s.heading}”`,
+          body: `${doc.title} (${doc.doc_number})${b.note ? `: ${b.note}` : ''}`, link: { kind: 'review', id: doc.id },
+        });
+      } else if (!(await one(db, `select 1 from notifications where org_id = $1 and kind = 'review' and title = $2 and created_at > now() - interval '12 hours' limit 1`, [doc.org_id, `${b.name} is approving ${doc.title}`]))) {
+        // One message per reviewer per document per half-day, not one per section.
+        await notifyOrg(db, doc.org_id, null, { kind: 'review', title: `${b.name} is approving ${doc.title}`, body: `${doc.doc_number} — first approved section: “${s.heading}”`, link: { kind: 'review', id: doc.id } });
+      }
       await publishChange(db, [doc.org_id]);
       return { ok: true };
     });

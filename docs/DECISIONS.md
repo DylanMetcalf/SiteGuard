@@ -5,6 +5,42 @@ Newest first.
 
 ---
 
+**DECISION** Site Ready is withdrawn automatically when a file stops qualifying, rather than shown as "approved" until someone notices.
+**REASON** An independent audit found that an expired COID letter or a reported fatality left the public verification page saying "Site Ready". A live status protects the mine, the contractor and whoever checks the verification code.
+**DATE** 2026-09-29
+
+**DECISION** A mine's review counts only its own reviewers' section decisions.
+**REASON** The author can send review links to anyone, and several mines may review the same document; only the mine's own people can approve on its behalf.
+**DATE** 2026-09-29
+
+**DECISION** Removing a contractor from a shared site hides its file from the contractor but keeps it, with a reason the contractor sees; the mine can restore it.
+**REASON** Site codes get forwarded. The mine needs a way to remove someone without deleting the record of what they submitted.
+**DATE** 2026-09-29
+
+**DECISION** A site that many contractors join is a new `workplaces` record; each contractor's file for it stays an ordinary `sites` row.
+**REASON** Mines run one site with many contractors, each with its own safety file. Keeping the per-contractor file as the existing site record means review, the builder, exports, permits, readiness and every permission check keep working unchanged, and the change is purely additive (no existing data moves). Single emailed invitations still work.
+**DATE** 2026-09-29
+
+**DECISION** The general safety file lists follow published sources (Construction Regulations 2014, OHS Act, MHSA, a mining house's published contractor procedure) and cite a regulation only where it is certain.
+**REASON** Customers rely on the list; a wrong regulation number would undermine trust. Everything else is labelled best practice or client requirement, and every item stays editable per site.
+**DATE** 2026-09-29
+
+**DECISION** Once a contractor has joined, its company details are read-only to the mine and come from the contractor's own account.
+**REASON** The contractor is responsible for its own registration, COID and contact details; letting the mine overwrite them would make the record unreliable and blur accountability. The mine can still correct the name or email it invited with until the contractor joins.
+**DATE** 2026-09-29
+
+**DECISION** Company documents (COID, insurance, CIPC, tax, policies) are uploaded once and submitted to sites from there.
+**REASON** Contractors were uploading the same letter to every site, and a copy saved only in the library looked "done" while the site still showed it missing. Matching by requirement name keeps it automatic; each site still reviews and approves its own copy.
+**DATE** 2026-09-29
+
+**DECISION** Approving a single section doesn't notify the author; changes do, and so does the last approval.
+**REASON** One review produced a notification per section, burying the ones that need action.
+**DATE** 2026-09-29
+
+**DECISION** Only never-submitted Studio documents can be deleted.
+**REASON** Anything a site has seen is part of its record; a new revision replaces it instead.
+**DATE** 2026-09-29
+
 **DECISION** Section approvals are keyed by a hash of the section's content, not by revision.
 **REASON** When an author fixes one section, the reviewer should only re-read that section. Hashing the content means unchanged sections keep their approval automatically, with no diffing or manual carry-over.
 **DATE** 2026-09-27

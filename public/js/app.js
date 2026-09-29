@@ -6,7 +6,8 @@ import { handleDeepLink, renderAuth, renderNoOrg } from './auth.js';
 import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
 import './assistant.js';
-import './studio.js';
+import { refreshStudio } from './studio.js';
+import { refreshGuide } from './guide.js';
 import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
 import './inbox.js';
 import './builder.js';
@@ -15,8 +16,8 @@ const app = document.getElementById('app');
 
 /* ---- Phone back button: each screen gets a history entry; Back returns to the previous screen. ---- */
 let restoring = false;
-const navOf = () => ({ nav: S.nav || 'dashboard', moreView: S.moreView || null, activeSiteId: S.activeSiteId || null, siteTab: S.siteTab || null });
-const sameNav = (a, b) => a.nav === b.nav && (a.moreView || null) === (b.moreView || null) && (a.activeSiteId || null) === (b.activeSiteId || null) && (a.siteTab || null) === (b.siteTab || null);
+const navOf = () => ({ nav: S.nav || 'dashboard', moreView: S.moreView || null, activeSiteId: S.activeSiteId || null, siteTab: S.siteTab || null, wp: S.activeWorkplaceId || null, wpTab: S.wpTab || null });
+const sameNav = (a, b) => a.nav === b.nav && (a.moreView || null) === (b.moreView || null) && (a.activeSiteId || null) === (b.activeSiteId || null) && (a.siteTab || null) === (b.siteTab || null) && (a.wp || null) === (b.wp || null) && (a.wpTab || null) === (b.wpTab || null);
 function syncHistory(){
   if(restoring || !S.boot || !S.boot.authenticated) return;
   afterPendingBack(()=>{
@@ -31,7 +32,7 @@ window.addEventListener('popstate', (e)=>{
   if(document.querySelector('.overlay:not(.tutorial)')){ closeSheet(true); return; }
   const st = e.state;
   if(!st || !st.nav || st.sheet || !S.boot || !S.boot.authenticated || sameNav(st, navOf())) return;
-  S.nav = st.nav; S.moreView = st.moreView; S.activeSiteId = st.activeSiteId; if(st.siteTab) S.siteTab = st.siteTab;
+  S.nav = st.nav; S.moreView = st.moreView; S.activeSiteId = st.activeSiteId; if(st.siteTab) S.siteTab = st.siteTab; S.activeWorkplaceId = st.wp || null; if(st.wpTab) S.wpTab = st.wpTab;
   restoring = true; render(); restoring = false; window.scrollTo(0,0);
 });
 window.addEventListener('sg:signed-out', ()=>{
@@ -73,10 +74,13 @@ function render(){
     return;
   }
   const y = window.scrollY;
+  // Keep the cursor in a page's search box when the page redraws (typing, or a live update).
+  const typing = active && active.dataset && active.dataset.search ? { key: active.dataset.search, pos: active.selectionStart } : null;
   const arriving = wasOutside; wasOutside = false; // just signed in or up: start at the top, not where the form was scrolled
   app.innerHTML = topbar() + '<main class="view">'+renderView()+'</main>' + bottomNav();
   syncHistory();
-  if(arriving) window.scrollTo(0, 0); else if(S.keepScroll) window.scrollTo(0, y);
+  if(arriving) window.scrollTo(0, 0); else if(S.keepScroll || typing) window.scrollTo(0, y);
+  if(typing){ const n = document.querySelector('[data-search="'+typing.key+'"]'); if(n){ n.focus(); try{ n.setSelectionRange(typing.pos, typing.pos); }catch{ /* search inputs in some browsers */ } } }
   startLive();
   maybeShowTutorial();
 }
@@ -117,7 +121,7 @@ document.addEventListener('keydown', (e)=>{
 async function switchPersona(userId){
   try{
     await api.post('/api/demo/switch', { userId });
-    S.nav='dashboard'; S.activeSiteId=null; S.moreView=null; S.focusSiteId=null;
+    S.nav='dashboard'; S.activeSiteId=null; S.activeWorkplaceId=null; S.moreView=null; S.focusSiteId=null;
     closeSheet();
     await reload();
     showToast('Now viewing as '+S.boot.me.name.replace(/&amp;/g,'&'));
@@ -132,7 +136,7 @@ function startLive(){
   es.addEventListener('open', ()=>{ if(!S.live){ S.live = true; updateLiveDot(); } });
   es.addEventListener('change', ()=>{
     clearTimeout(refetchTimer);
-    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>refreshReview()).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
+    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>{ refreshReview(); refreshStudio(); refreshGuide(); }).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
   });
   es.addEventListener('error', ()=>{
     S.live = false; updateLiveDot();
@@ -193,4 +197,4 @@ function finishTutorial(){
   }
 })();
 
-on('open-review', (el)=>openReview(el.dataset.id));
+on('open-review', (el)=>openReview(el.dataset.id, el.dataset.req));

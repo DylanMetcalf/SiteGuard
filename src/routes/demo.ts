@@ -15,6 +15,7 @@ import { forbidden, notFound, unavailable } from '../lib/errors.js';
 import { requireUser, type OrgCtx } from '../lib/authz.js';
 import { createSession, destroySession } from '../lib/sessions.js';
 import { seedDemo } from '../demo/seed.js';
+import { seedCleanDemo } from '../demo/clean.js';
 import { runAgentForOrg } from '../lib/agent.js';
 import { storage } from '../lib/storage.js';
 
@@ -36,8 +37,17 @@ export async function personasFor(db: Db, ctx: OrgCtx) {
 export default async function demoRoutes(app: FastifyInstance) {
   app.post('/api/demo', { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req, reply) => {
     if (!features.demo) throw unavailable('Demo sandboxes are turned off on this server.');
+    const body = z
+      .object({
+        clean: z.boolean().default(false),
+        hostName: z.string().trim().min(2).max(120).default('My Mine'),
+        contractorName: z.string().trim().min(2).max(120).default('My Contractor'),
+        contractorName2: z.string().trim().max(120).optional().transform((v) => (v && v.length >= 2 ? v : undefined)),
+        yourName: z.string().trim().min(2).max(80).default('SHE Manager'),
+      })
+      .parse(req.body ?? {});
     await withTx(async (db) => {
-      const { entryUserId, group } = await seedDemo(db);
+      const { entryUserId, group } = body.clean ? await seedCleanDemo(db, body) : await seedDemo(db);
       // Give the new sandbox its compliance agent findings straight away.
       for (const org of await many<{ id: string; kind: string }>(db, 'select id, kind from organisations where demo_group = $1', [group])) {
         await runAgentForOrg(db, org);
@@ -76,7 +86,9 @@ export async function purgeOldDemos(days = 3): Promise<number> {
     await db.query(`set local siteguard.purge = 'on'`);
     const groups = await many<{ demo_group: string }>(
       db,
-      `select distinct demo_group from organisations where is_demo and demo_group is not null and created_at < now() - make_interval(days => $1)`,
+      // A clean-start sandbox (settings.cleanDemo) is kept for 30 days so it can be used over several sessions.
+      `select distinct demo_group from organisations where is_demo and demo_group is not null
+          and created_at < now() - make_interval(days => case when settings->>'cleanDemo' = 'true' then 30 else $1 end)`,
       [days],
     );
     for (const { demo_group } of groups) {

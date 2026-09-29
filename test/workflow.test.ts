@@ -114,7 +114,9 @@ describe('site lifecycle', () => {
     const r = await host.post(`/api/sites/${siteId}/requests`, { type: 'document', title: 'Renewed COID', linkedReqId: reqIds[0] });
     assert.equal(r.status, 200);
     await contractor.upload(`/api/documents/${reqIds[0]}/file`, 'coid-2.pdf', PDF);
-    await contractor.post(`/api/documents/${reqIds[0]}/submit`, {});
+    const noDate = await contractor.post(`/api/documents/${reqIds[0]}/submit`, {});
+    assert.equal(noDate.status, 400, 'a COID letter needs its valid-until date');
+    await contractor.post(`/api/documents/${reqIds[0]}/submit`, { expiryDate: '2040-03-31' });
     const st = await host.state();
     assert.equal(st.state.requests[r.body.id].status, 'submitted');
   });

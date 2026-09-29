@@ -5,7 +5,7 @@ import {
   S, ICONS, SOURCE_LABEL, INCIDENT_TYPES, PERMIT_TYPES, LIBRARY_TYPES, CERT_KINDS, APPOINTMENT_PRESETS,
   org, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId,
   computeReadiness, effectiveStatus, certStatus, badge, timeAgo, dateTime, todayStr, daysUntil, incidentTypeInfo, permitTypeInfo,
-  permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml, deepEscape,
+  permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml, deepEscape, libraryCopyFor, sitesNeedingLibrary,
   on, actions, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
 } from './core.js';
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
@@ -195,7 +195,7 @@ function renderReqSheet(reqId){
   if(doc.studioDocId){
     body += '<div class="card" style="margin-top:10px;background:var(--brand-bg);border-color:transparent;"><div class="chat-card-title" style="color:var(--brand);">'+ICONS.passport+' Document Studio document</div>'
       +'<div class="site-card-sub" style="color:var(--ink-soft);">'+(canReview() && (eff==='awaiting_review'||eff==='correction_required') ? 'Review it section by section: approve each part, highlight text and leave comments.' : isContractor() ? 'Read the feedback section by section, edit it in the app and resubmit.' : 'Read it section by section, with all comments.')+'</div>'
-      +'<button class="btn primary small" style="margin-top:10px;" data-action="open-review" data-id="'+doc.studioDocId+'">'+(canReview() && eff==='awaiting_review' ? 'Review section by section' : 'Open in review workspace')+'</button></div>';
+      +'<button class="btn primary small" style="margin-top:10px;" data-action="open-review" data-id="'+doc.studioDocId+'" data-req="'+reqId+'">'+(canReview() && eff==='awaiting_review' ? 'Review section by section' : 'Open in review workspace')+'</button></div>';
   }
   if(doc.history && doc.history.length){
     body += '<details style="margin-top:8px;"><summary style="font-size:12.5px;color:var(--grey);cursor:pointer;">Version history ('+doc.history.length+' earlier)</summary>'
@@ -214,7 +214,14 @@ function renderReqSheet(reqId){
     else if(eff==='complete' && !reqId.startsWith('lib:')){ body += '<p class="site-card-sub">This requirement is complete.</p>'; }
     else {
       const renewing = eff==='expiring' || (eff==='complete' && reqId.startsWith('lib:'));
-      const bpId = studioBlueprintFor(reqId);
+      const reqObj = reqId.startsWith('lib:') ? null : findReq(reqId);
+      const lib = libraryCopyFor(reqObj);
+      if(lib) body += '<div class="card" style="background:var(--green-bg);border-color:transparent;margin-bottom:6px;"><div class="chat-card-title" style="color:var(--green);">'+ICONS.check+' You already have this</div>'
+        +'<div class="site-card-sub" style="color:var(--ink-soft);">Your company documents hold a current '+lib.type.name+(lib.doc.expiryDate?' (valid until '+lib.doc.expiryDate+')':'')+'. Submit that copy here — no need to upload it again.</div>'
+        +'<button class="btn primary small" style="margin-top:10px;" data-action="use-library" data-req="'+reqId+'">Submit my company copy</button></div>'
+        +'<div class="site-card-sub" style="text-align:center;margin:6px 0;">or upload a different file</div>';
+      else if(reqObj && reqObj.library) body += '<div class="site-card-sub" style="margin-bottom:8px;">Tip: keep this in <strong>Your Documents → Company documents</strong> and you can submit it to every site with one tap.</div>';
+      const bpId = lib ? null : studioBlueprintFor(reqId);
       if(bpId) body += '<div class="card" style="background:var(--sage-bg);border-color:var(--sage-soft);margin-bottom:6px;"><div class="chat-card-title">'+ICONS.sparkle+' Document Studio</div>'
         +'<div class="site-card-sub" style="color:var(--ink-soft);">Don\'t have this document yet? Create a professional, branded version in a few minutes and submit it straight from here.</div>'
         +'<button class="btn sage small" style="margin-top:10px;" data-action="studio-for-req" data-req="'+reqId+'" data-bp="'+bpId+'">Create it in Document Studio</button></div>'
@@ -229,7 +236,7 @@ function renderReqSheet(reqId){
     }
   } else if(canReview() && !ro){
     if((eff==='awaiting_review' || eff==='correction_required') && doc.assetUrl){
-      body += '<button class="btn primary block" data-action="approve-req" data-req="'+reqId+'" style="margin-bottom:8px;">Approve</button>'
+      body += '<button class="btn primary block" data-action="approve-req" data-req="'+reqId+'" data-version="'+(doc.version||'')+'" style="margin-bottom:8px;">Approve '+(doc.version||'')+'</button>'
         +'<label class="field-label" for="correctionNote">Request correction</label><textarea id="correctionNote" placeholder="What needs to change?"></textarea>'
         +'<button class="btn secondary block" style="margin-top:8px;" data-action="correct-req" data-req="'+reqId+'">Request correction</button>';
     } else if(eff==='missing') body += '<p class="site-card-sub">Not yet submitted by the contractor.</p>';
@@ -266,10 +273,40 @@ on('attach-file', async (el)=>{
 });
 on('submit-req', async (el)=>{
   const reqId = el.dataset.req;
-  const ok = await act(()=>api.post(docUrl(reqId,'submit'), { note: val('submitNote'), expiryDate: val('expiryInput') }), reqId.startsWith('lib:')?'Saved to your library':'Submitted for review', el);
-  if(ok) closeSheet();
+  const ok = await act(()=>api.post(docUrl(reqId,'submit'), { note: val('submitNote'), expiryDate: val('expiryInput') }), reqId.startsWith('lib:')?'Saved to your company documents':'Submitted for review', el);
+  if(!ok) return;
+  closeSheet();
+  // A company document usually belongs on several sites: offer to send it to every site that needs it.
+  if(reqId.startsWith('lib:')) offerLibraryToSites(reqId.split(':')[2]);
 });
-on('approve-req', async (el)=>{ if(await act(()=>api.post(docUrl(el.dataset.req,'approve')), 'Approved', el)) closeSheet(); });
+function offerLibraryToSites(type){
+  const need = sitesNeedingLibrary(type);
+  if(!need.length) return;
+  const t = LIBRARY_TYPES.find(x=>x.id===type);
+  setTimeout(()=>openSheet(sheetHead('Send it to your sites?', t ? t.name : '')
+    +'<div class="site-card-sub">'+need.length+' site'+(need.length===1?' needs':'s need')+' this document. Submit your company copy to '+(need.length===1?'it':'all of them')+' now:</div>'
+    +'<div class="card" style="margin-top:10px;">'+need.map(n=>'<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+n.site.name+'</div><div class="reqrow-meta">'+badge(effectiveStatus(S.state.documents[n.req.id]))+'<span class="srctag">'+n.req.name+'</span></div></div></div>').join('')+'</div>'
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="library-send-all" data-type="'+type+'">Submit to '+(need.length===1?'this site':'all '+need.length+' sites')+'</button>'
+    +'<button class="btn secondary block" style="margin-top:8px;" data-action="close-sheet">Not now</button>'), 250);
+}
+async function submitLibraryCopy(reqId){
+  const a = await api.post(docUrl(reqId,'use-library'));
+  await api.post(docUrl(reqId,'submit'), { note: a.note, expiryDate: a.expiryDate });
+}
+on('use-library', async (el)=>{
+  if(await act(()=>submitLibraryCopy(el.dataset.req), 'Your company copy was submitted for review', el)) closeSheet();
+});
+on('library-send-all', async (el)=>{
+  if(el.disabled) return;
+  const need = sitesNeedingLibrary(el.dataset.type);
+  el.disabled = true; el.textContent = 'Submitting…';
+  let ok = 0; const failed = [];
+  for(const n of need){ try{ await submitLibraryCopy(n.req.id); ok++; }catch(e){ failed.push(n.site.name+': '+e.message); } }
+  await reload().catch(()=>{});
+  closeSheet();
+  showToast(ok+' site'+(ok===1?'':'s')+' updated'+(failed.length?' · '+failed.length+' couldn\'t be submitted — open them to see why':''));
+});
+on('approve-req', async (el)=>{ if(await act(()=>api.post(docUrl(el.dataset.req,'approve'), el.dataset.version ? { version: unescapeHtml(el.dataset.version) } : {}), 'Approved', el)) closeSheet(); });
 on('correct-req', async (el)=>{
   const text = val('correctionNote');
   if(!text){ document.getElementById('correctionNote').focus(); return; }
@@ -400,16 +437,29 @@ on('save-investigation', async (el)=>{
 });
 
 /* ============ PERMITS ============ */
+const localInput = (d)=>{ const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,16); };
+const shiftStart = ()=>localInput(Math.ceil(Date.now()/900e3)*900e3);
+const shiftEnd = ()=>localInput(Math.ceil(Date.now()/900e3)*900e3 + 8*3600e3);
+/** Before a permit is issued: is this contractor's file actually in order? */
+function readinessWarning(siteId){
+  const site = S.state.sites[siteId];
+  if(!site || site.status==='site_ready') return '';
+  const r = computeReadiness(siteId);
+  const out = (r.counts.missing||0)+(r.counts.expired||0)+(r.counts.correction_required||0);
+  return '<div class="notice" style="background:var(--amber-bg);color:var(--amber);margin-bottom:8px;"><strong>Not Site Ready.</strong> '+(out ? out+' document'+(out===1?' is':'s are')+' outstanding or expired' : 'The safety file is still being reviewed')+'. Check that the crew doing this work is covered before issuing.</div>';
+}
 function renderNewPermitSheet(siteId){
   const requesting = isContractor();
   return sheetHead(requesting?'Request a permit':'Issue a permit', S.state.sites[siteId].name)
+    + (!requesting ? readinessWarning(siteId) : '')
     +'<label class="field-label" for="permitType">Permit type</label><select id="permitType" class="field">'+PERMIT_TYPES.map(t=>'<option value="'+t.id+'">'+t.label+'</option>').join('')+'</select>'
     +'<label class="field-label" for="permitLocation">Location / work area</label><input type="text" id="permitLocation" placeholder="e.g. Conveyor drive station, level 2">'
     +'<label class="field-label" for="permitDescription">Description of work</label><textarea id="permitDescription" placeholder="What work is being done, and by whom"></textarea>'
     +'<label class="field-label" for="permitPrecautions">Precautions / controls in place</label><textarea id="permitPrecautions" placeholder="Isolation confirmed, fire watch posted, gas tested, etc."></textarea>'
     +'<label class="field-label" for="permitIssuedTo">Issued to (person/crew)</label><input type="text" id="permitIssuedTo" placeholder="e.g. Crew supervisor name">'
-    +'<label class="field-label" for="permitFrom">Valid from</label><input type="datetime-local" id="permitFrom">'
-    +'<label class="field-label" for="permitTo">Valid to</label><input type="datetime-local" id="permitTo">'
+    +'<label class="field-label" for="permitFrom">Valid from</label><input type="datetime-local" id="permitFrom" value="'+(requesting?'':shiftStart())+'">'
+    +'<label class="field-label" for="permitTo">Valid to</label><input type="datetime-local" id="permitTo" value="'+(requesting?'':shiftEnd())+'">'
+    +(requesting?'<div class="site-card-sub" style="margin-top:4px;">Optional — the site sets the final times when it issues the permit.</div>':'<div class="site-card-sub" style="margin-top:4px;">Pre-filled for one 8-hour shift.</div>')
     +'<button class="btn primary block" style="margin-top:12px;" data-action="save-permit" data-site="'+siteId+'">'+(requesting?'Submit request':'Issue permit')+'</button>';
 }
 const localToIso = (v) => v ? new Date(v).toISOString() : '';
@@ -433,8 +483,14 @@ function renderPermitDetailSheet(siteId, permitId){
     +'<div class="divider"></div>';
   if(readOnly()) return body;
   if(eff==='pending' && canReview()){
-    body += '<label class="field-label" for="permitIssueFrom">Valid from</label><input type="datetime-local" id="permitIssueFrom">'
-      +'<label class="field-label" for="permitIssueTo">Valid to</label><input type="datetime-local" id="permitIssueTo">'
+    body += readinessWarning(siteId);
+    // Start from what was requested, or from now until the end of an 8-hour shift; the issuer adjusts if needed.
+    const local = (d)=>{ const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,16); };
+    const from = p.validFrom && new Date(p.validFrom) > new Date(Date.now() - 3600e3) ? new Date(p.validFrom) : new Date(Math.ceil(Date.now()/900e3)*900e3);
+    const to = p.validTo && new Date(p.validTo) > from ? new Date(p.validTo) : new Date(from.getTime() + 8*3600e3);
+    body += '<label class="field-label" for="permitIssueFrom">Valid from</label><input type="datetime-local" id="permitIssueFrom" value="'+local(from)+'">'
+      +'<label class="field-label" for="permitIssueTo">Valid to</label><input type="datetime-local" id="permitIssueTo" value="'+local(to)+'">'
+      +'<div class="site-card-sub" style="margin-top:4px;">Pre-filled '+(p.validTo ? 'with the requested times' : 'for one 8-hour shift')+' — change it if the work needs longer.</div>'
       +'<button class="btn primary block" style="margin-top:10px;" data-action="issue-permit" data-id="'+permitId+'">Issue this permit</button>'
       +'<button class="btn secondary block" style="margin-top:8px;" data-action="close-permit" data-id="'+permitId+'" data-refuse="1">Refuse request</button>';
   } else if(eff==='pending'){
@@ -611,7 +667,7 @@ export async function loadPacks(){
   return packsCache;
 }
 /** Checkbox list of starter packs; counts show only requirements the site doesn't already have. */
-function packPicker(packs, checked, existingNames){
+export function packPicker(packs, checked, existingNames){
   const have = new Set((existingNames||[]).map(n=>n.toLowerCase()));
   return packs.map(p=>{
     const fresh = p.items.filter(i=>!have.has(i.name.toLowerCase()));
@@ -624,8 +680,8 @@ function packPicker(packs, checked, existingNames){
       +'</details></div>';
   }).join('');
 }
-const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
-const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
+export const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
+export const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
 
 function renderNewSiteSheet(packs, prefill){
   const pf = prefill || {};
@@ -646,6 +702,8 @@ function renderNewSiteSheet(packs, prefill){
 }
 /** Opens the Add a site sheet, optionally prefilled (e.g. from an assistant proposal). */
 export async function openNewSite(prefill){
+  // Mines normally create a site contractors join with a code; a single emailed invitation is the exception.
+  if(!(prefill && prefill.single)){ import('./workplaces.js').then(m=>m.openNewWorkplace(prefill)); return; }
   S.newSiteExtras = (prefill && prefill.extraRequirements) || [];
   try{ openSheet(renderNewSiteSheet(await loadPacks(), prefill)); }
   catch(e){ showToast(e.message); }
@@ -1089,12 +1147,17 @@ on('join-code', async (el)=>{
 });
 on('copy-join-code', async (el)=>{ try{ await navigator.clipboard.writeText(el.dataset.code); showToast('Code copied'); }catch{ showToast('Write the code down: '+el.dataset.code); } });
 on('join-site', ()=>openSheet(sheetHead('Join a site', 'With the code the site gave you')
-  +'<label class="field-label" for="joinCode">Join code</label><input type="text" id="joinCode" class="join-input" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345" autofocus>'
+  +'<div class="site-card-sub" style="margin-bottom:4px;">The mine or site gives every contractor its site code — on the notice board, by WhatsApp or by email. Joining shows you exactly what your safety file for that site needs.</div>'
+  +'<label class="field-label" for="joinCode">Site code</label><input type="text" id="joinCode" class="join-input" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345" autofocus>'
   +'<div class="site-card-sub" style="margin-top:6px;">Capitals, dashes and spaces don\'t matter.</div>'
   +'<button class="btn primary block" style="margin-top:12px;" data-action="join-go">Join site</button>'));
 on('join-go', async (el)=>{
   const code = val('joinCode');
   if(code.replace(/[^A-Za-z0-9]/g,'').length < 8){ showToast('Join codes have 8 letters and numbers'); document.getElementById('joinCode').focus(); return; }
-  const r = await act(()=>api.post('/api/sites/join', { code }), 'You\'ve joined the site', el);
-  if(r){ closeSheet(); S.nav='sites'; S.activeSiteId=r.siteId; S.siteTab='compliance'; render(); window.scrollTo(0,0); }
+  const r = await act(()=>api.post('/api/sites/join', { code }), null, el);
+  if(!r) return;
+  closeSheet(); S.nav='sites'; S.activeSiteId=r.siteId; S.siteTab='compliance'; render(); window.scrollTo(0,0);
+  if(r.already){ showToast('You\'re already on this site'); return; }
+  // Straight into the guided safety file for the new site.
+  setTimeout(()=>import('./guide.js').then(m=>m.openGuide(r.siteId, true)), 300);
 });

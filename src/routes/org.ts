@@ -254,6 +254,7 @@ export async function auditFor(
        -- only from when it was invited, and only events by the host or itself.
        select s.id, s.org_id as host_id,
               case when s.org_id = $1 then '-infinity'::timestamptz
+                   when s.workplace_id is not null then s.created_at -- joined with a site code: its file starts then
                    else (select min(i.sent_at) from site_invitations i
                           where i.site_id = s.id and i.contractor_id = s.contractor_id and i.status = 'accepted') end as since
          from sites s join contractors c on c.id = s.contractor_id

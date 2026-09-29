@@ -101,6 +101,8 @@ export const LIBRARY_TYPES = [
   {id:'insurance', category:'Company Documents', name:'Public liability insurance', source:'client', why:'Most sites require at least R5m cover; keep one current copy here.'},
   {id:'she-policy', category:'Company Documents', name:'Health & Safety policy', source:'legal', why:'Required under the MHSA for every site you work on.'},
   {id:'environmental-policy', category:'Company Documents', name:'Environmental policy', source:'best_practice', why:'Increasingly expected by sites working near environmentally sensitive areas.'},
+  {id:'cipc', category:'Company Documents', name:'CIPC company registration', source:'legal', why:'Confirms the company is legally registered; sites and procurement ask for it.'},
+  {id:'tax', category:'Company Documents', name:'Tax compliance status (SARS PIN)', source:'client', why:'Procurement departments need a valid tax compliance status before paying a contractor.'},
 ];
 export const CERT_KINDS = {medical_fitness:'Medical fitness', induction:'Site induction', competency:'Competency', training:'Training', other:'Other'};
 export const APPOINTMENT_PRESETS = [
@@ -220,6 +222,26 @@ export function initials(name){
   return unescapeHtml(name).split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase();
 }
 export function libraryReqId(contractorId, typeId){ return 'lib:'+contractorId+':'+typeId; }
+/** The contractor's current (not expired) company copy that satisfies a site requirement, if it has one. */
+export function libraryCopyFor(req){
+  if(!req || !req.library || !isContractor()) return null;
+  const id = libraryReqId(myContractorId(), req.library);
+  const doc = S.state.documents[id];
+  if(!doc || !doc.assetUrl || effectiveStatus(doc)==='expired') return null;
+  return { id, doc, type: LIBRARY_TYPES.find(t=>t.id===req.library) };
+}
+/** Site requirements (on sites the contractor is working on) that a company document type could satisfy right now. */
+export function sitesNeedingLibrary(type){
+  const out = [];
+  Object.values(S.state.sites).filter(s=>s.status!=='invited' && s.status!=='declined').forEach(site=>{
+    (S.state.requirements[site.id]||[]).forEach(r=>{
+      if(r.library!==type) return;
+      const eff = effectiveStatus(S.state.documents[r.id]);
+      if(eff==='missing' || eff==='expired' || eff==='correction_required' || eff==='expiring') out.push({ req:r, site });
+    });
+  });
+  return out;
+}
 export function findReq(reqId){
   if(reqId && reqId.indexOf('lib:')===0){
     const typeId = reqId.split(':')[2];
@@ -296,6 +318,26 @@ export function val(id){ const el = document.getElementById(id); return el ? (el
 /* ============ ACTIONS & DATA ============ */
 export const actions = {};
 export function on(name, fn){ actions[name] = fn; }
+
+/* ---- Search box for list pages ---- */
+/** A search box for a list page; the page filters its rows with matchSearch(key, ...fields). */
+export function searchBox(key, placeholder){
+  const v = (S.search||{})[key] || '';
+  return '<div class="page-search">'+ICONS.search+'<input type="search" data-action-input="page-search" data-search="'+key+'" value="'+escapeHtml(v)+'" placeholder="'+placeholder+'" aria-label="'+placeholder+'" autocomplete="off" enterkeyhint="search"></div>';
+}
+/** True when every word typed in the search box appears somewhere in the fields. */
+export function matchSearch(key, ...fields){
+  const q = ((S.search||{})[key] || '').trim().toLowerCase();
+  if(!q) return true;
+  const hay = unescapeHtml(fields.filter(Boolean).join(' ')).toLowerCase();
+  return q.split(/\s+/).every(w=>hay.includes(w));
+}
+export const searching = (key) => !!((S.search||{})[key] || '').trim();
+on('page-search', (el)=>{
+  S.search = S.search || {};
+  S.search[el.dataset.search] = el.value;
+  S.keepScroll = true; render(); S.keepScroll = false;
+});
 
 let renderFn = ()=>{};
 export function setRender(fn){ renderFn = fn; }

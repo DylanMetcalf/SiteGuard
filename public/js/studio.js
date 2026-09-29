@@ -4,7 +4,7 @@
 
 import { api } from './api.js';
 import {
-  S, ICONS, escapeHtml, on, openSheet, closeSheet, sheetHead, showToast, render, reload, act, val,
+  S, ICONS, escapeHtml, unescapeHtml, on, openSheet, closeSheet, sheetHead, showToast, render, reload, act, val, daysUntil, searchBox, matchSearch, searching,
   isContractor, readOnly, findReq, siteIdForReq, libraryReqId, myContractorId, effectiveStatus,
 } from './core.js';
 
@@ -29,10 +29,15 @@ export function studioBlueprintFor(reqId){
 /* ---------- Studio view (More → Document Studio) ---------- */
 let docsCache = null;
 async function loadDocs(force){
-  if(!docsCache || force) docsCache = (await api.get('/api/studio/documents')).documents.map((d)=>({ ...d, title: escapeHtml(d.title), docNumber: escapeHtml(d.docNumber), createdBy: escapeHtml(d.createdBy), siteName: d.siteName ? escapeHtml(d.siteName) : '' }));
+  if(!docsCache || force) docsCache = (await api.get('/api/studio/documents')).documents.map((d)=>({ ...d, title: escapeHtml(d.title), docNumber: escapeHtml(d.docNumber), createdBy: escapeHtml(d.createdBy), siteName: d.siteName ? escapeHtml(d.siteName) : '', requirementName: d.requirementName ? escapeHtml(d.requirementName) : '' }));
   return docsCache;
 }
 export function invalidateStudio(){ docsCache = null; }
+/** After a live update: refresh the list in place if it's on screen, otherwise reload it next time. */
+export function refreshStudio(){
+  if(S.nav==='more' && S.moreView==='studio' && docsCache) loadDocs(true).then(()=>{ S.keepScroll = true; render(); S.keepScroll = false; }).catch(()=>{});
+  else docsCache = null;
+}
 
 export function renderStudio(){
   if(!catalog || !docsCache){
@@ -48,22 +53,78 @@ export function renderStudio(){
     +(ai ? ' AI tailors every document to the job and can research the site\'s own requirements.' : '')+'</p></div>';
   html += '<div class="studio-cats" role="tablist">'+cats.map(c=>'<button class="site-picker-chip'+(c===cat?' active':'')+'" data-action="studio-cat" data-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>').join('')+'</div>';
   html += '<div class="studio-grid">'+bps.map(b=>'<button class="studio-card" data-action="studio-new" data-bp="'+b.id+'"><span class="qa-icon">'+(CATEGORY_ICON[b.category]||ICONS.passport)+'</span><h4>'+escapeHtml(b.name)+'</h4><p>'+escapeHtml(b.description)+'</p><span class="badge sage" style="align-self:flex-start;">'+escapeHtml(b.category)+'</span></button>').join('')+'</div>';
-  const docs = docsCache;
-  html += '<div class="section-title">Your documents</div>';
-  if(!docs.length) html += '<div class="card"><div class="site-card-sub">Documents you create appear here, with their revision history and review dates.</div></div>';
-  else html += '<div class="card">'+docs.map(docRow).join('')+'</div>';
+  html += '<div class="section-title" id="studio-docs">Your documents</div>' + libraryHtml();
   return html;
 }
 
+/* ---------- Your documents: grouped by where each one stands ---------- */
+const GROUPS = [
+  ['missing', 'Missing', 'Still needed by a site — SiteGuard can write these'],
+  ['draft', 'Not submitted', 'Created but not yet sent to a site'],
+  ['review', 'In review', 'Waiting for the site to review'],
+  ['changes', 'Needs changes', 'Sent back, expired, or a newer revision to submit'],
+  ['approved', 'Approved', 'Accepted by the site'],
+];
+export function studioStatus(d){
+  if(!d.everSubmitted) return 'draft';
+  if(d.submittedStatus==='awaiting_review') return d.latestSubmitted ? 'review' : 'changes';
+  if(d.submittedStatus==='correction_required' || d.submittedStatus==='expired') return 'changes';
+  if(d.submittedExpiry && daysUntil(d.submittedExpiry) < 0) return 'changes';
+  return d.latestSubmitted ? 'approved' : 'changes';
+}
+function missingForStudio(){
+  if(!isContractor()) return [];
+  const out = [];
+  Object.values(S.state.sites).filter(s=>s.status!=='invited' && s.status!=='declined').forEach(site=>{
+    (S.state.requirements[site.id]||[]).forEach(r=>{
+      if(!r.blueprint) return;
+      const eff = effectiveStatus(S.state.documents[r.id]);
+      if(eff==='missing' || (eff==='correction_required' && !(S.state.documents[r.id]||{}).studioDocId)) out.push({ req:r, site, eff });
+    });
+  });
+  return out;
+}
+function libraryHtml(){
+  const docs = docsCache.filter(d=>matchSearch('studio', d.title, d.docNumber, d.siteName, d.requirementName));
+  const missing = missingForStudio().filter(m=>matchSearch('studio', m.req.name, m.site.name));
+  const by = { missing, draft:[], review:[], changes:[], approved:[] };
+  docs.forEach(d=>by[studioStatus(d)].push(d));
+  const f = S.studioFilter || 'all';
+  let html = searchBox('studio', 'Search your documents');
+  html += '<div class="filter-chips">'+[['all','All', docs.length+missing.length], ...GROUPS.filter(g=>g[0]!=='missing' || isContractor()).map(g=>[g[0], g[1], by[g[0]].length])]
+    .map(([id, label, n])=>'<button class="site-picker-chip'+(f===id?' active':'')+'" data-action="studio-filter" data-filter="'+id+'">'+label+'<b>'+n+'</b></button>').join('')+'</div>';
+  let any = false;
+  GROUPS.forEach(([id, label, sub])=>{
+    if(f!=='all' && f!==id) return;
+    const rows = by[id];
+    if(!rows.length) return;
+    any = true;
+    html += '<div class="group-head"><span>'+label+' · '+rows.length+'</span><span class="site-card-sub">'+sub+'</span></div><div class="card">'
+      + rows.map(id==='missing' ? missingRow : docRow).join('') + '</div>';
+  });
+  if(!any) html += '<div class="list-empty">'+(searching('studio') ? 'Nothing matches “'+escapeHtml(S.search.studio)+'”.' : f==='all' ? 'Documents you create appear here, grouped by where they stand: not submitted, in review, needs changes and approved.' : 'Nothing here right now.')+'</div>';
+  return html;
+}
+function missingRow(m){
+  return '<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+m.req.name+'</div>'
+    +'<div class="reqrow-meta"><span class="badge '+(m.eff==='missing'?'missing':'correction_required')+'">'+(m.eff==='missing'?'Missing':'Correction needed')+'</span><span class="srctag">'+m.site.name+'</span></div>'
+    +'<div class="row-actions"><button class="btn primary small" data-action="studio-create-for" data-req="'+m.req.id+'" data-site="'+m.site.id+'" data-bp="'+m.req.blueprint+'">Create it</button></div></div></div>';
+}
+
+const STATUS_BADGE = { draft:['grey','Not submitted'], review:['awaiting_review','In review'], changes:['correction_required','Needs changes'], approved:['complete','Approved'] };
 function docRow(d){
   const days = Math.round((new Date(d.reviewDue) - Date.now())/86400000);
-  const due = days < 0 ? '<span class="badge missing">Review overdue</span>' : days <= 30 ? '<span class="badge expiring">Review due in '+days+' days</span>' : '<span class="badge grey">Review '+d.reviewDue+'</span>';
+  const due = days < 0 ? '<span class="badge missing">Review overdue</span>' : days <= 30 ? '<span class="badge expiring">Review due in '+days+' days</span>' : '<span class="srctag">Review '+d.reviewDue+'</span>';
+  const st = studioStatus(d), b = STATUS_BADGE[st];
+  const why = st==='changes' ? (d.submittedStatus==='correction_required' ? 'The site asked for changes' : !d.latestSubmitted ? 'A newer revision hasn\'t been submitted yet' : 'The submitted copy has expired') : '';
   return '<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+d.title+'</div>'
-    +'<div class="reqrow-meta"><span class="srctag">'+d.docNumber+' · Rev '+d.revision+'</span>'+(d.ai?'<span class="badge sage">AI</span>':'')+due+(d.siteName?'<span class="srctag">'+d.siteName+'</span>':'')+'</div>'
-    +'<div class="row-actions"><button class="btn primary small" data-action="open-review" data-id="'+d.id+'">Open</button><a class="btn secondary small" href="/api/files/'+d.pdfFileId+'" target="_blank" rel="noopener">PDF</a>'
+    +'<div class="reqrow-meta"><span class="badge '+b[0]+'">'+b[1]+'</span><span class="srctag">'+d.docNumber+' · Rev '+d.revision+'</span>'+(d.ai?'<span class="badge sage">AI</span>':'')+due+(d.siteName?'<span class="srctag">'+d.siteName+'</span>':'')+'</div>'
+    +(why?'<div class="site-card-sub" style="margin-top:4px;">'+why+'</div>':'')
+    +'<div class="row-actions"><button class="btn primary small" data-action="open-review" data-id="'+d.id+'">Open &amp; edit</button><a class="btn secondary small" href="/api/files/'+d.pdfFileId+'" target="_blank" rel="noopener">PDF</a>'
     +'<a class="btn secondary small" href="/api/files/'+d.docxFileId+'?download=1">Word</a>'
     +(readOnly()?'':'<button class="btn secondary small" data-action="studio-revise" data-id="'+d.id+'">New revision</button>')
-    +(isContractor() && !readOnly()?'<button class="btn secondary small" data-action="studio-add" data-id="'+d.id+'">Add to safety file</button>':'')
+    +(isContractor() && !readOnly() && st!=='review' && st!=='approved'?'<button class="btn secondary small" data-action="studio-add" data-id="'+d.id+'">'+(st==='draft'?'Submit to a site':'Submit this revision')+'</button>':'')
+    +(!readOnly() && !d.everSubmitted?'<button class="btn danger small" data-action="studio-delete" data-id="'+d.id+'" data-title="'+d.title+'">Delete</button>':'')
     +'</div></div></div>';
 }
 
@@ -201,3 +262,17 @@ export { reload };
 
 /** The document catalogue, for other modules (e.g. the Safety File Builder). */
 export const loadCatalogPublic = () => loadCatalog();
+
+on('studio-filter', (el)=>{ S.studioFilter = el.dataset.filter; S.keepScroll = true; render(); S.keepScroll = false; });
+on('studio-create-for', (el)=>{
+  const site = S.state.sites[el.dataset.site];
+  const req = (S.state.requirements[el.dataset.site]||[]).find(r=>r.id===el.dataset.req);
+  openStudioForm(el.dataset.bp, { siteId: el.dataset.site, reqId: el.dataset.req, reqName: req ? req.name : '', siteName: site ? site.name : '' });
+});
+on('studio-delete', async (el)=>{
+  if(el.disabled) return;
+  if(!confirm('Delete “'+unescapeHtml(el.dataset.title)+'” and all its revisions? This can\'t be undone.')) return;
+  el.disabled = true;
+  try{ await api.del('/api/studio/documents/'+el.dataset.id); await loadDocs(true); showToast('Document deleted'); render(); }
+  catch(e){ el.disabled = false; showToast(e.message); }
+});

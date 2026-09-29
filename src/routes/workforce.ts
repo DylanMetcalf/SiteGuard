@@ -203,6 +203,7 @@ export default async function workforceRoutes(app: FastifyInstance) {
         fileId: optUuid,
       })
       .parse(req.body);
+    if (b.kind === 'medical_fitness' && !b.expiresOn) throw badRequest('Add the date the certificate of fitness expires — it decides when this person may no longer work on site.', 'expiry_required');
     const { id } = req.params as { id: string };
     return withTx(async (db) => {
       const w = await ownWorker(db, ctx, id);

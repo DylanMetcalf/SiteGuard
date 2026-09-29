@@ -40,14 +40,26 @@ async function pages(buf: Buffer) {
   return (await PDFDocument.load(buf)).getPageCount();
 }
 
+describe('document pack', () => {
+  it('merges the selected documents into one PDF, and refuses other companies\' documents', async () => {
+    const reqs = (await contractor.state()).state.requirements[siteId] as { id: string }[];
+    const r = await contractor.req('POST', '/api/documents/pack', { slots: [reqs[0].id, reqs[1].id] });
+    assert.equal(r.status, 200);
+    assert.match(String(r.raw.headers['content-disposition']), /Document-pack-Sigma-Electrical\.pdf/);
+    assert.ok((await pages(r.raw.rawPayload)) >= 4, 'cover + contents + 2 documents');
+    assert.equal((await stranger.post('/api/documents/pack', { slots: [reqs[0].id] })).status, 404);
+    assert.equal((await contractor.post('/api/documents/pack', { slots: [] })).status, 400);
+  });
+});
+
 describe('bound safety file', () => {
   it('merges every submitted document behind a cover and contents, for both sides', async () => {
     const c = await contractor.req('GET', `/api/sites/${siteId}/safety-file.pdf`);
     assert.equal(c.status, 200);
     assert.match(String(c.raw.headers['content-disposition']), /Safety-file-Shaft-4-Substation\.pdf/);
     const n = await pages(c.raw.rawPayload);
-    // cover + contents (≥2) + damaged-PDF notice (1) + photo page (1) + Studio document (≥3)
-    assert.ok(n >= 7, `expected at least 7 pages, got ${n}`);
+    // cover + contents (≥2) + registers (1) + damaged-PDF notice (1) + photo page (1) + Studio document (≥3)
+    assert.ok(n >= 8, `expected at least 8 pages, got ${n}`);
     const h = await host.req('GET', `/api/sites/${siteId}/safety-file.pdf`);
     assert.equal(h.status, 200);
     assert.equal(await pages(h.raw.rawPayload), n);

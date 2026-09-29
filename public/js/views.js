@@ -7,12 +7,13 @@ import {
   org, role, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId, isDemoMode,
   computeReadiness, siteSubmissionStatus, statusLabelForSubmission, gauge, gaugeColor, badge, timeAgo, dateTime, initials,
   openSafetyIssues, orgOpenSafetyIssuesCount, incidentTypeInfo, permitTypeInfo, permitEffectiveStatus, effectiveStatus, certStatus,
-  libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq,
+  libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, openSheet, sheetHead, closeSheet, searchBox, matchSearch, searching, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq,
 } from './core.js';
 import { computeTasks } from './sheets.js';
 import { renderStudio } from './studio.js';
 import { renderReview } from './review.js';
-import { builderCard } from './builder.js';
+import { guideCard } from './guide.js';
+import { renderWorkplace, workplaceCards } from './workplaces.js';
 
 /* ============ SHELL ============ */
 export function topbar(){
@@ -26,7 +27,8 @@ export function topbar(){
     +'<button class="identity-avatar" data-action="open-search" aria-label="Search" style="background:var(--paper-raised); color:var(--ink);">'+ICONS.search+'</button>'
     +(()=>{ const unread = (S.boot.inbox||{}).unread||0; return '<button class="identity-avatar" data-action="open-inbox" aria-label="Inbox'+(unread?', '+unread+' new':'')+'" style="background:var(--paper-raised); color:var(--ink); position:relative;">'+ICONS.bell+(unread?'<span class="bell-count">'+(unread>9?'9+':unread)+'</span>':highCount?'<span class="bell-dot"></span>':'')+'</button>'; })()
     +(personas && personas.length ? '<select class="persona-select" id="personaSel" aria-label="Demo persona" title="Demo persona — switches to another sample user (their real permissions apply)">'
-        + personas.map(p=>'<option value="'+p.userId+'"'+(p.current?' selected':'')+' title="'+p.label+'">'+p.name+' ('+p.label.split(' · ')[1]+')</option>').join('')+'</select>' : '')
+        // In a clean start both people share one name, so lead with the company ("the mine" / "the contractor").
+        + personas.map(p=>'<option value="'+p.userId+'"'+(p.current?' selected':'')+' title="'+p.label+'">'+(org().cleanDemo ? p.label.split(' · ')[1] : p.name+' ('+p.label.split(' · ')[1]+')')+'</option>').join('')+'</select>' : '')
     +'<button class="identity-avatar" data-action="open-profile" aria-label="Profile">'+initials(myName())+'</button></div>'
     +'</div>'+banners()+'</div>';
 }
@@ -34,7 +36,7 @@ export function topbar(){
 function banners(){
   const o = org(), f = S.boot.features;
   let html = '';
-  if(o.isDemo) html += '<div class="banner warn"><span>Demo with sample data. Switch people with the menu above.</span><button class="btn small secondary" data-action="leave-demo">Create a real account</button></div>';
+  if(o.isDemo) html += '<div class="banner warn"><span>'+(o.cleanDemo ? 'Your practice space — kept for 30 days. Switch between the mine and the contractor with the menu above.' : 'Demo with sample data. Switch people with the menu above.')+'</span><button class="btn small secondary" data-action="leave-demo">Create a real account</button></div>';
   if(!S.boot.me.verified) html += '<div class="banner info"><span>Confirm your email address — we sent a link to '+S.boot.me.email+'.</span><button class="btn small secondary" data-action="resend-verification">Resend</button></div>';
   if(f.billing && !o.isDemo){
     if(o.standing==='lapsed') html += '<div class="banner bad"><span>Read-only: '+(o.subscriptionStatus==='trialing'?'your trial has ended':'your subscription is inactive')+'. Everything stays viewable; choose a plan to keep making changes.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="goto-more" data-view="billing">Billing</button>':'')+'</div>';
@@ -57,7 +59,11 @@ export function bottomNav(){
 
 export function renderView(){
   if(S.nav==='dashboard') return renderDashboard();
-  if(S.nav==='sites') return S.activeSiteId && S.state.sites[S.activeSiteId] ? renderSiteDetail(S.activeSiteId) : renderSitesList();
+  if(S.nav==='sites'){
+    if(S.activeSiteId && S.state.sites[S.activeSiteId]) return renderSiteDetail(S.activeSiteId);
+    if(S.activeWorkplaceId && (S.state.workplaces||{})[S.activeWorkplaceId]) return renderWorkplace(S.activeWorkplaceId);
+    return renderSitesList();
+  }
   if(S.nav==='passport') return isContractor() ? renderPassport() : renderContractorsList();
   if(S.nav==='more') return renderMore();
   if(S.nav==='review') return renderReview();
@@ -144,12 +150,13 @@ function assistantWidget(){
 
 /** First-run checklist for site owners; disappears once the core loop has happened once. */
 function gettingStarted(){
-  if(!isHost() || !isOrgAdmin() || isDemoMode()) return '';
+  if(!isHost() || !isOrgAdmin() || (isDemoMode() && !org().cleanDemo)) return '';
   const sites = Object.values(S.state.sites);
+  const wps = Object.values(S.state.workplaces||{});
   const steps = [
-    { done: sites.length>0, title:'Add your first site', sub:'Pick a starter pack of required documents and invite the contractor by email.', action:'new-site' },
-    { done: sites.some(s=>(S.state.requirements[s.id]||[]).length), title:'Set the documents the site needs', sub:'Start from a pack, then add or remove anything specific to the site.' },
-    { done: sites.some(s=>s.status==='in_progress'||s.status==='site_ready'), title:'Contractor accepts', sub:'They get an email link. Once they accept, you\'ll see their documents arrive here live.' },
+    { done: sites.length>0 || wps.length>0, title:'Add your first site', sub:'Name it and tick what every contractor\'s safety file must contain — a general safety file list is ready to use.', action:'new-site' },
+    { done: wps.some(w=>w.requirements.length) || sites.some(s=>(S.state.requirements[s.id]||[]).length), title:'Set what the safety file must contain', sub:'Start from the general list, then add anything specific to the site.' },
+    { done: sites.some(s=>s.status==='in_progress'||s.status==='site_ready'), title:'Share the site code with your contractors', sub:'Send the code by WhatsApp or email, or put it on the notice board. Each contractor that joins gets its own safety file for the site.', action: wps.length ? 'open-workplace' : null, id: wps.length ? wps[0].id : '' },
     { done: sites.some(s=>(S.state.requirements[s.id]||[]).some(r=>{ const d = S.state.documents[r.id]; return d && d.version && (d.status==='complete' || d.status==='correction_required'); })), title:'Review the first submission', sub:'Approve it or request a correction — the contractor is notified either way.' },
   ];
   if(steps.every(x=>x.done)) return '';
@@ -157,7 +164,7 @@ function gettingStarted(){
   return '<div class="section-title">Getting started</div><div class="card checkpoint">'
     + steps.map((x,i)=>'<div class="reqrow"><div class="qa-icon" style="width:28px;height:28px;border-radius:50%;flex:none;'+(x.done?'background:var(--green-bg);color:var(--green);':i===next?'background:var(--brand);color:#fff;':'')+'">'+(x.done?ICONS.check:(i+1))+'</div>'
       +'<div class="reqrow-main"><div class="reqrow-name"'+(x.done?' style="color:var(--grey);text-decoration:line-through;"':'')+'>'+x.title+'</div>'+(i===next?'<div class="site-card-sub">'+x.sub+'</div>':'')+'</div>'
-      +(i===next && x.action && !readOnly()?'<button class="btn primary small" data-action="'+x.action+'">Start</button>':'')+'</div>').join('')
+      +(i===next && x.action && !readOnly()?'<button class="btn primary small" data-action="'+x.action+'"'+(x.id?' data-id="'+x.id+'"':'')+'>'+(x.action==='open-workplace'?'Show code':'Start')+'</button>':'')+'</div>').join('')
     +'</div>';
 }
 
@@ -318,11 +325,33 @@ export function portfolioRow(site){
 
 /* ============ SITES ============ */
 function renderSitesList(){
-  const sites = Object.values(S.state.sites);
-  return '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')+'</div>'
-    +'<p>'+sites.length+' site'+(sites.length===1?'':'s')+'</p></div>'
-    + (sites.length ? sites.map(portfolioRow).join('') : '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>');
+  // On the mine side, each contractor's file on a shared site lives inside that site's page.
+  const sites = Object.values(S.state.sites).filter(s=>!(isHost() && s.workplaceId && (S.state.workplaces||{})[s.workplaceId]));
+  const nWp = Object.keys(S.state.workplaces||{}).length;
+  let html = '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')
+    +(isContractor() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="join-site">+ Join a site</button>':'')+'</div>'
+    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : sites.length+' site'+(sites.length===1?'':'s'))+'</p></div>';
+  if(isHost() && nWp){
+    html += ((nWp + sites.length) > 3 || searching('sites') ? searchBox('sites', 'Search sites, locations or contractors') : '')
+      + '<div class="section-title">Sites contractors join with a code</div>' + (workplaceCards() || '<div class="list-empty">No site matches.</div>');
+    if(!sites.length) return html;
+    html += '<div class="section-title">Single-contractor jobs</div>';
+    return html + sites.filter(s=>matchSearch('sites', s.name, s.location, (contractorOf(s)||{}).name)).map(portfolioRow).join('');
+  }
+  if(!sites.length) return html + '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>';
+  const kind = (s)=>s.status==='site_ready'?'ready':s.status==='invited'?'invited':s.status==='declined'?'declined':'progress';
+  const attention = (s)=>{ if(s.status!=='in_progress') return false; const st = siteSubmissionStatus(s.id); return st==='changes_required' || (isHost() ? st==='under_review' || st==='ready_to_approve' : st!=='under_review'); };
+  const base = sites.filter(s=>matchSearch('sites', s.name, s.location, s.hostName, (contractorOf(s)||{}).name));
+  const tests = { all:()=>true, attention, progress:s=>kind(s)==='progress', ready:s=>kind(s)==='ready', invited:s=>kind(s)==='invited' };
+  const f = tests[S.sitesFilter] ? S.sitesFilter : 'all';
+  const chips = [['all','All'],['attention','Needs attention'],['progress','In progress'],['ready','Site Ready'],['invited','Invited']];
+  html += (sites.length > 3 || searching('sites') ? searchBox('sites', isHost()?'Search sites, locations or contractors':'Search sites, locations or mines') : '')
+    + '<div class="filter-chips">'+chips.map(([k,l])=>'<button class="site-picker-chip'+(f===k?' active':'')+'" data-action="sites-filter" data-filter="'+k+'">'+l+'<b>'+base.filter(tests[k]).length+'</b></button>').join('')+'</div>';
+  const shown = base.filter(tests[f]);
+  return html + (shown.length ? shown.map(portfolioRow).join('') : '<div class="list-empty">'+(searching('sites') ? 'No site matches “'+escapeHtml(S.search.sites)+'”.' : 'No sites in this view.')+'</div>');
 }
+on('passport-filter', (el)=>{ S.passportFilter = el.dataset.filter; S.keepScroll = true; render(); S.keepScroll = false; });
+on('sites-filter', (el)=>{ S.sitesFilter = el.dataset.filter; S.keepScroll = true; render(); S.keepScroll = false; });
 
 function renderSiteDetail(siteId){
   const site = S.state.sites[siteId];
@@ -343,10 +372,11 @@ function renderSiteDetail(siteId){
 
   const canShare = !readOnly() && (isContractor() ? isOrgAdmin() : canReview());
   let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;justify-content:space-between;flex-wrap:wrap;">'
-    +'<button class="btn secondary small" data-action="back-sites">← Sites</button>'
+    +'<button class="btn secondary small" data-action="back-sites">'+(isHost() && site.workplaceId && (S.state.workplaces||{})[site.workplaceId] ? '← '+S.state.workplaces[site.workplaceId].name : '← Sites')+'</button>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
     +'<button class="btn danger small icon" data-action="open-emergency" data-site="'+siteId+'" title="Emergency info" aria-label="Emergency info">'+ICONS.emergency+'</button>'
-    +(isHost() && isOrgAdmin() && !readOnly() ? '<button class="btn secondary small" data-action="edit-site" data-site="'+siteId+'">Edit</button>' : '')
+    +(isHost() && isOrgAdmin() && !readOnly() && !site.workplaceId ? '<button class="btn secondary small" data-action="edit-site" data-site="'+siteId+'">Edit</button>' : '')
+    +(isHost() && isOrgAdmin() && !readOnly() && site.workplaceId && site.status!=='declined' ? '<button class="btn secondary small" data-action="wp-remove-contractor" data-site="'+siteId+'">Remove</button>' : '')
     +(canShare && site.status!=='declined' ? '<button class="btn secondary small" data-action="new-share-link" data-site="'+siteId+'">Share</button>' : '')
     +'<button class="btn secondary small" data-action="export-site" data-site="'+siteId+'">Export</button></div></div>'
     +'<div class="view-head"><h1>'+site.name+'</h1><p>'+[site.location, isContractor()?site.hostName:contractor.name].filter(Boolean).join(' · ')+'</p></div>'
@@ -400,7 +430,7 @@ function renderSiteDetail(siteId){
     else if(submission==='ready_to_approve' && safetyBlocksApproval) html += '<div class="notice" style="background:var(--red-bg);color:var(--red);">All requirements complete, but this site can\'t be marked Ready while a lost time injury or fatality investigation is still open.</div>';
     else if(submission==='ready_to_approve' && !canReview()) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">All requirements complete — waiting on final site approval.</div>';
     if(canApprove) html += '<button class="btn primary block" data-action="approve-site" data-site="'+siteId+'" style="margin-bottom:14px;">Approve — Mark Site Ready</button>';
-    if(isContractor() && !readOnly()) html += builderCard(siteId);
+    if(isContractor()) html += guideCard(siteId);
   }
   const filed = (S.state.requirements[siteId]||[]).filter(r=>['complete','expiring','awaiting_review'].includes(effectiveStatus(S.state.documents[r.id]))).length;
   if(filed) html += '<a class="bundle-link" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>';
@@ -568,14 +598,26 @@ function renderPassport(){
       +'<div style="display:flex;gap:6px;"><button class="btn secondary small" data-action="export-selected">Export PDF</button>'
       +(readOnly()?'':'<button class="btn danger small" data-action="withdraw-selected">Withdraw</button>')+'</div></div>';
   }
-  html += '<div class="section-title">Company documents</div>'
-    +'<div class="site-card-sub" style="margin-bottom:8px;">Upload each once — keep one current copy here for every site you work on.</div><div class="card">'
-    + LIBRARY_TYPES.map(t=>{ const id = libraryReqId(contractorId, t.id); return documentRow(id, t.name, S.state.documents[id] || {status:'missing'}); }).join('')+'</div>';
-  mySites.forEach(site=>{
-    const reqs = (S.state.requirements[site.id]||[]).filter(r=>{ const d = S.state.documents[r.id]; return d && (d.assetUrl || d.pendingFileId); });
-    if(!reqs.length) return;
-    html += '<div class="section-title">'+site.name+'</div><div class="card">' + reqs.map(r=>documentRow(r.id, r.name, S.state.documents[r.id])).join('') +'</div>';
+  // Every document the company owes: its reusable company documents, then each site's requirements.
+  const groups = [{ title:'Company documents', sub:'Upload each once — keep one current copy here for every site you work on.',
+    rows: LIBRARY_TYPES.map(t=>{ const id = libraryReqId(contractorId, t.id); return { id, name:t.name, doc:S.state.documents[id] || {status:'missing'}, where:'Company documents' }; }) }];
+  mySites.forEach(site=>groups.push({ title:site.name, rows:(S.state.requirements[site.id]||[]).map(r=>({ id:r.id, name:r.name, doc:S.state.documents[r.id] || {status:'missing'}, where:site.name+' '+r.category })) }));
+  const bucket = (d)=>{ const e = effectiveStatus(d); return e==='complete' ? 'approved' : e==='awaiting_review' ? 'review' : e==='missing' ? (d.pendingFileId ? 'attention' : 'missing') : 'attention'; };
+  const f = S.passportFilter || 'all';
+  const counts = { all:0, missing:0, attention:0, review:0, approved:0 };
+  groups.forEach(g=>g.rows.forEach(r=>{ if(!matchSearch('mydocs', r.name, r.where)) return; counts.all++; counts[bucket(r.doc)]++; }));
+  html += searchBox('mydocs', 'Search your documents or sites')
+    + '<div class="filter-chips">'+[['all','All'],['missing','Missing'],['attention','Needs attention'],['review','In review'],['approved','Approved']]
+      .map(([k,l])=>'<button class="site-picker-chip'+(f===k?' active':'')+'" data-action="passport-filter" data-filter="'+k+'">'+l+'<b>'+counts[k]+'</b></button>').join('')+'</div>';
+  let shownAny = false;
+  groups.forEach((g, gi)=>{
+    const rows = g.rows.filter(r=>matchSearch('mydocs', r.name, r.where) && (f==='all' || bucket(r.doc)===f));
+    if(!rows.length) return;
+    shownAny = true;
+    html += '<div class="section-title">'+g.title+'</div>'+(gi===0 && f==='all' && !searching('mydocs') ? '<div class="site-card-sub" style="margin-bottom:8px;">'+g.sub+'</div>' : '')
+      +'<div class="card">'+rows.map(r=>documentRow(r.id, r.name, r.doc)).join('')+'</div>';
   });
+  if(!shownAny) html += '<div class="list-empty">'+(searching('mydocs') ? 'Nothing matches “'+escapeHtml(S.search.mydocs)+'”.' : f==='approved' ? 'Nothing approved yet.' : 'Nothing here — well done.')+'</div>';
   html += '<div class="section-title">Your people</div><div class="card checkpoint" data-action="goto-more" data-view="workforce" style="cursor:pointer;"><div class="flexbetween"><div><div class="site-card-title">Workforce</div><div class="site-card-sub">Medical fitness, inductions and training for each worker</div></div>'+ICONS.chevron+'</div></div>';
   html += '<div class="section-title">Sites you\'re on</div>'
     + (mySites.length ? mySites.map(portfolioRow).join('') : '<div class="empty"><h3>Not on any sites yet</h3><p>Once a site invites you and you accept, it\'ll show up here.</p></div>');
@@ -603,34 +645,105 @@ function allDocumentsAcrossSites(){
   return rows;
 }
 function renderDocumentCentre(){
-  const rows = allDocumentsAcrossSites();
-  const counts = {all:rows.length, awaiting_review:0, expiring:0, expired:0, correction_required:0, missing:0};
+  const all = allDocumentsAcrossSites();
+  const rows = all.filter(r=>matchSearch('docs', r.req.name, r.req.category, r.site.name, r.contractor.name));
+  const counts = {all:rows.length, awaiting_review:0, expiring:0, expired:0, correction_required:0, missing:0, complete:0};
   rows.forEach(r=>{ if(counts[r.status]!==undefined) counts[r.status]++; });
   const filter = S.docCentreFilter;
   const shown = filter==='all' ? rows : rows.filter(r=>r.status===filter);
-  const chips = [['all','All'],['awaiting_review','Awaiting review'],['expiring','Expiring'],['expired','Expired'],['correction_required','Corrections'],['missing','Missing']];
-  let html = '<div class="section-title">Document Centre</div><div class="site-picker-row" style="margin-bottom:10px;">'
-    + chips.map(([key,label])=>'<button class="site-picker-chip'+(filter===key?' active':'')+'" data-action="doc-centre-filter" data-filter="'+key+'">'+label+' ('+counts[key]+')</button>').join('')+'</div>';
-  if(!rows.length) return html + '<div class="empty"><h3>No documents yet</h3><p>Once contractors start submitting against site requirements, they\'ll show up here.</p></div>';
-  if(!shown.length) return html + '<div class="site-card-sub" style="padding:8px 2px;">Nothing in this category.</div>';
-  return html + '<div class="card">' + shown.slice(0,200).map(r=>'<div class="reqrow" data-action="open-req" data-req="'+r.req.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main">'
+  const chips = [['all','All'],['awaiting_review','Awaiting review'],['missing','Missing'],['correction_required','Corrections'],['expiring','Expiring'],['expired','Expired'],['complete','Approved']];
+  let html = searchBox('docs', 'Search documents, sites or contractors')
+    + '<div class="filter-chips">'+chips.map(([key,label])=>'<button class="site-picker-chip'+(filter===key?' active':'')+'" data-action="doc-centre-filter" data-filter="'+key+'">'+label+'<b>'+counts[key]+'</b></button>').join('')+'</div>';
+  if(!all.length) return html + '<div class="empty"><h3>No documents yet</h3><p>Once contractors start submitting against site requirements, they\'ll show up here.</p></div>';
+  if(!shown.length) return html + '<div class="list-empty">'+(searching('docs') ? 'Nothing matches “'+escapeHtml(S.search.docs)+'”.' : 'Nothing in this category.')+'</div>';
+  const LIMIT = 200;
+  return html + '<div class="card">' + shown.slice(0, LIMIT).map(r=>'<div class="reqrow" data-action="open-req" data-req="'+r.req.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main">'
     +'<div class="reqrow-name">'+r.req.name+'</div><div class="reqrow-meta">'+badge(r.status)+'<span class="srctag">'+r.site.name+' · '+r.contractor.name+'</span></div></div>'
-    +'<div class="reqrow-chevron">'+ICONS.chevron+'</div></div>').join('') + '</div>';
+    +'<div class="reqrow-chevron">'+ICONS.chevron+'</div></div>').join('') + '</div>'
+    + (shown.length > LIMIT ? '<div class="list-empty">Showing '+LIMIT+' of '+shown.length+'. Search or pick a category to narrow it down.</div>' : '');
 }
+
+/** What a contractor still owes, and what's waiting on us, across its active sites. */
+function contractorSummary(c){
+  const sites = Object.values(S.state.sites).filter(s=>s.contractorId===c.id);
+  let outstanding = 0, awaiting = 0, total = 0, complete = 0;
+  sites.filter(s=>s.status!=='declined').forEach(s=>{
+    (S.state.requirements[s.id]||[]).forEach(r=>{
+      const st = effectiveStatus(S.state.documents[r.id]);
+      total++;
+      if(st==='awaiting_review') awaiting++;
+      else if(st==='complete' || st==='expiring') complete++;
+      else outstanding++;
+    });
+  });
+  const ids = new Set(sites.map(s=>s.id));
+  const workers = Object.values(S.state.workers||{}).filter(w=>!w.own && (w.siteIds||[]).some(id=>ids.has(id))).length;
+  return { sites, outstanding, awaiting, total, complete, workers, percent: total ? Math.round(100*complete/total) : 0 };
+}
+
 function renderContractorsList(){
+  const tab = S.hostPeopleTab || 'contractors';
+  let html = '<div class="view-head"><h1>'+(tab==='contractors'?'Contractors':'Documents')+'</h1><p>'+org().name+'</p></div>'
+    +'<div class="subtabs" role="tablist">'
+    +[['contractors','Contractors'],['documents','Documents']].map(([t,l])=>'<button role="tab" data-action="host-people-tab" data-tab="'+t+'" class="'+(tab===t?'active':'')+'" aria-selected="'+(tab===t)+'">'+l+'</button>').join('')
+    +'</div>';
+  if(tab==='documents') return html + renderDocumentCentre();
+
   const list = Object.values(S.state.contractors);
-  let html = '<div class="view-head"><h1>Documents &amp; Contractors</h1><p>'+org().name+'</p></div>' + renderDocumentCentre() + '<div class="section-title">Contractors</div>';
-  if(!list.length) return html+'<div class="empty"><h3>No contractors yet</h3><p>Add your first contractor from "Add a site" — you\'ll be asked for their details the first time you invite them.</p></div>';
-  return html + list.map(c=>{
-    const sitesFor = Object.values(S.state.sites).filter(s=>s.contractorId===c.id);
-    const rated = c.reliability>0;
-    return '<div class="card checkpoint"><div class="flexbetween"><div class="site-card-title">'+c.name+'</div><span class="score-pill" style="color:'+(rated?gaugeColor(c.reliability):'var(--grey)')+';" title="Based on first-time-right submissions and on-time responses">'+(rated?c.reliability+'<span class="lbl">/100</span>':'<span class="lbl">Not yet rated</span>')+'</span></div>'
-      +'<div class="site-card-sub">'+(c.trade||'Trade not set')+' · Reg '+(c.reg||'—')+' · '+(c.linked?'<span style="color:var(--green);">On SiteGuard'+(c.linkedOrgName && c.linkedOrgName!==c.name?' as '+c.linkedOrgName:'')+'</span>':'Not yet joined')+'</div>'
-      +'<div class="site-card-sub">'+(c.contact||'No contact')+(c.contactEmail?' · '+c.contactEmail:'')+'</div>'
-      +'<div class="site-card-sub" style="margin-top:6px;">'+(sitesFor.length?sitesFor.map(s=>s.name).join(', '):'No sites yet')+'</div>'
-      +(isOrgAdmin() && !readOnly() ? '<div class="row-actions"><button class="btn secondary small" data-action="edit-contractor" data-id="'+c.id+'">Edit details</button></div>' : '')+'</div>';
-  }).join('');
+  if(!list.length) return html+'<div class="empty"><h3>No contractors yet</h3><p>Contractors are added when you create a site and invite them. Tap + and choose <strong>Add a site</strong>.</p></div>';
+  const withSum = list.map(c=>({ c, sum: contractorSummary(c) }));
+  const trades = [...new Set(list.map(c=>(c.trade||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const f = S.contractorFilter || 'all', trade = S.contractorTrade || '', sort = S.contractorSort || 'attention';
+  const counts = { all:0, review:0, outstanding:0, joined:0, pending:0 };
+  const passes = (x)=>matchSearch('contractors', x.c.name, x.c.trade, x.c.reg, x.c.coid, x.c.contact, x.c.contactEmail, x.sum.sites.map(s=>s.name).join(' ')) && (!trade || (x.c.trade||'').trim()===trade);
+  const base = withSum.filter(passes);
+  const is = { all:()=>true, review:x=>x.sum.awaiting>0, outstanding:x=>x.sum.outstanding>0, joined:x=>x.c.linked, pending:x=>!x.c.linked };
+  base.forEach(x=>Object.keys(is).forEach(k=>{ if(is[k](x)) counts[k]++; }));
+  const shown = base.filter(is[f] || is.all).sort(sort==='name' ? (a,b)=>unescapeHtml(a.c.name).localeCompare(unescapeHtml(b.c.name))
+    : sort==='reliability' ? (a,b)=>b.c.reliability-a.c.reliability
+    : (a,b)=>(b.sum.awaiting*2+b.sum.outstanding)-(a.sum.awaiting*2+a.sum.outstanding) || unescapeHtml(a.c.name).localeCompare(unescapeHtml(b.c.name)));
+  html += searchBox('contractors', 'Search by name, trade, registration, contact or site');
+  html += '<div class="filter-chips">'+[['all','All'],['review','Awaiting your review'],['outstanding','Documents outstanding'],['joined','On SiteGuard'],['pending','Not yet joined']]
+    .map(([k,l])=>'<button class="site-picker-chip'+(f===k?' active':'')+'" data-action="contractor-filter" data-filter="'+k+'">'+l+'<b>'+counts[k]+'</b></button>').join('')+'</div>';
+  html += '<div class="list-tools">'
+    +'<label>Trade <select class="field" data-action-change="contractor-trade"><option value="">All trades</option>'+trades.map(t=>'<option'+(t===trade?' selected':'')+'>'+t+'</option>').join('')+'</select></label>'
+    +'<label>Sort <select class="field" data-action-change="contractor-sort">'+[['attention','Needs attention first'],['name','Name A–Z'],['reliability','Most reliable']].map(([k,l])=>'<option value="'+k+'"'+(k===sort?' selected':'')+'>'+l+'</option>').join('')+'</select></label></div>';
+  if(!shown.length) return html + '<div class="list-empty">'+(searching('contractors') ? 'No contractor matches “'+escapeHtml(S.search.contractors)+'”.' : 'No contractors in this view.')+'</div>';
+  return html + '<div class="card">' + shown.map(({c, sum})=>'<div class="reqrow" data-action="open-contractor" data-id="'+c.id+'" role="button" tabindex="0" style="cursor:pointer;">'
+    +'<div class="avatar-sq">'+initials(unescapeHtml(c.name))+'</div><div class="reqrow-main">'
+    +'<div class="reqrow-name">'+c.name+'</div>'
+    +'<div class="reqrow-meta">'
+      +(sum.awaiting?'<span class="badge awaiting_review">'+sum.awaiting+' to review</span>':'')
+      +(sum.outstanding?'<span class="badge missing">'+sum.outstanding+' outstanding</span>':'')
+      +(!sum.awaiting && !sum.outstanding && sum.total?'<span class="badge complete">Up to date</span>':'')
+      +'<span class="srctag">'+(c.trade||'Trade not set')+'</span>'
+      +'<span class="srctag">'+sum.sites.length+' site'+(sum.sites.length===1?'':'s')+'</span>'
+      +(c.linked?'':'<span class="srctag">Not yet joined</span>')
+    +'</div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>').join('') + '</div>';
 }
+
+on('host-people-tab', (el)=>{ S.hostPeopleTab = el.dataset.tab; render(); window.scrollTo(0,0); });
+on('contractor-filter', (el)=>{ S.contractorFilter = el.dataset.filter; S.keepScroll = true; render(); S.keepScroll = false; });
+on('contractor-trade', (el)=>{ S.contractorTrade = el.value; S.keepScroll = true; render(); S.keepScroll = false; });
+on('contractor-sort', (el)=>{ S.contractorSort = el.value; S.keepScroll = true; render(); S.keepScroll = false; });
+on('open-contractor', (el)=>{
+  const c = S.state.contractors[el.dataset.id];
+  if(!c) return;
+  const sum = contractorSummary(c);
+  const row = (k, v)=>'<div class="kv"><span>'+k+'</span><strong>'+(v||'—')+'</strong></div>';
+  openSheet(sheetHead(c.name, c.linked ? 'On SiteGuard — details kept up to date by '+c.name : 'Not yet joined SiteGuard')
+    +'<div class="card">'+row('Trade / specialisation', c.trade)+row('Registration no.', c.reg)+row('COID no.', c.coid)+row('Contact', c.contact)+row('Email', c.contactEmail && !/\.invalid$/.test(c.contactEmail) ? '<a href="mailto:'+c.contactEmail+'">'+c.contactEmail+'</a>' : '')+(c.address?row('Address', c.address):'')
+      +row('Reliability', c.reliability>0 ? c.reliability+'% (first-time-right '+c.firstTimeRightRate+'%'+(c.onTimeRate?', on time '+c.onTimeRate+'%':'')+')' : 'Not enough submissions yet')
+      +row('Workers on your sites', String(sum.workers))+'</div>'
+    +'<div class="section-title">Sites</div>'
+    +(sum.sites.length ? '<div class="card">'+sum.sites.map(s=>{ const r = computeReadiness(s.id); const pct = s.status==='site_ready' ? 100 : r.percent;
+        return '<div class="reqrow" data-action="contractor-site" data-site="'+s.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main"><div class="reqrow-name">'+s.name+'</div><div class="reqrow-meta"><span class="badge '+(s.status==='site_ready'?'complete':s.status==='invited'?'grey':'awaiting_review')+'">'+(s.status==='site_ready'?'Site Ready':s.status==='invited'?'Invited':s.status==='declined'?'Declined':pct+'% ready')+'</span></div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>'; }).join('')+'</div>'
+      : '<div class="list-empty">No sites yet.</div>')
+    +(c.linked
+      ? '<div class="notice" style="margin-top:12px;">'+c.name+' manages its own company details in SiteGuard, so they can\'t be changed here. That keeps the record accurate and shows who is responsible for it.</div>'
+      : (isOrgAdmin() && !readOnly() ? '<button class="btn secondary block" style="margin-top:12px;" data-action="edit-contractor" data-id="'+c.id+'">Correct invitation details</button><div class="site-card-sub" style="margin-top:6px;">You can correct the name or email you invited them with until they join. After that, they keep their own details up to date.</div>' : '')));
+});
+on('contractor-site', (el)=>{ closeSheet(); S.nav='sites'; S.activeSiteId = el.dataset.site; S.siteTab='compliance'; render(); window.scrollTo(0,0); });
 
 /* ============ MORE ============ */
 function renderMore(){
@@ -692,8 +805,10 @@ function renderSafetyCentre(){
     +'<div class="attn-card blue" data-action="safety-filter" data-filter="pending" style="cursor:pointer;"><div class="attn-num">'+pending.length+'</div><div class="attn-label">Permits awaiting issue</div></div>'
     +'<div class="attn-card amber" data-action="safety-filter" data-filter="expired" style="cursor:pointer;"><div class="attn-num">'+expired.length+'</div><div class="attn-label">Expired, not closed</div></div></div>'
     +'<div class="site-picker-row" style="margin-bottom:10px;">'+chips.map(([k,l,n])=>'<button class="site-picker-chip'+(f===k?' active':'')+'" data-action="safety-filter" data-filter="'+k+'">'+l+' ('+n+')</button>').join('')+'</div>';
-  const incRows = (f==='open'||f==='action'?openInc : f==='severe'?severe : f==='all'?incidents : []);
-  const permRows = (f==='action'?pending.concat(expired) : f==='pending'?pending : f==='active'?active : f==='expired'?expired : f==='all'?permits : []);
+  const siteName = (id)=>(S.state.sites[id]||{}).name;
+  const incRows = (f==='open'||f==='action'?openInc : f==='severe'?severe : f==='all'?incidents : []).filter(x=>matchSearch('safety', x.inc.description, x.inc.person, x.inc.type, siteName(x.siteId)));
+  const permRows = (f==='action'?pending.concat(expired) : f==='pending'?pending : f==='active'?active : f==='expired'?expired : f==='all'?permits : []).filter(x=>matchSearch('safety', x.p.location, x.p.description, x.p.type, x.p.issuedTo, siteName(x.siteId)));
+  html += searchBox('safety', 'Search by site, location, person or description');
   if(incRows.length) html += '<div class="section-title">Incidents</div><div class="card">'+incRows.map(x=>renderIncidentRow(x.inc, x.siteId, true)).join('')+'</div>';
   if(permRows.length) html += '<div class="section-title">Permits</div><div class="card">'+permRows.map(x=>renderPermitRow(x.p, x.siteId, true)).join('')+'</div>';
   if(!incRows.length && !permRows.length) html += '<div class="empty"><h3>'+(f==='action'?'All clear':'Nothing here')+'</h3><p>'+(f==='action'?'No open incidents, permits awaiting issue or expired permits across your sites.':'No items match this filter.')+'</p></div>';
@@ -702,10 +817,13 @@ function renderSafetyCentre(){
 
 /* ---- Workforce ---- */
 function renderWorkforce(){
-  const workers = Object.values(S.state.workers||{});
+  const allWorkers = Object.values(S.state.workers||{});
+  const workers = allWorkers.filter(w=>matchSearch('workforce', w.name, w.occupation, w.employeeNo, w.orgName, (w.certificates||[]).map(c=>c.name).join(' ')));
   const own = workers.filter(w=>w.own), others = workers.filter(w=>!w.own);
   let html = '<div class="view-head"><div class="flexbetween"><h1>Workforce</h1>'+(canEdit() && !readOnly()?'<button class="btn primary small" data-action="new-worker">+ Add worker</button>':'')+'</div>'
     +'<p>Per-worker medical surveillance, inductions and training. Only the last 4 characters of ID numbers are stored.</p></div>';
+  if(allWorkers.length) html += searchBox('workforce', 'Search by name, occupation, company or certificate');
+  if(searching('workforce') && !workers.length) return html + '<div class="list-empty">No worker matches “'+escapeHtml(S.search.workforce)+'”.</div>';
   if(isContractor() || own.length){
     html += '<div class="section-title">'+(isContractor()?'Your workers':'Your own staff')+'</div>'
       + (own.length ? '<div class="card">'+own.map(w=>workerRow(w)).join('')+'</div>' : '<div class="empty"><h3>No workers yet</h3><p>Add each person on your crew, then record their medical certificate of fitness, site inductions and training with expiry dates. You\'ll get reminders before anything lapses.</p></div>');
@@ -719,10 +837,12 @@ function renderWorkforce(){
 
 /* ---- Appointments register ---- */
 function renderAppointments(){
-  const list = S.state.appointments || [];
+  const all = S.state.appointments || [];
+  const list = all.filter(a=>matchSearch('appointments', a.appointeeName, a.type, a.legalReference, a.orgName));
   const own = list.filter(a=>a.own), others = list.filter(a=>!a.own);
   let html = '<div class="view-head"><div class="flexbetween"><h1>Appointments register</h1>'+(isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-appointment">+ Record</button>':'')+'</div>'
     +'<p>Statutory appointments (e.g. OHS Act s16(1)/16(2), Construction Regulations 8(1)/8(7), MHSA appointments) with their signed letters.</p></div>';
+  if(all.length > 3 || searching('appointments')) html += searchBox('appointments', 'Search by person, appointment or company');
   html += '<div class="section-title">'+org().name+'</div>' + (own.length ? '<div class="card">'+own.map(appointmentRow).join('')+'</div>' : '<div class="card"><div class="site-card-sub">No appointments recorded yet.</div></div>');
   if(others.length) html += '<div class="section-title">Other organisations on your sites</div><div class="card">'+others.map(appointmentRow).join('')+'</div>';
   html += '<div class="notice" style="margin-top:12px;">SiteGuard records appointments; it doesn\'t decide which ones your operation legally needs. Confirm requirements with your legal or SHE advisor.</div>';
@@ -734,7 +854,7 @@ function renderAudit(){
   const sites = Object.values(S.state.sites);
   const f = S.auditFilter;
   const filtered = f.from || f.to || f.siteId;
-  const rows = filtered && S.auditRows ? S.auditRows : S.state.audit;
+  const rows = (filtered && S.auditRows ? S.auditRows : S.state.audit).filter(a=>matchSearch('audit', a.actor, a.action, a.detail, (S.state.sites[a.siteId]||{}).name));
   return '<div class="view-head"><h1>Audit trail</h1><p>Complete, append-only history — who, what, when</p></div>'
     +'<div class="card">'
     +'<label class="field-label" for="auditFrom">From</label><input type="date" id="auditFrom" value="'+f.from+'">'
@@ -743,6 +863,7 @@ function renderAudit(){
       + sites.map(s=>'<option value="'+s.id+'"'+(f.siteId===s.id?' selected':'')+'>'+s.name+'</option>').join('')+'</select>'
     +'<div style="display:flex;gap:8px;margin-top:10px;"><button class="btn secondary small" style="flex:1;" data-action="audit-filter">Apply filter</button>'
     +'<button class="btn primary small" style="flex:1;" data-action="audit-export">Export PDF</button></div></div>'
+    + searchBox('audit', 'Search by person, action or detail')
     +'<div class="site-card-sub" style="margin-bottom:8px;">'+(filtered?rows.length+' event'+(rows.length===1?'':'s')+' matching filter':'Latest '+rows.length+' events — filter or export for the full history')+'</div>'
     +'<div class="card">' + (rows.length ? rows.map(a=>'<div class="audit-row"><div class="audit-dot action"></div><div class="audit-body">'
       +'<div class="audit-action"><strong>'+a.actor+'</strong> ('+a.role+') — '+a.action+'</div>'
@@ -757,7 +878,8 @@ function renderShareLinks(){
   let html = '<div class="view-head"><h1>External share links</h1><p>Read-only links for auditors, clients or principal contractors outside '+org().name+'. Each one expires, can be revoked, and shows only the one site it was made for.</p></div>';
   html += '<div class="notice">Create a link from a site\'s page with the <strong>Share</strong> button.</div>';
   if(!links.length) return html + '<div class="empty"><h3>No links yet</h3><p>Links you create will be listed here with how often they were opened.</p></div>';
-  return html + '<div class="card">'+links.map(l=>{
+  if(links.length > 5 || searching('links')) html += searchBox('links', 'Search by site or who it was for');
+  return html + '<div class="card">'+links.filter(l=>matchSearch('links', (S.state.sites[l.siteId]||{}).name, l.label, l.createdBy)).map(l=>{
     const site = S.state.sites[l.siteId];
     const status = l.revokedAt ? 'Revoked' : l.expiresAt < now ? 'Expired' : 'Active';
     return '<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+(l.kind==='safety_file'?'Safety file':'Readiness status')+' — '+(site?site.name:'Site')+(l.label?' ('+l.label+')':'')+'</div>'
@@ -805,7 +927,8 @@ function renderTeam(){
       +'<button class="btn primary block" style="margin-top:10px;" data-action="invite-user">Send invitation</button>'
       +'<div class="site-card-sub" style="margin-top:8px;">'+roleHelp()+'</div></div>';
   }
-  html += '<div class="section-title">Members</div><div class="card">'+t.members.map(m=>{
+  if(t.members.length > 5 || searching('team')) html += searchBox('team', 'Search colleagues by name or email');
+  html += '<div class="section-title">Members</div><div class="card">'+t.members.filter(m=>matchSearch('team', escapeHtml(m.name), escapeHtml(m.email))).map(m=>{
     const me = m.id===S.boot.me.id;
     return '<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+escapeHtml(m.name)+(me?' (you)':'')+'</div>'
       +'<div class="reqrow-meta"><span class="srctag">'+escapeHtml(m.email)+'</span>'+(m.verified?'':'<span class="badge expiring">Unconfirmed email</span>')+'</div>'
@@ -961,14 +1084,19 @@ export function exportSafetyFile(siteId){
 }
 
 /* ============ view-level actions ============ */
-on('nav', (el)=>{ S.nav = el.dataset.nav; if(S.nav==='sites') S.activeSiteId=null; if(S.nav==='more') S.moreView=null; S.docSelectMode=false; render(); window.scrollTo(0,0); });
+on('nav', (el)=>{ S.nav = el.dataset.nav; if(S.nav==='sites'){ S.activeSiteId=null; S.activeWorkplaceId=null; } if(S.nav==='more') S.moreView=null; S.docSelectMode=false; render(); window.scrollTo(0,0); });
 on('open-site', (el)=>{ S.activeSiteId = el.dataset.site; S.nav='sites'; S.siteTab='compliance'; render(); window.scrollTo(0,0); });
-on('back-sites', ()=>{ S.activeSiteId=null; render(); });
+on('back-sites', ()=>{
+  // A contractor's file on a shared site goes back to that site's page on the mine side.
+  const s = S.state.sites[S.activeSiteId];
+  S.activeWorkplaceId = isHost() && s && s.workplaceId && (S.state.workplaces||{})[s.workplaceId] ? s.workplaceId : null;
+  S.activeSiteId=null; render(); window.scrollTo(0,0);
+});
 on('focus-site', (el, e)=>{ e.stopPropagation(); S.focusSiteId = el.dataset.site; render(); });
 on('site-tab', (el)=>{ S.siteTab = el.dataset.tab; render(); });
 on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); render(); window.scrollTo(0,0); });
 on('doc-centre-filter', (el)=>{ S.docCentreFilter = el.dataset.filter; render(); });
-on('doc-centre-jump', (el)=>{ S.docCentreFilter = el.dataset.filter; S.nav='passport'; render(); });
+on('doc-centre-jump', (el)=>{ S.docCentreFilter = el.dataset.filter; S.hostPeopleTab = 'documents'; S.nav='passport'; render(); });
 on('safety-filter', (el)=>{ S.safetyFilter = el.dataset.filter; render(); });
 on('toggle-select', ()=>{ S.docSelectMode = !S.docSelectMode; S.selectedDocs = []; render(); });
 on('doc-check', (el)=>{
@@ -976,14 +1104,13 @@ on('doc-check', (el)=>{
   if(el.checked){ if(!S.selectedDocs.includes(id)) S.selectedDocs.push(id); } else S.selectedDocs = S.selectedDocs.filter(x=>x!==id);
   render();
 });
-on('export-selected', ()=>{
-  if(!S.selectedDocs.length) return;
-  const rows = S.selectedDocs.map(id=>({req:findReq(id), doc:S.state.documents[id]||{status:'missing'}})).filter(r=>r.req);
-  printHtml('<h1>SiteGuard Document Pack</h1><div class="p-sub">'+org().name+' · '+rows.length+' document'+(rows.length===1?'':'s')+'</div>'
-    +'<div class="p-sub">Exported '+new Date().toLocaleString('en-ZA')+' by '+myName()+'</div>'
-    +'<table><tr><th>Document</th><th>Status</th><th>Version</th><th>Expiry</th><th>Updated</th></tr>'
-    + rows.map(r=>'<tr><td>'+r.req.name+'</td><td>'+STATUS_LABEL[effectiveStatus(r.doc)]+'</td><td>'+(r.doc.version||'—')+'</td><td>'+(r.doc.expiryDate||'—')+'</td><td>'+(r.doc.updatedAt||'—')+'</td></tr>').join('')
-    +'</table><div class="p-foot">Generated by SiteGuard. Open each source file in SiteGuard to view or share it individually.</div>');
+on('export-selected', async (el)=>{
+  if(!S.selectedDocs.length){ showToast('Tick the documents to include first'); return; }
+  if(el.disabled) return;
+  const label = el.textContent; el.disabled = true; el.textContent = 'Merging…';
+  try{ await api.download('/api/documents/pack', { slots: S.selectedDocs }, 'Document-pack.pdf'); showToast('Document pack downloaded — '+S.selectedDocs.length+' document'+(S.selectedDocs.length===1?'':'s')+' in one PDF'); }
+  catch(e){ showToast(e.message); }
+  finally{ el.disabled = false; el.textContent = label; }
 });
 on('withdraw-selected', async ()=>{
   if(!S.selectedDocs.length) return;
@@ -992,7 +1119,18 @@ on('withdraw-selected', async ()=>{
   await act(async ()=>{ for(const id of ids) await api.del('/api/documents/'+encodeURIComponent(id)); }, 'Withdrawn');
   S.selectedDocs = []; S.docSelectMode = false; render();
 });
-on('export-site', (el)=>exportSafetyFile(el.dataset.site));
+on('export-site', (el)=>{
+  const id = el.dataset.site;
+  openSheet(sheetHead('Export', S.state.sites[id].name)
+    +'<button class="qa-item" data-action="export-bundle" data-site="'+id+'"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">Complete safety file (PDF)</div><div class="qa-sub">Cover, contents, site registers, then every submitted document, appointment and worker certificate in one file</div></div>'+ICONS.chevron+'</button>'
+    +'<button class="qa-item" data-action="export-register" data-site="'+id+'"><div class="qa-icon">'+ICONS.audit+'</div><div style="flex:1;"><div class="qa-title">One-page status report (print)</div><div class="qa-sub">Requirement statuses, registers and recent audit history, to print or save as PDF</div></div>'+ICONS.chevron+'</button>');
+});
+on('export-register', (el)=>{ closeSheet(); exportSafetyFile(el.dataset.site); });
+on('export-bundle', (el)=>{
+  closeSheet();
+  showToast('Preparing the safety file — the download starts in a moment');
+  window.location.href = '/api/sites/'+encodeURIComponent(el.dataset.site)+'/safety-file.pdf';
+});
 on('approve-site', (el)=>act(()=>api.post('/api/sites/'+el.dataset.site+'/approve'), 'Site marked Site Ready', el));
 on('invitation-decide', async (el)=>{
   const ok = await act(()=>api.post('/api/invitations/'+el.dataset.id+'/'+el.dataset.decision), el.dataset.decision==='accept'?'Invitation accepted — requirements are now open':'Invitation declined', el);

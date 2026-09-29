@@ -1,3 +1,4 @@
+import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { many, one, pool, withTx, type Db } from '../db/pool.js';
@@ -15,15 +16,15 @@ import { requireVerified } from './org.js';
 import { itemsFromPacks, TEMPLATE_PACKS } from '../lib/templates.js';
 import { acceptSiteInvitation } from './auth.js';
 
-const text = (max: number) => z.string().trim().max(max);
-const emergencySchema = z.object({ musterPoint: text(300), contact: text(300), hospital: text(300) }).partial();
-const requirementSchema = z.object({
+export const text = (max: number) => z.string().trim().max(max);
+export const emergencySchema = z.object({ musterPoint: text(300), contact: text(300), hospital: text(300) }).partial();
+export const requirementSchema = z.object({
   category: text(80).min(1),
   name: text(200).min(1),
   source: z.enum(['legal', 'client', 'site', 'project', 'company', 'best_practice', 'platform']),
   why: text(1000).default(''),
 });
-const packIdsSchema = z.array(z.enum(TEMPLATE_PACKS.map((p) => p.id) as [string, ...string[]])).max(TEMPLATE_PACKS.length);
+export const packIdsSchema = z.array(z.enum(TEMPLATE_PACKS.map((p) => p.id) as [string, ...string[]])).max(TEMPLATE_PACKS.length);
 const newContractorSchema = z.object({
   name: text(200).min(1),
   trade: text(120).default(''),
@@ -133,7 +134,7 @@ export default async function siteRoutes(app: FastifyInstance) {
       await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
       const limit = planOf(ctx.org).siteLimit;
       if (limitsEnforced() && limit !== null) {
-        const n = Number((await one<{ n: number }>(db, `select count(*) as n from sites where org_id = $1 and status <> 'declined'`, [ctx.org.id]))!.n);
+        const n = Number((await one<{ n: number }>(db, `select (select count(*) from sites where org_id = $1 and status <> 'declined' and workplace_id is null) + (select count(*) from workplaces where org_id = $1) as n`, [ctx.org.id]))!.n);
         if (n >= limit) throw new HttpError(402, 'site_limit', `Your plan includes ${limit} active sites. Upgrade under Billing to add more.`);
       }
       const contractor = await resolveContractor(db, ctx, body.contractorId || undefined, body.newContractor);
@@ -246,6 +247,29 @@ export default async function siteRoutes(app: FastifyInstance) {
         [site.id, body.category, body.name, body.source, body.why],
       ))!;
       await audit(db, ctx, 'Added requirement', body.name, site.id);
+      await recheckSiteReady(db, site.id, `new requirement: ${body.name}`);
+      await publishChange(db, parties);
+      return { id: r.id };
+    });
+  });
+
+  /** Contractor: add a document of its own to its safety file for a site (e.g. a lift plan the site didn't ask for). */
+  app.post('/api/sites/:id/my-documents', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const { id } = req.params as { id: string };
+    const body = z.object({ name: text(200).min(2, 'Say what the document is.'), category: text(80).min(1).default('Site-Specific') }).parse(req.body);
+    return withTx(async (db) => {
+      const { site, side, parties } = await loadSite(db, ctx, id);
+      if (side !== 'contractor') throw forbidden('The site adds its own requirements from its requirements list.');
+      if (await one(db, 'select 1 from requirements where site_id = $1 and lower(name) = lower($2)', [site.id, body.name])) throw conflict('That document is already in your safety file for this site.');
+      const r = (await one<{ id: string }>(
+        db,
+        `insert into requirements (site_id, category, name, source, why, position)
+         values ($1, $2, $3, 'company', $4, coalesce((select max(position) + 1 from requirements where site_id = $1), 0)) returning id`,
+        [site.id, body.category, body.name, `Added by ${ctx.org.name} to its safety file for this site.`],
+      ))!;
+      await audit(db, ctx, 'Added own document to safety file', body.name, site.id);
       await publishChange(db, parties);
       return { id: r.id };
     });
@@ -279,6 +303,7 @@ export default async function siteRoutes(app: FastifyInstance) {
       }
       const names = TEMPLATE_PACKS.filter((p) => packIds.includes(p.id)).map((p) => p.name).join(', ');
       await audit(db, ctx, 'Applied requirement pack', `${names} — ${items.length} requirement${items.length === 1 ? '' : 's'} added`, site.id);
+      await recheckSiteReady(db, site.id, `requirements added: ${names}`);
       await publishChange(db, parties);
       return { added: items.length };
     });
@@ -319,6 +344,9 @@ export default async function siteRoutes(app: FastifyInstance) {
       })
       .parse(req.body);
     await withTx(async (db) => {
+      const linked = await one<{ linked_org_id: string | null }>(db, 'select linked_org_id from contractors where id = $1 and org_id = $2 for update', [id, ctx.org.id]);
+      if (!linked) throw notFound();
+      if (linked.linked_org_id) throw conflict('This contractor keeps its own company details up to date in SiteGuard, so they can\'t be changed here. Ask them to update their organisation settings.');
       const c = await one<{ name: string }>(
         db,
         `update contractors set name = coalesce($3, name), trade = coalesce($4, trade), contact_name = coalesce($5, contact_name),

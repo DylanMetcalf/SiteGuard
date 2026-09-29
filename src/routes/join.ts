@@ -7,6 +7,7 @@ import { one, withTx } from '../db/pool.js';
 import { audit } from '../lib/audit.js';
 import { sha256 } from '../lib/security.js';
 import { acceptSiteInvitation, rl } from './auth.js';
+import { joinWorkplaceByCode } from './workplaces.js';
 
 // No 0/O, 1/I/L: easy to read out loud and type on a phone.
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -48,6 +49,9 @@ export default async function joinRoutes(app: FastifyInstance) {
     const { code } = z.object({ code: z.string().trim().min(4).max(20) }).parse(req.body);
     const clean = normaliseCode(code);
     return withTx(async (db) => {
+      // A site code (shared by the mine with every contractor) first; otherwise a one-off invitation code.
+      const viaSite = await joinWorkplaceByCode(db, ctx, clean);
+      if (viaSite) return viaSite;
       const inv = await one<{ id: string }>(
         db,
         `select id from site_invitations where join_code_hash = $1 and status = 'pending' and join_code_expires_at > now()`,

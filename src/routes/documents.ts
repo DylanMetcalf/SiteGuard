@@ -1,3 +1,4 @@
+import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -8,12 +9,18 @@ import { actorRole, isUuid, loadSite, requireOrg, requireReviewer, requireWritab
 import { audit, clip } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { appUrl, queueToOrg } from '../lib/email.js';
-import { bumpVersion, effectiveStatus, LIBRARY_TYPES } from '../lib/readiness.js';
+import { bumpVersion, effectiveStatus, libraryTypeFor, LIBRARY_TYPES } from '../lib/readiness.js';
 import { sniffType, storage } from '../lib/storage.js';
 import { aiAllowed } from '../lib/plans.js';
 import { extractExpiryDate } from '../lib/ai.js';
 import { rl } from './auth.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
+import { buildDocumentPack, statusLabel, type BundleItem } from '../lib/bundle.js';
+import { canReadFile } from './files.js';
+import { contentDisposition } from '../lib/storage.js';
+
+/** Documents that always have a valid-until date (COID letter, insurance, tax status, medicals, licences, load tests). */
+export const MUST_EXPIRE = /good\s*standing|\bcoid\b|insurance|tax\s+(compliance|clearance)|sars\s+pin|medical|fitness|licen[cs]e|load\s+test/i;
 
 export interface Slot {
   kind: 'site' | 'library';
@@ -98,6 +105,33 @@ export async function storeFile(db: Db, ctx: OrgCtx, buf: Buffer, filename: stri
 export default async function documentRoutes(app: FastifyInstance) {
   const slotParam = (req: { params: unknown }) => decodeURIComponent((req.params as { slot: string }).slot);
 
+  /** The selected documents merged into one PDF (current version of each; an unsubmitted attachment if that's all there is). */
+  app.post('/api/documents/pack', rl(10), async (req, reply) => {
+    const ctx = requireOrg(req.ctx);
+    const { slots } = z.object({ slots: z.array(z.string().max(120)).min(1, 'Select at least one document.').max(100) }).parse(req.body);
+    const items: BundleItem[] = [];
+    for (const slot of [...new Set(slots)]) {
+      const s = await resolveSlot(pool, ctx, slot);
+      const d = s.kind === 'site'
+        ? await one<any>(pool, 'select * from documents where requirement_id = $1', [s.requirementId])
+        : await one<any>(pool, 'select * from documents where library_org_id = $1 and library_type = $2', [s.contractorOrgId, s.libraryType]);
+      const fileId = d?.current_file_id ?? d?.pending_file_id ?? null;
+      const f = fileId ? await one<any>(pool, 'select id, org_id, storage_key, filename, content_type from files where id = $1', [fileId]) : null;
+      const readable = f && (await canReadFile(pool, ctx, f));
+      const st = effectiveStatus(d ? { status: d.status, expiry_date: d.expiry_date } : null);
+      items.push({
+        section: s.siteName ?? 'Company documents', name: s.name,
+        status: d?.current_file_id ? statusLabel(st) : fileId ? ['Not yet submitted', '#8A5200'] : statusLabel('missing'),
+        version: d?.version, expiry: d?.expiry_date,
+        file: readable ? { storage_key: f.storage_key, content_type: f.content_type, filename: f.filename } : null,
+      });
+    }
+    items.sort((a, b) => (a.section === b.section ? 0 : a.section === 'Company documents' ? -1 : b.section === 'Company documents' ? 1 : a.section.localeCompare(b.section)));
+    const { pdf, filename } = await buildDocumentPack(pool, ctx.org, items, ctx.user.name);
+    reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, false));
+    return reply.type('application/pdf').send(pdf);
+  });
+
   app.post('/api/documents/:slot/file', rl(60), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
@@ -143,6 +177,32 @@ export default async function documentRoutes(app: FastifyInstance) {
     });
   });
 
+  /** Attaches the matching current company document (e.g. the COID letter) to a site requirement, ready to submit. */
+  app.post('/api/documents/:slot/use-library', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const s = await resolveSlot(pool, ctx, slotParam(req));
+    requireSubmitter(s);
+    if (s.kind !== 'site') throw badRequest('Only a site requirement can use a company document.');
+    const type = libraryTypeFor(s.name);
+    const t = LIBRARY_TYPES.find((x) => x.id === type);
+    if (!t) throw badRequest('None of your company documents matches this requirement. Upload the document instead.', 'no_match');
+    return withTx(async (db) => {
+      const lib = await one<{ status: string; expiry_date: string | null; current_file_id: string | null; version: string | null }>(
+        db, `select status, to_char(expiry_date, 'YYYY-MM-DD') as expiry_date, current_file_id, version from documents where library_org_id = $1 and library_type = $2`, [ctx.org.id, t.id]);
+      if (!lib?.current_file_id) throw badRequest(`Your ${t.name} isn't in your company documents yet. Add it there once, then use it for every site.`, 'no_library_copy');
+      if (effectiveStatus(lib) === 'expired') throw badRequest(`Your ${t.name} has expired. Upload the current one to your company documents first.`, 'library_expired');
+      const doc = await docFor(db, s);
+      if (doc.status === 'awaiting_review') throw conflict('This document is waiting on review. You can replace it if the reviewer asks for a correction.');
+      if (doc.status === 'correction_required' && doc.current_file_id === lib.current_file_id) {
+        throw conflict(`The site sent this exact copy back. Put a corrected or newer ${t.name} in your company documents first, or upload one here.`);
+      }
+      await db.query('update documents set pending_file_id = $2 where id = $1', [doc.id, lib.current_file_id]);
+      await publishChange(db, [ctx.org.id]);
+      return { fileId: lib.current_file_id, note: `Current ${t.name} from ${ctx.org.name}'s company documents${lib.version ? ` (${lib.version})` : ''}`, expiryDate: lib.expiry_date ?? '' };
+    });
+  });
+
   app.post('/api/documents/:slot/submit', async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
@@ -166,6 +226,8 @@ export default async function documentRoutes(app: FastifyInstance) {
       // A common slip is typing last year; an already-expired document can never count.
       if (expiry && expiry < new Date().toISOString().slice(0, 10)) throw badRequest('That expiry date has already passed — check the date (especially the year) and try again.', 'expired_date');
       if (expiry && expiry > `${new Date().getFullYear() + 25}-12-31`) throw badRequest('That expiry date is too far in the future — check the year.', 'bad_date');
+      // Documents that lapse must carry their date, or nobody gets warned before they do.
+      if (!expiry && MUST_EXPIRE.test(s.name)) throw badRequest(`Add the expiry (valid-until) date printed on the ${s.name} — without it SiteGuard can't warn anyone before it lapses.`, 'expiry_required');
       await db.query(
         `insert into document_versions (document_id, version, file_id, note, expiry_date, ai_drafted, submitted_by, submitted_by_name)
          values ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -204,6 +266,8 @@ export default async function documentRoutes(app: FastifyInstance) {
     requireReviewer(ctx);
     requireWritable(ctx);
     const slot = slotParam(req);
+    // The version the reviewer actually read; if the contractor has since swapped the file, approving is refused.
+    const { version } = z.object({ version: z.string().max(20).optional() }).parse(req.body ?? {});
     return withTx(async (db) => {
       const s = await resolveSlot(db, ctx, slot);
       if (s.side !== 'host') throw forbidden();
@@ -211,6 +275,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (!['awaiting_review', 'correction_required'].includes(doc.status) || !doc.current_file_id) {
         throw conflict('There is no submitted version to approve.');
       }
+      if (version && version !== doc.version) throw conflict(`The contractor submitted a newer version (${doc.version}) while you were reading ${version}. Open it again and check the new version before approving.`);
       await db.query(`update documents set status = 'complete', updated_at = now() where id = $1`, [doc.id]);
       await audit(db, ctx, 'Approved document', `${s.name} (${doc.version})`, s.siteId);
       if (s.contractorOrgId) await notifyOrg(db, s.contractorOrgId, null, { kind: 'approved', title: `Approved: ${s.name}`, body: `${s.siteName} · approved by ${ctx.user.name}, ${ctx.org.name}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
@@ -235,8 +300,16 @@ export default async function documentRoutes(app: FastifyInstance) {
         [doc.id, ctx.user.id, ctx.user.name, actorRole(ctx), text],
       );
       await audit(db, ctx, 'Requested correction', `${s.name} — "${clip(text)}"`, s.siteId);
+      if (s.siteId) await recheckSiteReady(db, s.siteId, `${s.name} sent back`);
       if (s.contractorOrgId) {
-        await notifyOrg(db, s.contractorOrgId, null, { kind: 'correction', title: `Correction requested: ${s.name}`, body: `${s.siteName} — ${text}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
+        // A document written in SiteGuard opens straight in the review workspace, where the notes and highlights are.
+        const studio = doc.current_file_id
+          ? await one<{ id: string }>(db, 'select id from generated_documents where pdf_file_id = $1 and org_id = $2', [doc.current_file_id, s.contractorOrgId])
+          : null;
+        await notifyOrg(db, s.contractorOrgId, null, {
+          kind: 'correction', title: `Correction requested: ${s.name}`, body: `${s.siteName} — ${text}`,
+          link: studio ? { kind: 'review', id: studio.id } : { kind: 'req', id: s.requirementId!, siteId: s.siteId! },
+        });
         await queueToOrg(db, s.contractorOrgId, null, (to) => ({
           to: to.email,
           subject: `Correction requested: ${s.name}`,
@@ -283,6 +356,7 @@ export default async function documentRoutes(app: FastifyInstance) {
         [doc.id],
       );
       await audit(db, ctx, 'Withdrew document', s.name, s.siteId);
+      if (s.siteId) await recheckSiteReady(db, s.siteId, `${s.name} withdrawn`);
       await publishChange(db, s.parties);
       return { ok: true };
     });

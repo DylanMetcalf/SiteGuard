@@ -50,6 +50,21 @@ requirement that a blueprint can produce shows **Create it in Document Studio**,
 attached and submitted for review in one step. Documents due for review are flagged by the
 compliance agent. See `src/lib/studio/`.
 
+**One site, many contractors**: a mine creates a **site** once (name, location, emergency
+details) and ticks what every contractor's safety file must contain, starting from a researched
+**General safety file** list for mines (MHSA) or construction (Construction Regulations 2014).
+It gets a **site code** to share by WhatsApp, email or the notice board. Every contractor that
+types the code gets **its own safety file for that site**. The mine's site page shows the site
+code, the contractors grouped by trade, **one review queue** for everything waiting to be vetted,
+and the site's requirements; a new requirement reaches every contractor's file at once. Sign-up
+asks whether you run a site or are a contractor. (Inviting one contractor by email for a single
+job still works.)
+
+**Safety file guide**: straight after joining, the contractor gets a six-step guide for that
+site: company documents (submitted in one tap if already held), people and medicals, documents
+SiteGuard writes, certificates to upload, anything else they want to add (typed in; Document
+Studio offers to write it where it can), then check and download the safety file PDF.
+
 **Safety File Builder**: on a contractor's site page, *Build my safety file* writes every
 document the site still needs that Document Studio can produce (typically 7 of the 14 in the
 baseline pack) in one go. Tick the documents, answer the shared questions once, watch each one
@@ -70,10 +85,28 @@ approvals, corrections and contractors joining a site. Tapping one opens the exa
 **Join codes**: besides the email invitation, a site can give a contractor an 8-character code
 (valid 14 days). The contractor taps *Join a site with a code*, and the site is connected.
 
-**Bound safety file**: *Download the safety file* on a site (both sides, and on safety-file share
-links) produces one PDF: branded cover, contents with each requirement's status and page number,
-then every submitted document merged in order. Photos become pages; Word files and protected PDFs
-get a page saying where to find them; every page is stamped with the site and page number.
+**Bound safety file**: *Export → Complete safety file* (or *Download the safety file*) on a site
+(both sides, and on safety-file share links) produces one PDF: branded cover, contents with each
+item's status and page number, the site registers (workforce, permits, incidents, toolbox talks),
+then every submitted document, the site's appointment letters and the assigned workers'
+certificates, merged in order. Photos become pages; Word files and protected PDFs get a page
+saying where to find them; every page is stamped with the site and page number. Contractors can
+also tick any of their documents and export them as one **document pack** PDF.
+
+**Company documents, reused**: a contractor keeps one current COID letter, insurance, CIPC
+registration, tax compliance status and policies under *Your Documents → Company documents*. Any
+site requirement they satisfy shows **Submit my company copy**; saving one offers to send it to
+every site that needs it; and the Safety File Builder submits them along with what it writes.
+
+**Finding things**: every list (sites, contractors, documents, Document Studio, safety centre,
+workforce, appointments, audit trail, team, share links) has a search box and status filters.
+The mine's *Contractors* page lists contractors first, with trade filter and sort, and a
+read-only profile: once a contractor has joined, its company details come from its own account
+and the mine can't change them.
+
+**Clean start**: *Or start fresh with no sample data* on the sign-in page creates an empty mine
+and an empty contractor, both yours, switchable from the top bar and kept for 30 days: a safe
+place to try every function from a true first-time start.
 
 **Compliance agent**: a background check every 15 minutes across every organisation's sites.
 It keeps a prioritised list of what needs attention (expired or expiring documents, reviews
@@ -101,7 +134,7 @@ Product gaps from the last audit, also built:
 ## Going live
 
 Non-technical? Start with **[docs/LAUNCH_GUIDE.md](docs/LAUNCH_GUIDE.md)**: one-click deploy on
-Render with [`render.yaml`](render.yaml), email, domain, the AI key, costs in rands, and a demo
+Render with [`render.yaml`](render.yaml) (or a free try-out with [`render.free.yaml`](render.free.yaml)), email, domain, the AI key, costs in rands, and a demo
 script for selling on site.
 
 ## Quick start (local)

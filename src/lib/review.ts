@@ -57,7 +57,7 @@ function canonical(v: unknown): string {
 export const sectionHash = (s: Section) => createHash('sha256').update(canonical(s)).digest('hex').slice(0, 20);
 
 /** The revision this signed-in viewer should see, and what they may do with it. */
-export async function resolveForUser(db: Db, ctx: OrgCtx, anyId: string): Promise<{ doc: GenRow; viewer: Viewer }> {
+export async function resolveForUser(db: Db, ctx: OrgCtx, anyId: string, requirementId?: string): Promise<{ doc: GenRow; viewer: Viewer }> {
   if (!isUuid(anyId)) throw notFound();
   const row = await one<{ org_id: string; doc_number: string }>(db, 'select org_id, doc_number from generated_documents where id = $1', [anyId]);
   if (!row) throw notFound();
@@ -65,7 +65,9 @@ export async function resolveForUser(db: Db, ctx: OrgCtx, anyId: string): Promis
     const doc = (await one<GenRow>(db, `select ${GEN_COLS} from generated_documents g where g.org_id = $1 and g.doc_number = $2 order by g.revision desc limit 1`, [row.org_id, row.doc_number]))!;
     return { doc, viewer: { role: 'owner', canComment: true, canDecide: false, canEdit: standing(ctx.org) !== 'lapsed' } };
   }
-  // A host sees revisions that were submitted to one of its own sites.
+  // A host sees revisions that were submitted to one of its own sites. Opened from a
+  // particular requirement (e.g. a site's review queue), it shows the revision submitted there.
+  const forReq = requirementId && isUuid(requirementId);
   const doc = await one<GenRow>(
     db,
     `select ${GEN_COLS} from generated_documents g
@@ -73,9 +75,9 @@ export async function resolveForUser(db: Db, ctx: OrgCtx, anyId: string): Promis
        join documents d on d.id = v.document_id
        join requirements r on r.id = d.requirement_id
        join sites s on s.id = r.site_id
-      where g.org_id = $1 and g.doc_number = $2 and s.org_id = $3
-      order by g.revision desc limit 1`,
-    [row.org_id, row.doc_number, ctx.org.id],
+      where g.org_id = $1 and g.doc_number = $2 and s.org_id = $3 ${forReq ? 'and r.id = $4' : ''}
+      order by ${forReq ? 'v.submitted_at desc' : 'g.revision desc'} limit 1`,
+    forReq ? [row.org_id, row.doc_number, ctx.org.id, requirementId] : [row.org_id, row.doc_number, ctx.org.id],
   );
   if (!doc) throw notFound();
   return { doc, viewer: { role: 'host', canComment: true, canDecide: canReview(ctx), canEdit: false } };
@@ -98,14 +100,15 @@ export async function resolveForToken(db: Db, token: string): Promise<{ doc: Gen
 }
 
 /** Everything the review workspace shows. */
-export async function reviewPayload(db: Db, doc: GenRow, viewer: Viewer, opts: { forHostOrgId?: string } = {}) {
+export async function reviewPayload(db: Db, doc: GenRow, viewer: Viewer, opts: { forHostOrgId?: string; requirementId?: string } = {}) {
   const sections = doc.content.sections.map((s, index) => ({ index, heading: s.heading, hash: sectionHash(s), blocks: s.blocks }));
   const decisions = await many<{ section_hash: string; decision: 'approved' | 'changes'; note: string; reviewer_kind: string; reviewer_name: string; created_at: Date; revision: number }>(
     db,
     `select r.section_hash, r.decision, r.note, r.reviewer_kind, r.reviewer_name, r.created_at, g.revision
        from doc_section_reviews r join generated_documents g on g.id = r.generated_document_id
-      where g.org_id = $1 and g.doc_number = $2 order by r.created_at`,
-    [doc.org_id, doc.doc_number],
+      where g.org_id = $1 and g.doc_number = $2 ${opts.forHostOrgId ? 'and r.reviewer_org_id = $3' : ''} order by r.created_at`,
+    // A mine counts only its own reviewers' decisions — never the author's guests or another mine's.
+    opts.forHostOrgId ? [doc.org_id, doc.doc_number, opts.forHostOrgId] : [doc.org_id, doc.doc_number],
   );
   const latest = new Map<string, (typeof decisions)[number]>();
   for (const d of decisions) latest.set(d.section_hash, d);
@@ -114,8 +117,8 @@ export async function reviewPayload(db: Db, doc: GenRow, viewer: Viewer, opts: {
     `select c.id, c.section_index as "sectionIndex", c.section_heading as "sectionHeading", c.quote, c.body, c.author_kind as "authorKind",
             c.author_name as "authorName", c.created_at as "createdAt", c.resolved_at as "resolvedAt", c.resolved_by_name as "resolvedBy", g.revision
        from doc_comments c join generated_documents g on g.id = c.generated_document_id
-      where c.org_id = $1 and c.doc_number = $2 order by c.created_at`,
-    [doc.org_id, doc.doc_number],
+      where c.org_id = $1 and c.doc_number = $2 ${opts.forHostOrgId ? "and (c.author_kind = 'owner' or c.author_org_id = $3)" : ''} order by c.created_at`,
+    opts.forHostOrgId ? [doc.org_id, doc.doc_number, opts.forHostOrgId] : [doc.org_id, doc.doc_number],
   );
   const revisions = await many<Record<string, unknown>>(
     db,
@@ -132,9 +135,11 @@ export async function reviewPayload(db: Db, doc: GenRow, viewer: Viewer, opts: {
        join documents d on d.id = v.document_id
        join requirements r on r.id = d.requirement_id
        join sites s on s.id = r.site_id
-      where g.org_id = $1 and g.doc_number = $2 ${opts.forHostOrgId ? 'and s.org_id = $3' : ''}
+      where g.org_id = $1 and g.doc_number = $2 ${opts.forHostOrgId ? 'and s.org_id = $3' : ''} ${opts.forHostOrgId && opts.requirementId && isUuid(opts.requirementId) ? 'and r.id = $4' : ''}
       order by v.submitted_at desc limit 1`,
-    opts.forHostOrgId ? [doc.org_id, doc.doc_number, opts.forHostOrgId] : [doc.org_id, doc.doc_number],
+    opts.forHostOrgId
+      ? (opts.requirementId && isUuid(opts.requirementId) ? [doc.org_id, doc.doc_number, opts.forHostOrgId, opts.requirementId] : [doc.org_id, doc.doc_number, opts.forHostOrgId])
+      : [doc.org_id, doc.doc_number],
   );
   const target = submitted ?? (doc.requirement_id
     ? await one<{ requirement_id: string; site_id: string; site_name: string; req_name: string; status: string | null }>(
