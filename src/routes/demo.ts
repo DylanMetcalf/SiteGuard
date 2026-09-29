@@ -42,6 +42,7 @@ export default async function demoRoutes(app: FastifyInstance) {
         clean: z.boolean().default(false),
         hostName: z.string().trim().min(2).max(120).default('My Mine'),
         contractorName: z.string().trim().min(2).max(120).default('My Contractor'),
+        contractorName2: z.string().trim().max(120).optional().transform((v) => (v && v.length >= 2 ? v : undefined)),
         yourName: z.string().trim().min(2).max(80).default('SHE Manager'),
       })
       .parse(req.body ?? {});

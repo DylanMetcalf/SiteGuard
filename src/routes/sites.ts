@@ -251,6 +251,28 @@ export default async function siteRoutes(app: FastifyInstance) {
     });
   });
 
+  /** Contractor: add a document of its own to its safety file for a site (e.g. a lift plan the site didn't ask for). */
+  app.post('/api/sites/:id/my-documents', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const { id } = req.params as { id: string };
+    const body = z.object({ name: text(200).min(2, 'Say what the document is.'), category: text(80).min(1).default('Site-Specific') }).parse(req.body);
+    return withTx(async (db) => {
+      const { site, side, parties } = await loadSite(db, ctx, id);
+      if (side !== 'contractor') throw forbidden('The site adds its own requirements from its requirements list.');
+      if (await one(db, 'select 1 from requirements where site_id = $1 and lower(name) = lower($2)', [site.id, body.name])) throw conflict('That document is already in your safety file for this site.');
+      const r = (await one<{ id: string }>(
+        db,
+        `insert into requirements (site_id, category, name, source, why, position)
+         values ($1, $2, $3, 'company', $4, coalesce((select max(position) + 1 from requirements where site_id = $1), 0)) returning id`,
+        [site.id, body.category, body.name, `Added by ${ctx.org.name} to its safety file for this site.`],
+      ))!;
+      await audit(db, ctx, 'Added own document to safety file', body.name, site.id);
+      await publishChange(db, parties);
+      return { id: r.id };
+    });
+  });
+
   app.get('/api/requirement-templates', async (req, reply) => {
     requireOrg(req.ctx);
     reply.header('cache-control', 'private, max-age=3600');

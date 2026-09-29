@@ -12,7 +12,8 @@ import {
 import { computeTasks } from './sheets.js';
 import { renderStudio } from './studio.js';
 import { renderReview } from './review.js';
-import { builderCard } from './builder.js';
+import { guideCard } from './guide.js';
+import { renderWorkplace, workplaceCards } from './workplaces.js';
 
 /* ============ SHELL ============ */
 export function topbar(){
@@ -58,7 +59,11 @@ export function bottomNav(){
 
 export function renderView(){
   if(S.nav==='dashboard') return renderDashboard();
-  if(S.nav==='sites') return S.activeSiteId && S.state.sites[S.activeSiteId] ? renderSiteDetail(S.activeSiteId) : renderSitesList();
+  if(S.nav==='sites'){
+    if(S.activeSiteId && S.state.sites[S.activeSiteId]) return renderSiteDetail(S.activeSiteId);
+    if(S.activeWorkplaceId && (S.state.workplaces||{})[S.activeWorkplaceId]) return renderWorkplace(S.activeWorkplaceId);
+    return renderSitesList();
+  }
   if(S.nav==='passport') return isContractor() ? renderPassport() : renderContractorsList();
   if(S.nav==='more') return renderMore();
   if(S.nav==='review') return renderReview();
@@ -145,12 +150,13 @@ function assistantWidget(){
 
 /** First-run checklist for site owners; disappears once the core loop has happened once. */
 function gettingStarted(){
-  if(!isHost() || !isOrgAdmin() || isDemoMode()) return '';
+  if(!isHost() || !isOrgAdmin() || (isDemoMode() && !org().cleanDemo)) return '';
   const sites = Object.values(S.state.sites);
+  const wps = Object.values(S.state.workplaces||{});
   const steps = [
-    { done: sites.length>0, title:'Add your first site', sub:'Pick a starter pack of required documents and invite the contractor by email.', action:'new-site' },
-    { done: sites.some(s=>(S.state.requirements[s.id]||[]).length), title:'Set the documents the site needs', sub:'Start from a pack, then add or remove anything specific to the site.' },
-    { done: sites.some(s=>s.status==='in_progress'||s.status==='site_ready'), title:'Contractor accepts', sub:'They get an email link. Once they accept, you\'ll see their documents arrive here live.' },
+    { done: sites.length>0 || wps.length>0, title:'Add your first site', sub:'Name it and tick what every contractor\'s safety file must contain — a general safety file list is ready to use.', action:'new-site' },
+    { done: wps.some(w=>w.requirements.length) || sites.some(s=>(S.state.requirements[s.id]||[]).length), title:'Set what the safety file must contain', sub:'Start from the general list, then add anything specific to the site.' },
+    { done: sites.some(s=>s.status==='in_progress'||s.status==='site_ready'), title:'Share the site code with your contractors', sub:'Send the code by WhatsApp or email, or put it on the notice board. Each contractor that joins gets its own safety file for the site.', action: wps.length ? 'open-workplace' : null, id: wps.length ? wps[0].id : '' },
     { done: sites.some(s=>(S.state.requirements[s.id]||[]).some(r=>{ const d = S.state.documents[r.id]; return d && d.version && (d.status==='complete' || d.status==='correction_required'); })), title:'Review the first submission', sub:'Approve it or request a correction — the contractor is notified either way.' },
   ];
   if(steps.every(x=>x.done)) return '';
@@ -158,7 +164,7 @@ function gettingStarted(){
   return '<div class="section-title">Getting started</div><div class="card checkpoint">'
     + steps.map((x,i)=>'<div class="reqrow"><div class="qa-icon" style="width:28px;height:28px;border-radius:50%;flex:none;'+(x.done?'background:var(--green-bg);color:var(--green);':i===next?'background:var(--brand);color:#fff;':'')+'">'+(x.done?ICONS.check:(i+1))+'</div>'
       +'<div class="reqrow-main"><div class="reqrow-name"'+(x.done?' style="color:var(--grey);text-decoration:line-through;"':'')+'>'+x.title+'</div>'+(i===next?'<div class="site-card-sub">'+x.sub+'</div>':'')+'</div>'
-      +(i===next && x.action && !readOnly()?'<button class="btn primary small" data-action="'+x.action+'">Start</button>':'')+'</div>').join('')
+      +(i===next && x.action && !readOnly()?'<button class="btn primary small" data-action="'+x.action+'"'+(x.id?' data-id="'+x.id+'"':'')+'>'+(x.action==='open-workplace'?'Show code':'Start')+'</button>':'')+'</div>').join('')
     +'</div>';
 }
 
@@ -319,9 +325,19 @@ export function portfolioRow(site){
 
 /* ============ SITES ============ */
 function renderSitesList(){
-  const sites = Object.values(S.state.sites);
-  let html = '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')+'</div>'
-    +'<p>'+sites.length+' site'+(sites.length===1?'':'s')+'</p></div>';
+  // On the mine side, each contractor's file on a shared site lives inside that site's page.
+  const sites = Object.values(S.state.sites).filter(s=>!(isHost() && s.workplaceId && (S.state.workplaces||{})[s.workplaceId]));
+  const nWp = Object.keys(S.state.workplaces||{}).length;
+  let html = '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')
+    +(isContractor() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="join-site">+ Join a site</button>':'')+'</div>'
+    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : sites.length+' site'+(sites.length===1?'':'s'))+'</p></div>';
+  if(isHost() && nWp){
+    html += ((nWp + sites.length) > 3 || searching('sites') ? searchBox('sites', 'Search sites, locations or contractors') : '')
+      + '<div class="section-title">Sites contractors join with a code</div>' + (workplaceCards() || '<div class="list-empty">No site matches.</div>');
+    if(!sites.length) return html;
+    html += '<div class="section-title">Single-contractor jobs</div>';
+    return html + sites.filter(s=>matchSearch('sites', s.name, s.location, (contractorOf(s)||{}).name)).map(portfolioRow).join('');
+  }
   if(!sites.length) return html + '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>';
   const kind = (s)=>s.status==='site_ready'?'ready':s.status==='invited'?'invited':s.status==='declined'?'declined':'progress';
   const attention = (s)=>{ if(s.status!=='in_progress') return false; const st = siteSubmissionStatus(s.id); return st==='changes_required' || (isHost() ? st==='under_review' || st==='ready_to_approve' : st!=='under_review'); };
@@ -356,7 +372,7 @@ function renderSiteDetail(siteId){
 
   const canShare = !readOnly() && (isContractor() ? isOrgAdmin() : canReview());
   let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;justify-content:space-between;flex-wrap:wrap;">'
-    +'<button class="btn secondary small" data-action="back-sites">← Sites</button>'
+    +'<button class="btn secondary small" data-action="back-sites">'+(isHost() && site.workplaceId && (S.state.workplaces||{})[site.workplaceId] ? '← '+S.state.workplaces[site.workplaceId].name : '← Sites')+'</button>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
     +'<button class="btn danger small icon" data-action="open-emergency" data-site="'+siteId+'" title="Emergency info" aria-label="Emergency info">'+ICONS.emergency+'</button>'
     +(isHost() && isOrgAdmin() && !readOnly() ? '<button class="btn secondary small" data-action="edit-site" data-site="'+siteId+'">Edit</button>' : '')
@@ -413,7 +429,7 @@ function renderSiteDetail(siteId){
     else if(submission==='ready_to_approve' && safetyBlocksApproval) html += '<div class="notice" style="background:var(--red-bg);color:var(--red);">All requirements complete, but this site can\'t be marked Ready while a lost time injury or fatality investigation is still open.</div>';
     else if(submission==='ready_to_approve' && !canReview()) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">All requirements complete — waiting on final site approval.</div>';
     if(canApprove) html += '<button class="btn primary block" data-action="approve-site" data-site="'+siteId+'" style="margin-bottom:14px;">Approve — Mark Site Ready</button>';
-    if(isContractor() && !readOnly()) html += builderCard(siteId);
+    if(isContractor()) html += guideCard(siteId);
   }
   const filed = (S.state.requirements[siteId]||[]).filter(r=>['complete','expiring','awaiting_review'].includes(effectiveStatus(S.state.documents[r.id]))).length;
   if(filed) html += '<a class="bundle-link" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>';
@@ -1067,9 +1083,14 @@ export function exportSafetyFile(siteId){
 }
 
 /* ============ view-level actions ============ */
-on('nav', (el)=>{ S.nav = el.dataset.nav; if(S.nav==='sites') S.activeSiteId=null; if(S.nav==='more') S.moreView=null; S.docSelectMode=false; render(); window.scrollTo(0,0); });
+on('nav', (el)=>{ S.nav = el.dataset.nav; if(S.nav==='sites'){ S.activeSiteId=null; S.activeWorkplaceId=null; } if(S.nav==='more') S.moreView=null; S.docSelectMode=false; render(); window.scrollTo(0,0); });
 on('open-site', (el)=>{ S.activeSiteId = el.dataset.site; S.nav='sites'; S.siteTab='compliance'; render(); window.scrollTo(0,0); });
-on('back-sites', ()=>{ S.activeSiteId=null; render(); });
+on('back-sites', ()=>{
+  // A contractor's file on a shared site goes back to that site's page on the mine side.
+  const s = S.state.sites[S.activeSiteId];
+  S.activeWorkplaceId = isHost() && s && s.workplaceId && (S.state.workplaces||{})[s.workplaceId] ? s.workplaceId : null;
+  S.activeSiteId=null; render(); window.scrollTo(0,0);
+});
 on('focus-site', (el, e)=>{ e.stopPropagation(); S.focusSiteId = el.dataset.site; render(); });
 on('site-tab', (el)=>{ S.siteTab = el.dataset.tab; render(); });
 on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); render(); window.scrollTo(0,0); });

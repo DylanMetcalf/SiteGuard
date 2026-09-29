@@ -51,6 +51,7 @@ const act = async (p, sel) => { await p.locator(sel).first().click({ timeout: 80
 // 1. Host signs up
 await host.goto(base);
 await act(host, '[data-action="auth-go"][data-view="signup"]');
+await act(host, '[data-action="pick-kind"][data-kind="host"]');
 await host.fill('#suName', 'Thandi Nkosi');
 await host.fill('#suEmail', hostEmail);
 await host.fill('#suPassword', 'a long enough passphrase');
@@ -68,7 +69,7 @@ await host.fill('#chatInput', 'Safety file for electrical work at Tweefontein Co
 await host.keyboard.press('Enter');
 await host.waitForSelector('[data-action="chat-card-site"]', { timeout: 60000 });
 await act(host, '[data-action="chat-card-site"]');
-if ((await host.inputValue('#newSiteName')) !== 'Tweefontein Colliery') throw new Error('assistant proposal did not prefill the site name');
+if ((await host.inputValue('#wpName')) !== 'Tweefontein Colliery') throw new Error('assistant proposal did not prefill the site name');
 if (!(await host.isChecked('.pack-box[value="electrical"]'))) throw new Error('assistant proposal did not pick the electrical pack');
 await act(host, '[data-action="close-sheet"]');
 log('assistant answered and prefilled a new site from its proposal');
@@ -76,6 +77,9 @@ log('assistant answered and prefilled a new site from its proposal');
 // 2. Host adds a site with a new contractor and one requirement
 await act(host, '[data-action="open-fab"]');
 await act(host, '[data-qa="add-site"]');
+// A single job for one emailed contractor (sites that contractors join with a code are in the integration tests).
+await act(host, '[data-action="new-site-single"]');
+await host.waitForSelector('#newSiteName');
 await host.fill('#newSiteName', 'North Pit — Pump Station Upgrade');
 await host.fill('#newSiteLocation', 'North Pit');
 await host.fill('#nsCName', 'Sparks Electrical');

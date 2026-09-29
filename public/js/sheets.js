@@ -653,7 +653,7 @@ export async function loadPacks(){
   return packsCache;
 }
 /** Checkbox list of starter packs; counts show only requirements the site doesn't already have. */
-function packPicker(packs, checked, existingNames){
+export function packPicker(packs, checked, existingNames){
   const have = new Set((existingNames||[]).map(n=>n.toLowerCase()));
   return packs.map(p=>{
     const fresh = p.items.filter(i=>!have.has(i.name.toLowerCase()));
@@ -666,8 +666,8 @@ function packPicker(packs, checked, existingNames){
       +'</details></div>';
   }).join('');
 }
-const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
-const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
+export const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
+export const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
 
 function renderNewSiteSheet(packs, prefill){
   const pf = prefill || {};
@@ -688,6 +688,8 @@ function renderNewSiteSheet(packs, prefill){
 }
 /** Opens the Add a site sheet, optionally prefilled (e.g. from an assistant proposal). */
 export async function openNewSite(prefill){
+  // Mines normally create a site contractors join with a code; a single emailed invitation is the exception.
+  if(!(prefill && prefill.single)){ import('./workplaces.js').then(m=>m.openNewWorkplace(prefill)); return; }
   S.newSiteExtras = (prefill && prefill.extraRequirements) || [];
   try{ openSheet(renderNewSiteSheet(await loadPacks(), prefill)); }
   catch(e){ showToast(e.message); }
@@ -1131,12 +1133,17 @@ on('join-code', async (el)=>{
 });
 on('copy-join-code', async (el)=>{ try{ await navigator.clipboard.writeText(el.dataset.code); showToast('Code copied'); }catch{ showToast('Write the code down: '+el.dataset.code); } });
 on('join-site', ()=>openSheet(sheetHead('Join a site', 'With the code the site gave you')
-  +'<label class="field-label" for="joinCode">Join code</label><input type="text" id="joinCode" class="join-input" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345" autofocus>'
+  +'<div class="site-card-sub" style="margin-bottom:4px;">The mine or site gives every contractor its site code — on the notice board, by WhatsApp or by email. Joining shows you exactly what your safety file for that site needs.</div>'
+  +'<label class="field-label" for="joinCode">Site code</label><input type="text" id="joinCode" class="join-input" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345" autofocus>'
   +'<div class="site-card-sub" style="margin-top:6px;">Capitals, dashes and spaces don\'t matter.</div>'
   +'<button class="btn primary block" style="margin-top:12px;" data-action="join-go">Join site</button>'));
 on('join-go', async (el)=>{
   const code = val('joinCode');
   if(code.replace(/[^A-Za-z0-9]/g,'').length < 8){ showToast('Join codes have 8 letters and numbers'); document.getElementById('joinCode').focus(); return; }
-  const r = await act(()=>api.post('/api/sites/join', { code }), 'You\'ve joined the site', el);
-  if(r){ closeSheet(); S.nav='sites'; S.activeSiteId=r.siteId; S.siteTab='compliance'; render(); window.scrollTo(0,0); }
+  const r = await act(()=>api.post('/api/sites/join', { code }), null, el);
+  if(!r) return;
+  closeSheet(); S.nav='sites'; S.activeSiteId=r.siteId; S.siteTab='compliance'; render(); window.scrollTo(0,0);
+  if(r.already){ showToast('You\'re already on this site'); return; }
+  // Straight into the guided safety file for the new site.
+  setTimeout(()=>import('./guide.js').then(m=>m.openGuide(r.siteId, true)), 300);
 });

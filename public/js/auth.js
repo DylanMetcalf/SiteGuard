@@ -146,13 +146,16 @@ export function renderAuth(){
 
   if(v === 'signup'){
     return wrap('<div class="view-head" style="text-align:center;"><h1>Create your organisation</h1><p>Site owners get a 14-day trial with no card. Contractors are always free.</p></div><div class="card">'
-      +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name" placeholder="e.g. Thandi Nkosi" autofocus>'
+      +'<div class="field-label" style="margin-top:0;">Who are you signing up for?</div>'
+      +'<div class="role-cards" role="radiogroup">'
+        +roleCard('host', 'We run a site or mine', 'Create your sites, set what every contractor\'s safety file must contain, share a site code and vet what comes in.')
+        +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, and build each safety file in minutes — free.')
+      +'</div>'
+      +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name" placeholder="e.g. Thandi Nkosi">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email">'
       +'<label class="field-label" for="suPassword">Password</label><input type="password" id="suPassword" autocomplete="new-password">'
       +'<div class="site-card-sub" style="margin-top:4px;">At least 10 characters.</div>'
       +'<label class="field-label" for="suOrgName">Organisation name</label><input type="text" id="suOrgName" placeholder="e.g. Riverside Mining Group, or your own company name">'
-      +'<label class="field-label" for="suOrgKind">What best describes your organisation?</label>'
-      +'<select id="suOrgKind" class="field"><option value="host">A site / mining company that hosts contractors and needs safety files from them</option><option value="contractor">A contractor company that submits safety files to sites</option></select>'
       +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="new">Create my organisation</button>'+errorBox()
       +'<div class="auth-links"><button class="linkish" data-action="auth-go" data-view="signin">Already have an account? Sign in</button></div></div>'
       + demoCard(features));
@@ -162,6 +165,12 @@ export function renderAuth(){
   return wrap('<div class="view-head" style="text-align:center;"><h1>Sign in</h1><p>Contractor compliance, safety files and site operations.</p></div>'
     + signInCard('', '') + demoCard(features));
 }
+
+function roleCard(kind, title, sub){
+  const on = S.authContext.kind === kind;
+  return '<button type="button" class="role-card'+(on?' on':'')+'" role="radio" aria-checked="'+on+'" data-action="pick-kind" data-kind="'+kind+'"><span class="role-dot"></span><span><strong>'+title+'</strong><span>'+sub+'</span></span></button>';
+}
+on('pick-kind', (el)=>{ S.authContext.kind = el.dataset.kind; S.authContext.error = ''; keepTyped(render); });
 
 function signInCard(note, email){
   return '<div class="card">'+(note?'<div class="site-card-sub" style="margin-bottom:4px;">'+note+'</div>':'')
@@ -182,6 +191,7 @@ function demoCard(features){
         +'<div class="site-card-sub" style="margin-bottom:6px;">An empty mine and an empty contractor company, both yours. Switch between them with the name in the top bar. Kept for 30 days.</div>'
         +'<label class="field-label" for="cdHost">Mine / site company</label><input type="text" id="cdHost" maxlength="120" placeholder="e.g. Kathu Iron Ore Mine">'
         +'<label class="field-label" for="cdContractor">Contractor company</label><input type="text" id="cdContractor" maxlength="120" placeholder="e.g. Volt Electrical (Pty) Ltd">'
+        +'<label class="field-label" for="cdContractor2">Second contractor (optional)</label><input type="text" id="cdContractor2" maxlength="120" placeholder="e.g. SteelWorks Fabrication cc">'
         +'<label class="field-label" for="cdName">Your name</label><input type="text" id="cdName" maxlength="80" placeholder="e.g. Dylan Metcalf">'
         +'<button class="btn primary block" style="margin-top:12px;" data-action="clean-demo-go">Start with a clean slate</button></div>'
       : '<button class="linkish" style="margin-top:10px;" data-action="clean-demo-form">Or start fresh with no sample data</button>')
@@ -216,7 +226,11 @@ on('signup', async (el)=>{
   if(!body.name) return need('Enter your name.', 'suName');
   if(!body.email) return need('Enter your email address.', 'suEmail');
   if(body.password.length < 10) return need('Choose a password of at least 10 characters.', 'suPassword');
-  if(mode === 'new'){ body.orgName = val('suOrgName'); body.orgKind = val('suOrgKind'); if(!body.orgName) return need('Enter your company or organisation name.', 'suOrgName'); }
+  if(mode === 'new'){
+    body.orgName = val('suOrgName'); body.orgKind = S.authContext.kind;
+    if(!body.orgKind){ S.authContext.error = 'Choose whether you run a site or are a contractor.'; keepTyped(render); const c = document.querySelector('.role-card'); if(c) c.focus(); return; }
+    if(!body.orgName) return need('Enter your company or organisation name.', 'suOrgName');
+  }
   if(mode === 'invite') body.inviteToken = S.authContext.token;
   if(mode === 'site-invite'){ body.siteInviteToken = S.authContext.token; body.orgName = val('suOrgName'); body.orgKind = 'contractor'; }
   el.disabled = true;
@@ -297,7 +311,7 @@ on('auth-signout', async ()=>{
 on('clean-demo-form', ()=>{ S.authContext.cleanForm = true; keepTyped(render); const el = document.getElementById('cdHost'); if(el) el.focus(); });
 function cdNeed(msg, id){ showToast(msg); const el = document.getElementById(id); if(el) el.focus(); }
 on('clean-demo-go', async (el)=>{
-  const body = { clean: true, hostName: val('cdHost'), contractorName: val('cdContractor'), yourName: val('cdName') };
+  const body = { clean: true, hostName: val('cdHost'), contractorName: val('cdContractor'), contractorName2: val('cdContractor2') || undefined, yourName: val('cdName') };
   if(body.hostName.length < 2) return cdNeed('Enter the mine or site company name.', 'cdHost');
   if(body.contractorName.length < 2) return cdNeed('Enter the contractor company name.', 'cdContractor');
   if(body.yourName.length < 2) return cdNeed('Enter your name.', 'cdName');

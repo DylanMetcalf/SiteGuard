@@ -12,6 +12,8 @@ import { one } from '../db/pool.js';
 export interface CleanDemoInput {
   hostName: string;
   contractorName: string;
+  /** Optional second contractor, to show several contractors on one site. */
+  contractorName2?: string;
   yourName: string;
 }
 
@@ -38,5 +40,8 @@ export async function seedCleanDemo(db: Db, input: CleanDemoInput): Promise<{ gr
   const contractorId = await org(input.contractorName, 'contractor');
   const hostUser = await user(hostId, 'SHE Manager (mine)', 'mine');
   await user(contractorId, 'SHE Manager (contractor)', 'contractor');
+  if (input.contractorName2 && input.contractorName2.toLowerCase() !== input.contractorName.toLowerCase()) {
+    await user(await org(input.contractorName2, 'contractor'), 'SHE Manager (contractor)', 'contractor2');
+  }
   return { group, entryUserId: hostUser };
 }
