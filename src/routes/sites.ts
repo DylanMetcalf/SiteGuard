@@ -15,15 +15,15 @@ import { requireVerified } from './org.js';
 import { itemsFromPacks, TEMPLATE_PACKS } from '../lib/templates.js';
 import { acceptSiteInvitation } from './auth.js';
 
-const text = (max: number) => z.string().trim().max(max);
-const emergencySchema = z.object({ musterPoint: text(300), contact: text(300), hospital: text(300) }).partial();
-const requirementSchema = z.object({
+export const text = (max: number) => z.string().trim().max(max);
+export const emergencySchema = z.object({ musterPoint: text(300), contact: text(300), hospital: text(300) }).partial();
+export const requirementSchema = z.object({
   category: text(80).min(1),
   name: text(200).min(1),
   source: z.enum(['legal', 'client', 'site', 'project', 'company', 'best_practice', 'platform']),
   why: text(1000).default(''),
 });
-const packIdsSchema = z.array(z.enum(TEMPLATE_PACKS.map((p) => p.id) as [string, ...string[]])).max(TEMPLATE_PACKS.length);
+export const packIdsSchema = z.array(z.enum(TEMPLATE_PACKS.map((p) => p.id) as [string, ...string[]])).max(TEMPLATE_PACKS.length);
 const newContractorSchema = z.object({
   name: text(200).min(1),
   trade: text(120).default(''),

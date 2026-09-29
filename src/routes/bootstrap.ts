@@ -8,7 +8,7 @@ import { libraryTypeFor } from '../lib/readiness.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
 import { features } from '../config.js';
-import { actorRole, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
+import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
 import { aiAllowed, planOf, standing } from '../lib/plans.js';
 import { openFindings } from '../lib/agent.js';
 import { blueprintForRequirement } from '../lib/studio/blueprints.js';
@@ -33,6 +33,7 @@ interface SiteRow {
   emergency: Record<string, string>;
   created_at: Date;
   host_name: string;
+  workplace_id: string | null;
 }
 
 export async function visibleSites(db: Db, ctx: OrgCtx): Promise<SiteRow[]> {
@@ -69,7 +70,18 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     diary: {},
     settings: host ? { inspectxEnabled: false, inspectxBaseUrl: '', ...(ctx.org.settings as object) } : { inspectxEnabled: false, inspectxBaseUrl: '' },
     shareLinks: [],
+    workplaces: {},
   };
+
+  // ---- sites contractors join with a site code (mine side) ----
+  if (host) {
+    for (const w of await many<any>(db, 'select * from workplaces where org_id = $1 order by created_at', [ctx.org.id])) {
+      state.workplaces[w.id] = {
+        id: w.id, name: w.name, location: w.location, code: canAdminOrg(ctx) ? w.join_code : null, joinOpen: w.join_open,
+        requirements: w.requirements, emergency: { musterPoint: '', contact: '', hospital: '', ...w.emergency }, createdAt: d(w.created_at)?.slice(0, 10),
+      };
+    }
+  }
 
   // ---- contractors ----
   if (host) {
@@ -116,6 +128,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
       contractorId: host ? s.contractor_id : ctx.org.id,
       hostName: s.host_name, status: s.status, createdAt: d(s.created_at)?.slice(0, 10),
       emergency: { musterPoint: '', contact: '', hospital: '', ...s.emergency },
+      workplaceId: s.workplace_id ?? null,
     };
     state.requirements[s.id] = [];
     state.inspections[s.id] = [];
