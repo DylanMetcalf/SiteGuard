@@ -46,6 +46,24 @@ export const api = {
   put: (url, body = {}) => request('PUT', url, body),
   del: (url) => request('DELETE', url),
 
+  /** POSTs and saves the file the server sends back (e.g. a merged PDF). */
+  async download(url, body, fallbackName) {
+    let res;
+    try {
+      res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(body || {}), credentials: 'same-origin' });
+    } catch {
+      throw new ApiError(0, 'network', "Can't reach SiteGuard — check your connection and try again.");
+    }
+    if (!res.ok) return handle(res);
+    const blob = await res.blob();
+    const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(res.headers.get('content-disposition') || '');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = m ? decodeURIComponent(m[1]) : fallbackName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  },
+
   /** Multipart upload of a single file (field name "file"). */
   async upload(url, file, filename) {
     const form = new FormData();

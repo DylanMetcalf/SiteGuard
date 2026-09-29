@@ -14,6 +14,9 @@ import { aiAllowed } from '../lib/plans.js';
 import { extractExpiryDate } from '../lib/ai.js';
 import { rl } from './auth.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
+import { buildDocumentPack, statusLabel, type BundleItem } from '../lib/bundle.js';
+import { canReadFile } from './files.js';
+import { contentDisposition } from '../lib/storage.js';
 
 export interface Slot {
   kind: 'site' | 'library';
@@ -97,6 +100,33 @@ export async function storeFile(db: Db, ctx: OrgCtx, buf: Buffer, filename: stri
 
 export default async function documentRoutes(app: FastifyInstance) {
   const slotParam = (req: { params: unknown }) => decodeURIComponent((req.params as { slot: string }).slot);
+
+  /** The selected documents merged into one PDF (current version of each; an unsubmitted attachment if that's all there is). */
+  app.post('/api/documents/pack', rl(10), async (req, reply) => {
+    const ctx = requireOrg(req.ctx);
+    const { slots } = z.object({ slots: z.array(z.string().max(120)).min(1, 'Select at least one document.').max(100) }).parse(req.body);
+    const items: BundleItem[] = [];
+    for (const slot of [...new Set(slots)]) {
+      const s = await resolveSlot(pool, ctx, slot);
+      const d = s.kind === 'site'
+        ? await one<any>(pool, 'select * from documents where requirement_id = $1', [s.requirementId])
+        : await one<any>(pool, 'select * from documents where library_org_id = $1 and library_type = $2', [s.contractorOrgId, s.libraryType]);
+      const fileId = d?.current_file_id ?? d?.pending_file_id ?? null;
+      const f = fileId ? await one<any>(pool, 'select id, org_id, storage_key, filename, content_type from files where id = $1', [fileId]) : null;
+      const readable = f && (await canReadFile(pool, ctx, f));
+      const st = effectiveStatus(d ? { status: d.status, expiry_date: d.expiry_date } : null);
+      items.push({
+        section: s.siteName ?? 'Company documents', name: s.name,
+        status: d?.current_file_id ? statusLabel(st) : fileId ? ['Not yet submitted', '#8A5200'] : statusLabel('missing'),
+        version: d?.version, expiry: d?.expiry_date,
+        file: readable ? { storage_key: f.storage_key, content_type: f.content_type, filename: f.filename } : null,
+      });
+    }
+    items.sort((a, b) => (a.section === b.section ? 0 : a.section === 'Company documents' ? -1 : b.section === 'Company documents' ? 1 : a.section.localeCompare(b.section)));
+    const { pdf, filename } = await buildDocumentPack(pool, ctx.org, items, ctx.user.name);
+    reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, false));
+    return reply.type('application/pdf').send(pdf);
+  });
 
   app.post('/api/documents/:slot/file', rl(60), async (req) => {
     const ctx = requireOrg(req.ctx);

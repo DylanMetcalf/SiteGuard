@@ -176,7 +176,16 @@ function demoCard(features){
   if(!features.demo) return '';
   return '<div class="card" style="margin-top:10px;text-align:center;">'
     +'<div class="site-card-sub" style="margin-bottom:8px;">Not ready to enter real information? Explore SiteGuard in a private sandbox with realistic sample data — an example mine, contractors and safety files. It\'s separate from any real account and deleted after a few days.</div>'
-    +'<button class="btn secondary block" data-action="start-demo">Explore the demo</button></div>';
+    +'<button class="btn secondary block" data-action="start-demo">Explore the demo</button>'
+    + (S.authContext.cleanForm
+      ? '<div style="text-align:left;margin-top:16px;border-top:1px solid var(--grey-line);padding-top:14px;"><div class="site-card-title">Start fresh</div>'
+        +'<div class="site-card-sub" style="margin-bottom:6px;">An empty mine and an empty contractor company, both yours. Switch between them with the name in the top bar. Kept for 30 days.</div>'
+        +'<label class="field-label" for="cdHost">Mine / site company</label><input type="text" id="cdHost" maxlength="120" placeholder="e.g. Kathu Iron Ore Mine">'
+        +'<label class="field-label" for="cdContractor">Contractor company</label><input type="text" id="cdContractor" maxlength="120" placeholder="e.g. Volt Electrical (Pty) Ltd">'
+        +'<label class="field-label" for="cdName">Your name</label><input type="text" id="cdName" maxlength="80" placeholder="e.g. Dylan Metcalf">'
+        +'<button class="btn primary block" style="margin-top:12px;" data-action="clean-demo-go">Start with a clean slate</button></div>'
+      : '<button class="linkish" style="margin-top:10px;" data-action="clean-demo-form">Or start fresh with no sample data</button>')
+    +'</div>';
 }
 
 export function renderNoOrg(){
@@ -285,6 +294,18 @@ on('auth-signout', async ()=>{
   await reload();
 });
 
+on('clean-demo-form', ()=>{ S.authContext.cleanForm = true; keepTyped(render); const el = document.getElementById('cdHost'); if(el) el.focus(); });
+function cdNeed(msg, id){ showToast(msg); const el = document.getElementById(id); if(el) el.focus(); }
+on('clean-demo-go', async (el)=>{
+  const body = { clean: true, hostName: val('cdHost'), contractorName: val('cdContractor'), yourName: val('cdName') };
+  if(body.hostName.length < 2) return cdNeed('Enter the mine or site company name.', 'cdHost');
+  if(body.contractorName.length < 2) return cdNeed('Enter the contractor company name.', 'cdContractor');
+  if(body.yourName.length < 2) return cdNeed('Enter your name.', 'cdName');
+  if(body.hostName.toLowerCase() === body.contractorName.toLowerCase()) return cdNeed('Use two different company names, so you can tell the mine and the contractor apart.', 'cdContractor');
+  el.disabled = true; el.textContent = 'Setting up…';
+  try{ await api.post('/api/demo', body); await finish(); showToast('Clean start ready — you are the mine\'s SHE manager. Switch to the contractor from the top bar.'); }
+  catch(e){ el.disabled = false; el.textContent = 'Start with a clean slate'; showToast(e.message); }
+});
 on('start-demo', async (el)=>{
   el.disabled = true; el.textContent = 'Setting up your sandbox…';
   try{ await api.post('/api/demo'); await finish(); showToast('Demo sandbox ready — this is sample data, not a real account'); }
