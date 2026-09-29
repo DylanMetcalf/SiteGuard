@@ -30,8 +30,13 @@ To click through SiteGuard before paying for anything, deploy the free demo vers
 1. Sign up at **render.com** with your GitHub account.
 2. Click **New → Blueprint** and choose the `SiteGuard` repository.
 3. In **Blueprint Path**, type `render.free.yaml`. There is nothing else to fill in.
-4. Click **Apply** and wait 5–10 minutes. Open the `https://siteguard-demo-xxxx.onrender.com` link
-   and tap **Explore the demo**.
+4. Click **Apply** and wait 5–10 minutes. Open the `https://siteguard-demo-xxxx.onrender.com` link.
+5. Choose how to try it:
+   - **Explore the demo**: a sample mine with contractors and documents already in it.
+   - **Or start fresh with no sample data**: type your mine's name, a contractor's name and your
+     name. You get an empty mine and an empty contractor, both yours, and switch between them with
+     the company name in the top bar. It's kept for 30 days. Start as the mine: add a site, tap
+     **Get a join code**, switch to the contractor and tap **Join a site with a code**.
 
 The free version is for trying it out only. It sleeps after 15 minutes without visitors (the next
 visit waits about a minute), Render deletes its database after 30 days, uploaded files are lost

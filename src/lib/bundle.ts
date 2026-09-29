@@ -44,6 +44,9 @@ const latin = (s: string) => pdfSafe(s).replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
 const ver = (v: string | null | undefined) => (v ? (/^v/i.test(v) ? v : `v${v}`) : '—');
 const fmt = (d: string | Date | null | undefined) => (d ? new Date(d).toISOString().slice(0, 10) : '—');
 const t = (s: unknown) => pdfSafe(String(s ?? ''));
+/** South African time, e.g. 2026-09-29 07:00 — permits are issued per shift. */
+const fmtTime = (d: string | Date | null | undefined) =>
+  d ? new Date(new Date(d).getTime() + 2 * 3600e3).toISOString().slice(0, 16).replace('T', ' ') : '—';
 
 interface FileRef { storage_key: string; content_type: string; filename: string }
 export interface BundleItem {
@@ -232,7 +235,7 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
       workers.map((w) => [c(w.full_name), c(w.occupation), c(w.certs.map((x: any) => `${x.name}${x.expires ? ` (to ${fmt(x.expires)})` : ''}`).join('; ') || 'None recorded')]),
       'No workers assigned to this site yet.'),
     ...table('Permits to work', ['18%', '*', '14%', '20%', '22%'], ['Type', 'Location', 'Status', 'Issued to', 'Valid'],
-      permits.map((p) => [c(nice(p.type)), c(p.location), c(nice(p.status)), c(p.issued_to), c(p.valid_from ? `${fmt(p.valid_from)} to ${fmt(p.valid_to)}` : '')]),
+      permits.map((p) => [c(nice(p.type)), c(p.location), c(nice(p.status)), c(p.issued_to), c(p.valid_from ? `${fmtTime(p.valid_from)} to ${fmtTime(p.valid_to)}` : '')]),
       'No permits recorded.'),
     ...table('Incidents', ['14%', '16%', '12%', '*', '24%'], ['Date', 'Type', 'Status', 'Description', 'Root cause / actions'],
       incidents.map((i) => [c(fmt(i.occurred_on)), c(nice(i.type)), c(nice(i.status)), c(i.description), c([i.root_cause, i.corrective_actions].filter(Boolean).join(' — '))]),

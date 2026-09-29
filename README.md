@@ -70,10 +70,28 @@ approvals, corrections and contractors joining a site. Tapping one opens the exa
 **Join codes**: besides the email invitation, a site can give a contractor an 8-character code
 (valid 14 days). The contractor taps *Join a site with a code*, and the site is connected.
 
-**Bound safety file**: *Download the safety file* on a site (both sides, and on safety-file share
-links) produces one PDF: branded cover, contents with each requirement's status and page number,
-then every submitted document merged in order. Photos become pages; Word files and protected PDFs
-get a page saying where to find them; every page is stamped with the site and page number.
+**Bound safety file**: *Export → Complete safety file* (or *Download the safety file*) on a site
+(both sides, and on safety-file share links) produces one PDF: branded cover, contents with each
+item's status and page number, the site registers (workforce, permits, incidents, toolbox talks),
+then every submitted document, the site's appointment letters and the assigned workers'
+certificates, merged in order. Photos become pages; Word files and protected PDFs get a page
+saying where to find them; every page is stamped with the site and page number. Contractors can
+also tick any of their documents and export them as one **document pack** PDF.
+
+**Company documents, reused**: a contractor keeps one current COID letter, insurance, CIPC
+registration, tax compliance status and policies under *Your Documents → Company documents*. Any
+site requirement they satisfy shows **Submit my company copy**; saving one offers to send it to
+every site that needs it; and the Safety File Builder submits them along with what it writes.
+
+**Finding things**: every list (sites, contractors, documents, Document Studio, safety centre,
+workforce, appointments, audit trail, team, share links) has a search box and status filters.
+The mine's *Contractors* page lists contractors first, with trade filter and sort, and a
+read-only profile: once a contractor has joined, its company details come from its own account
+and the mine can't change them.
+
+**Clean start**: *Or start fresh with no sample data* on the sign-in page creates an empty mine
+and an empty contractor, both yours, switchable from the top bar and kept for 30 days: a safe
+place to try every function from a true first-time start.
 
 **Compliance agent**: a background check every 15 minutes across every organisation's sites.
 It keeps a prioritised list of what needs attention (expired or expiring documents, reviews

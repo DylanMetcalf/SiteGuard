@@ -289,7 +289,14 @@ export default async function documentRoutes(app: FastifyInstance) {
       );
       await audit(db, ctx, 'Requested correction', `${s.name} — "${clip(text)}"`, s.siteId);
       if (s.contractorOrgId) {
-        await notifyOrg(db, s.contractorOrgId, null, { kind: 'correction', title: `Correction requested: ${s.name}`, body: `${s.siteName} — ${text}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
+        // A document written in SiteGuard opens straight in the review workspace, where the notes and highlights are.
+        const studio = doc.current_file_id
+          ? await one<{ id: string }>(db, 'select id from generated_documents where pdf_file_id = $1 and org_id = $2', [doc.current_file_id, s.contractorOrgId])
+          : null;
+        await notifyOrg(db, s.contractorOrgId, null, {
+          kind: 'correction', title: `Correction requested: ${s.name}`, body: `${s.siteName} — ${text}`,
+          link: studio ? { kind: 'review', id: studio.id } : { kind: 'req', id: s.requirementId!, siteId: s.siteId! },
+        });
         await queueToOrg(db, s.contractorOrgId, null, (to) => ({
           to: to.email,
           subject: `Correction requested: ${s.name}`,

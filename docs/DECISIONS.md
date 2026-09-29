@@ -5,6 +5,22 @@ Newest first.
 
 ---
 
+**DECISION** Once a contractor has joined, its company details are read-only to the mine and come from the contractor's own account.
+**REASON** The contractor is responsible for its own registration, COID and contact details; letting the mine overwrite them would make the record unreliable and blur accountability. The mine can still correct the name or email it invited with until the contractor joins.
+**DATE** 2026-09-29
+
+**DECISION** Company documents (COID, insurance, CIPC, tax, policies) are uploaded once and submitted to sites from there.
+**REASON** Contractors were uploading the same letter to every site, and a copy saved only in the library looked "done" while the site still showed it missing. Matching by requirement name keeps it automatic; each site still reviews and approves its own copy.
+**DATE** 2026-09-29
+
+**DECISION** Approving a single section doesn't notify the author; changes do, and so does the last approval.
+**REASON** One review produced a notification per section, burying the ones that need action.
+**DATE** 2026-09-29
+
+**DECISION** Only never-submitted Studio documents can be deleted.
+**REASON** Anything a site has seen is part of its record; a new revision replaces it instead.
+**DATE** 2026-09-29
+
 **DECISION** Section approvals are keyed by a hash of the section's content, not by revision.
 **REASON** When an author fixes one section, the reviewer should only re-read that section. Hashing the content means unchanged sections keep their approval automatically, with no diffing or manual carry-over.
 **DATE** 2026-09-27

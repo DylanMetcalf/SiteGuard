@@ -26,7 +26,8 @@ export function topbar(){
     +'<button class="identity-avatar" data-action="open-search" aria-label="Search" style="background:var(--paper-raised); color:var(--ink);">'+ICONS.search+'</button>'
     +(()=>{ const unread = (S.boot.inbox||{}).unread||0; return '<button class="identity-avatar" data-action="open-inbox" aria-label="Inbox'+(unread?', '+unread+' new':'')+'" style="background:var(--paper-raised); color:var(--ink); position:relative;">'+ICONS.bell+(unread?'<span class="bell-count">'+(unread>9?'9+':unread)+'</span>':highCount?'<span class="bell-dot"></span>':'')+'</button>'; })()
     +(personas && personas.length ? '<select class="persona-select" id="personaSel" aria-label="Demo persona" title="Demo persona — switches to another sample user (their real permissions apply)">'
-        + personas.map(p=>'<option value="'+p.userId+'"'+(p.current?' selected':'')+' title="'+p.label+'">'+p.name+' ('+p.label.split(' · ')[1]+')</option>').join('')+'</select>' : '')
+        // In a clean start both people share one name, so lead with the company ("the mine" / "the contractor").
+        + personas.map(p=>'<option value="'+p.userId+'"'+(p.current?' selected':'')+' title="'+p.label+'">'+(org().cleanDemo ? p.label.split(' · ')[1] : p.name+' ('+p.label.split(' · ')[1]+')')+'</option>').join('')+'</select>' : '')
     +'<button class="identity-avatar" data-action="open-profile" aria-label="Profile">'+initials(myName())+'</button></div>'
     +'</div>'+banners()+'</div>';
 }

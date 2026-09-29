@@ -88,6 +88,10 @@ refuse.
 | Create a site join code | ✓ | | | | |
 | Join a site with a code | | | | ✓ | ✓ |
 | Download the bound safety file of a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Export own documents as one document pack | | | | ✓ | ✓ |
+| Submit a company document to a site requirement | | | | ✓ | ✓ |
+| Delete a never-submitted Studio document (creator or admin) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Correct a contractor's invitation details (only until it joins) | ✓ | | | | |
 | Appointments register | ✓ | | | ✓ | |
 | Team, roles, billing, organisation settings | ✓ | | | ✓ | |
 
@@ -218,6 +222,18 @@ storage), and routes in `routes/studio.ts`.
   includes only documents the other side can already see (complete, expiring, awaiting review),
   the same rule as safety-file share links, and caps merged content at 80 MB.
 
+- **Company documents on sites**: `libraryTypeFor` (`lib/readiness.ts`) matches a requirement's
+  name to a company document type; `POST /api/documents/:slot/use-library` attaches the current,
+  unexpired company copy as the pending file and the normal submit does the rest.
+- **Contractor details**: once `contractors.linked_org_id` is set, bootstrap shows the contractor
+  organisation's own registration, COID, trade, address and owner contact, and
+  `PATCH /api/contractors/:id` returns 409.
+- **Studio document status** comes from the requirement whose live file is any revision of the
+  document number; `DELETE /api/studio/documents/:id` refuses anything that ever reached
+  `document_versions`.
+- **Clean-start demo** (`demo/clean.ts`): `POST /api/demo {clean:true}` creates an empty host and
+  contractor organisation with one owner persona each; `settings.cleanDemo` keeps them 30 days.
+
 ## Known limits and next steps
 
 These are deliberate scope boundaries, not hidden gaps:
@@ -238,7 +254,9 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 81 integration tests, including the review workspace (visibility, section
+- `npm test`: 89 integration tests, including the clean-start demo, document packs, company
+  documents reused on sites, Studio document statuses and deletion, and contractor details being
+  read-only once joined, plus including the review workspace (visibility, section
   decisions, approvals carried across revisions, review links, notifications), join codes and the
   bound safety file, plus including every Document Studio blueprint rendered to PDF and
   Word, numbering and revisions, branding, attach-and-submit and tenant isolation, against real Postgres, covering the assistant's offline mode and
