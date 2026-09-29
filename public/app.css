@@ -581,3 +581,13 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .bundle-ic{width:40px; height:40px; border-radius:12px; background:var(--sage-bg); color:var(--sage-strong); display:flex; align-items:center; justify-content:center; flex:none;}
 .bundle-link svg{width:20px; height:20px; flex:none;}
 .qa-item.join-first{margin:0 0 14px; width:100%; padding:14px 16px; background:var(--paper-raised); border:1px solid var(--sage-soft); border-radius:16px;}
+/* ===== Page search ===== */
+.page-search{position:relative; margin:0 0 12px;}
+.page-search svg{position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--grey); pointer-events:none;}
+.page-search input{width:100%; padding:12px 14px 12px 42px; border-radius:14px; border:1px solid var(--grey-line); background:var(--paper-raised); font-size:15px;}
+.page-search input:focus{outline:none; border-color:var(--sage); box-shadow:0 0 0 3px var(--sage-bg);}
+.filter-chips{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 12px;}
+.filter-chips .site-picker-chip b{font-weight:700; margin-left:4px; opacity:.75;}
+.list-empty{padding:14px 4px; color:var(--grey); font-size:14px;}
+.group-head{display:flex; flex-direction:column; gap:1px; margin:16px 4px 8px; font-weight:700; font-size:14px; color:var(--ink);}
+.group-head .site-card-sub{font-weight:400;}

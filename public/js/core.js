@@ -297,6 +297,26 @@ export function val(id){ const el = document.getElementById(id); return el ? (el
 export const actions = {};
 export function on(name, fn){ actions[name] = fn; }
 
+/* ---- Search box for list pages ---- */
+/** A search box for a list page; the page filters its rows with matchSearch(key, ...fields). */
+export function searchBox(key, placeholder){
+  const v = (S.search||{})[key] || '';
+  return '<div class="page-search">'+ICONS.search+'<input type="search" data-action-input="page-search" data-search="'+key+'" value="'+escapeHtml(v)+'" placeholder="'+placeholder+'" aria-label="'+placeholder+'" autocomplete="off" enterkeyhint="search"></div>';
+}
+/** True when every word typed in the search box appears somewhere in the fields. */
+export function matchSearch(key, ...fields){
+  const q = ((S.search||{})[key] || '').trim().toLowerCase();
+  if(!q) return true;
+  const hay = unescapeHtml(fields.filter(Boolean).join(' ')).toLowerCase();
+  return q.split(/\s+/).every(w=>hay.includes(w));
+}
+export const searching = (key) => !!((S.search||{})[key] || '').trim();
+on('page-search', (el)=>{
+  S.search = S.search || {};
+  S.search[el.dataset.search] = el.value;
+  S.keepScroll = true; render(); S.keepScroll = false;
+});
+
 let renderFn = ()=>{};
 export function setRender(fn){ renderFn = fn; }
 export function render(){ renderFn(); }

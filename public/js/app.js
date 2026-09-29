@@ -6,7 +6,7 @@ import { handleDeepLink, renderAuth, renderNoOrg } from './auth.js';
 import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
 import './assistant.js';
-import './studio.js';
+import { refreshStudio } from './studio.js';
 import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
 import './inbox.js';
 import './builder.js';
@@ -73,10 +73,13 @@ function render(){
     return;
   }
   const y = window.scrollY;
+  // Keep the cursor in a page's search box when the page redraws (typing, or a live update).
+  const typing = active && active.dataset && active.dataset.search ? { key: active.dataset.search, pos: active.selectionStart } : null;
   const arriving = wasOutside; wasOutside = false; // just signed in or up: start at the top, not where the form was scrolled
   app.innerHTML = topbar() + '<main class="view">'+renderView()+'</main>' + bottomNav();
   syncHistory();
-  if(arriving) window.scrollTo(0, 0); else if(S.keepScroll) window.scrollTo(0, y);
+  if(arriving) window.scrollTo(0, 0); else if(S.keepScroll || typing) window.scrollTo(0, y);
+  if(typing){ const n = document.querySelector('[data-search="'+typing.key+'"]'); if(n){ n.focus(); try{ n.setSelectionRange(typing.pos, typing.pos); }catch{ /* search inputs in some browsers */ } } }
   startLive();
   maybeShowTutorial();
 }
@@ -132,7 +135,7 @@ function startLive(){
   es.addEventListener('open', ()=>{ if(!S.live){ S.live = true; updateLiveDot(); } });
   es.addEventListener('change', ()=>{
     clearTimeout(refetchTimer);
-    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>refreshReview()).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
+    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>{ refreshReview(); refreshStudio(); }).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
   });
   es.addEventListener('error', ()=>{
     S.live = false; updateLiveDot();
