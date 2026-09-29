@@ -50,6 +50,21 @@ requirement that a blueprint can produce shows **Create it in Document Studio**,
 attached and submitted for review in one step. Documents due for review are flagged by the
 compliance agent. See `src/lib/studio/`.
 
+**One site, many contractors**: a mine creates a **site** once (name, location, emergency
+details) and ticks what every contractor's safety file must contain, starting from a researched
+**General safety file** list for mines (MHSA) or construction (Construction Regulations 2014).
+It gets a **site code** to share by WhatsApp, email or the notice board. Every contractor that
+types the code gets **its own safety file for that site**. The mine's site page shows the site
+code, the contractors grouped by trade, **one review queue** for everything waiting to be vetted,
+and the site's requirements; a new requirement reaches every contractor's file at once. Sign-up
+asks whether you run a site or are a contractor. (Inviting one contractor by email for a single
+job still works.)
+
+**Safety file guide**: straight after joining, the contractor gets a six-step guide for that
+site: company documents (submitted in one tap if already held), people and medicals, documents
+SiteGuard writes, certificates to upload, anything else they want to add (typed in; Document
+Studio offers to write it where it can), then check and download the safety file PDF.
+
 **Safety File Builder**: on a contractor's site page, *Build my safety file* writes every
 document the site still needs that Document Studio can produce (typically 7 of the 14 in the
 baseline pack) in one go. Tick the documents, answer the shared questions once, watch each one

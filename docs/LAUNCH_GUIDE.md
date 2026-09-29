@@ -35,8 +35,11 @@ To click through SiteGuard before paying for anything, deploy the free demo vers
    - **Explore the demo**: a sample mine with contractors and documents already in it.
    - **Or start fresh with no sample data**: type your mine's name, a contractor's name and your
      name. You get an empty mine and an empty contractor, both yours, and switch between them with
-     the company name in the top bar. It's kept for 30 days. Start as the mine: add a site, tap
-     **Get a join code**, switch to the contractor and tap **Join a site with a code**.
+     the company name in the top bar (add a second contractor to see several on one site). It's
+     kept for 30 days. Start as the mine: tap **+ Add site**, keep the general safety file ticked,
+     create it and note the **site code**. Switch to a contractor, tap **Join a site with a code**
+     and follow the safety file guide. Switch back to the mine and open the site: contractors by
+     trade, the review queue, and the requirements.
 
 The free version is for trying it out only. It sleeps after 15 minutes without visitors (the next
 visit waits about a minute), Render deletes its database after 30 days, uploaded files are lost
@@ -243,8 +246,9 @@ mine and three contractors, deleted automatically after three days.
    Studio**. Describe the job, tap **Create document**, and open the PDF: a numbered, branded risk
    assessment with a risk register and sign-off blocks. Tap **Attach and submit for review**. (Upload
    a logo under More → Organisation settings first to show the company's own branding.)
-   Even faster: on the contractor's site page tap **Build my safety file**, answer the questions
-   once, and watch SiteGuard write every missing document it can, then **Submit all for review**.
+   Even faster: on the contractor's site page tap **Continue my safety file** (the safety file
+   guide), then **Write them now**: answer the questions once, watch SiteGuard write every missing
+   document it can, then **Submit all for review**.
 5. **Review and Site Ready (2 min).** Switch back to the mine persona and open the bell: the new
    submissions are there. Open one, approve a section, highlight a sentence and tap **Needs
    changes** with a note, then **Send back**. Switch to the contractor: the bell shows the feedback;
@@ -254,6 +258,20 @@ mine and three contractors, deleted automatically after three days.
 6. **Close (2 min).** "Contractors use it free. You pay per user after a 14-day trial. Can we set up
    your first site together now?" Create a real account on the spot and use **Ask SiteGuard** to
    start their first site.
+
+### The same demo from a clean start (best for a mine's SHE manager)
+
+Tap **Or start fresh with no sample data**, name the prospect's mine and two of their contractors.
+
+1. As the mine: **+ Add site** → keep **General safety file — mine** ticked, add the electrical
+   list if relevant → **Create site and get its code**. Show the requirements tab: "This is your
+   standard, researched and editable."
+2. Switch to the first contractor → **Join a site with a code** → the safety file guide opens:
+   submit company documents, add a worker with a medical, **Write them now**. Do the same quickly
+   for the second contractor.
+3. Back as the mine: open the site. Contractors grouped by trade, **Review queue** with everything
+   waiting, vet one document section by section, and export one contractor's safety file.
+   "One site, one code, every contractor's file in one place."
 
 ## Updates and maintenance
 

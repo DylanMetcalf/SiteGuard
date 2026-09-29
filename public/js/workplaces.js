@@ -51,7 +51,9 @@ export function renderWorkplace(wid){
   let html = '<div style="margin-bottom:14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><button class="btn secondary small" data-action="back-sites">← Sites</button>'
     +(admin?'<button class="btn secondary small" data-action="wp-edit" data-id="'+wid+'">Edit site</button>':'')+'</div>'
     +'<div class="view-head"><h1>'+w.name+'</h1><p>'+[w.location, st.files.length+' contractor'+(st.files.length===1?'':'s')].filter(Boolean).join(' · ')+'</p></div>';
-  if(w.code) html += '<div class="card wp-code-card"><div><div class="hero-eyebrow" style="color:var(--grey);">Site code</div>'
+  if(w.code && st.files.length && !S.wpCodeOpen) html += '<div class="card wp-code-line"><span class="hero-eyebrow" style="color:var(--grey);margin:0;">Site code</span><span class="mono wp-code-sm">'+w.code+'</span>'
+      +(w.joinOpen?'':'<span class="badge missing">Closed</span>')+'<button class="btn secondary small" data-action="wp-share" data-id="'+wid+'">Share</button><button class="linkish" data-action="wp-code-more">More</button></div>';
+  else if(w.code) html += '<div class="card wp-code-card"><div><div class="hero-eyebrow" style="color:var(--grey);">Site code</div>'
       +'<div class="wp-code mono" aria-label="Site code">'+w.code+'</div>'
       +'<div class="site-card-sub">'+(w.joinOpen ? 'Give this to every contractor working here. They type it in SiteGuard under <strong>Join a site with a code</strong> and their safety file for this site starts straight away.' : '<strong style="color:var(--red);">Closed</strong> — contractors can\'t join with this code until you open it again.')+'</div></div>'
       +'<div class="row-actions"><button class="btn primary small" data-action="wp-share" data-id="'+wid+'">Share code</button><button class="btn secondary small" data-action="wp-copy" data-id="'+wid+'">Copy</button>'
@@ -157,8 +159,9 @@ on('save-workplace', async (el)=>{
 });
 
 /* ---------- Actions ---------- */
-on('open-workplace', (el)=>{ S.nav='sites'; S.activeSiteId=null; S.activeWorkplaceId = el.dataset.id; S.wpTab='contractors'; render(); window.scrollTo(0,0); });
+on('open-workplace', (el)=>{ S.nav='sites'; S.activeSiteId=null; S.activeWorkplaceId = el.dataset.id; S.wpTab='contractors'; S.wpCodeOpen=false; render(); window.scrollTo(0,0); });
 on('wp-tab', (el)=>{ S.wpTab = el.dataset.tab; render(); });
+on('wp-code-more', ()=>{ S.wpCodeOpen = true; S.keepScroll = true; render(); S.keepScroll = false; });
 on('wp-trade', (el)=>{ S.wpTrade = el.dataset.trade; S.keepScroll = true; render(); S.keepScroll = false; });
 const shareText = (w)=>'Join '+unescapeHtml(w.name)+' on SiteGuard: open '+location.origin+' , sign in as your contractor company and tap "Join a site with a code". Site code: '+w.code;
 on('wp-copy', async (el)=>{ const w = W()[el.dataset.id]; try{ await navigator.clipboard.writeText(w.code); showToast('Site code copied'); }catch{ showToast('Site code: '+w.code); } });

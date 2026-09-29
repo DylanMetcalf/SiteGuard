@@ -626,3 +626,5 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .role-card .role-dot{width:20px; height:20px; border-radius:50%; border:2px solid var(--grey-line); flex:none; margin-top:1px;}
 .role-card.on{border-color:var(--brand); background:var(--brand-bg);}
 .role-card.on .role-dot{border-color:var(--brand); background:radial-gradient(circle, var(--brand) 45%, transparent 50%);}
+.wp-code-line{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 16px;}
+.wp-code-sm{font-size:18px; font-weight:800; letter-spacing:2px; color:var(--brand); flex:1;}

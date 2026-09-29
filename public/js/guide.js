@@ -88,12 +88,12 @@ function render(siteId, fresh){
 
 export function openGuide(siteId, fresh){
   openSheet(render(siteId, fresh));
-  const s = sheetEl(); if(s) s.dataset.guide = siteId;
+  const s = sheetEl(); if(s){ s.dataset.guide = siteId; s.dataset.fresh = fresh ? '1' : ''; }
 }
 /** Keep the guide current while it's open (after uploads, the builder, etc.). */
 export function refreshGuide(){
   const s = sheetEl();
-  if(s && s.dataset.guide && S.state.sites[s.dataset.guide]){ const y = s.scrollTop; s.innerHTML = render(s.dataset.guide, false); s.scrollTop = y; }
+  if(s && s.dataset.guide && S.state.sites[s.dataset.guide]){ const y = s.scrollTop; s.innerHTML = render(s.dataset.guide, s.dataset.fresh === '1'); s.scrollTop = y; }
 }
 
 on('guide-open', (el)=>openGuide(el.dataset.site, false));

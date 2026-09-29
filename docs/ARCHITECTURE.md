@@ -86,6 +86,9 @@ refuse.
 | Comment in the review workspace | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Edit, save revisions of, and send review links for the company's own Studio documents | | | | ✓ | ✓ |
 | Create a site join code | ✓ | | | | |
+| Create a site contractors join with a site code; change its requirements, code or open/closed state | ✓ | | | | |
+| Join a site with its site code (creates the contractor's own file for the site) | | | | ✓ | |
+| Add its own extra documents to its file for a site | | | | ✓ | ✓ |
 | Join a site with a code | | | | ✓ | ✓ |
 | Download the bound safety file of a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Export own documents as one document pack | | | | ✓ | ✓ |
@@ -222,6 +225,20 @@ storage), and routes in `routes/studio.ts`.
   includes only documents the other side can already see (complete, expiring, awaiting review),
   the same rule as safety-file share links, and caps merged content at 80 MB.
 
+- **Sites contractors join with a code** (`routes/workplaces.ts`, migration 010, `public/js/workplaces.js`):
+  a `workplaces` row holds the site's name, location, emergency details, requirement list and site
+  code. Joining (`POST /api/sites/join`, which tries a site code before one-off invitation codes)
+  finds or creates the mine's directory entry for the contractor company and creates the
+  contractor's own file for the site: an ordinary `sites` row with `workplace_id`, the site's
+  requirements copied in and status `in_progress` (one file per contractor per site, enforced by a
+  unique index). Everything else (review, builder, export, permits, readiness, Site Ready) works on
+  that file unchanged, and tenancy still goes through `loadSite`. Adding a requirement to the site
+  adds it to every file; removing one only affects future joiners (existing files keep their
+  history). The site code is stored readable so admins can show it again; it only lets a
+  contractor company ask to join, can be replaced, and the site can be closed to new joiners.
+- **Safety file guide** (`public/js/guide.js`) is client-side, built from the file's requirements,
+  company documents, assigned workers and the builder. `POST /api/sites/:id/my-documents` lets the
+  contractor add an extra item (source `company`) to its own file.
 - **Company documents on sites**: `libraryTypeFor` (`lib/readiness.ts`) matches a requirement's
   name to a company document type; `POST /api/documents/:slot/use-library` attaches the current,
   unexpired company copy as the pending file and the normal submit does the rest.

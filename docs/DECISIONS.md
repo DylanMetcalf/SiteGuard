@@ -5,6 +5,14 @@ Newest first.
 
 ---
 
+**DECISION** A site that many contractors join is a new `workplaces` record; each contractor's file for it stays an ordinary `sites` row.
+**REASON** Mines run one site with many contractors, each with its own safety file. Keeping the per-contractor file as the existing site record means review, the builder, exports, permits, readiness and every permission check keep working unchanged, and the change is purely additive (no existing data moves). Single emailed invitations still work.
+**DATE** 2026-09-29
+
+**DECISION** The general safety file lists follow published sources (Construction Regulations 2014, OHS Act, MHSA, a mining house's published contractor procedure) and cite a regulation only where it is certain.
+**REASON** Customers rely on the list; a wrong regulation number would undermine trust. Everything else is labelled best practice or client requirement, and every item stays editable per site.
+**DATE** 2026-09-29
+
 **DECISION** Once a contractor has joined, its company details are read-only to the mine and come from the contractor's own account.
 **REASON** The contractor is responsible for its own registration, COID and contact details; letting the mine overwrite them would make the record unreliable and blur accountability. The mine can still correct the name or email it invited with until the contractor joins.
 **DATE** 2026-09-29
