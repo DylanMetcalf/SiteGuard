@@ -40,7 +40,7 @@ export const statusLabel = (st: DocStatus): [string, string] => LABEL[st];
 const MAX_TOTAL_BYTES = 80 * 1024 * 1024;
 
 /** pdf-lib's standard fonts only encode Latin-1. */
-const latin = (s: string) => pdfSafe(s).replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
+const latin = (s: string) => pdfSafe(s).replace(/[\u2012-\u2015]/g, '-').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
 const ver = (v: string | null | undefined) => (v ? (/^v/i.test(v) ? v : `v${v}`) : '—');
 const fmt = (d: string | Date | null | undefined) => (d ? new Date(d).toISOString().slice(0, 10) : '—');
 const t = (s: unknown) => pdfSafe(String(s ?? ''));
