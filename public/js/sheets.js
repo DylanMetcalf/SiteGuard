@@ -5,7 +5,7 @@ import {
   S, ICONS, SOURCE_LABEL, INCIDENT_TYPES, PERMIT_TYPES, LIBRARY_TYPES, CERT_KINDS, APPOINTMENT_PRESETS,
   org, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId,
   computeReadiness, effectiveStatus, certStatus, badge, timeAgo, dateTime, todayStr, daysUntil, incidentTypeInfo, permitTypeInfo,
-  permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml, deepEscape,
+  permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml, deepEscape, libraryCopyFor, sitesNeedingLibrary,
   on, actions, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
 } from './core.js';
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
@@ -214,7 +214,14 @@ function renderReqSheet(reqId){
     else if(eff==='complete' && !reqId.startsWith('lib:')){ body += '<p class="site-card-sub">This requirement is complete.</p>'; }
     else {
       const renewing = eff==='expiring' || (eff==='complete' && reqId.startsWith('lib:'));
-      const bpId = studioBlueprintFor(reqId);
+      const reqObj = reqId.startsWith('lib:') ? null : findReq(reqId);
+      const lib = libraryCopyFor(reqObj);
+      if(lib) body += '<div class="card" style="background:var(--green-bg);border-color:transparent;margin-bottom:6px;"><div class="chat-card-title" style="color:var(--green);">'+ICONS.check+' You already have this</div>'
+        +'<div class="site-card-sub" style="color:var(--ink-soft);">Your company documents hold a current '+lib.type.name+(lib.doc.expiryDate?' (valid until '+lib.doc.expiryDate+')':'')+'. Submit that copy here — no need to upload it again.</div>'
+        +'<button class="btn primary small" style="margin-top:10px;" data-action="use-library" data-req="'+reqId+'">Submit my company copy</button></div>'
+        +'<div class="site-card-sub" style="text-align:center;margin:6px 0;">or upload a different file</div>';
+      else if(reqObj && reqObj.library) body += '<div class="site-card-sub" style="margin-bottom:8px;">Tip: keep this in <strong>Your Documents → Company documents</strong> and you can submit it to every site with one tap.</div>';
+      const bpId = lib ? null : studioBlueprintFor(reqId);
       if(bpId) body += '<div class="card" style="background:var(--sage-bg);border-color:var(--sage-soft);margin-bottom:6px;"><div class="chat-card-title">'+ICONS.sparkle+' Document Studio</div>'
         +'<div class="site-card-sub" style="color:var(--ink-soft);">Don\'t have this document yet? Create a professional, branded version in a few minutes and submit it straight from here.</div>'
         +'<button class="btn sage small" style="margin-top:10px;" data-action="studio-for-req" data-req="'+reqId+'" data-bp="'+bpId+'">Create it in Document Studio</button></div>'
@@ -266,8 +273,38 @@ on('attach-file', async (el)=>{
 });
 on('submit-req', async (el)=>{
   const reqId = el.dataset.req;
-  const ok = await act(()=>api.post(docUrl(reqId,'submit'), { note: val('submitNote'), expiryDate: val('expiryInput') }), reqId.startsWith('lib:')?'Saved to your library':'Submitted for review', el);
-  if(ok) closeSheet();
+  const ok = await act(()=>api.post(docUrl(reqId,'submit'), { note: val('submitNote'), expiryDate: val('expiryInput') }), reqId.startsWith('lib:')?'Saved to your company documents':'Submitted for review', el);
+  if(!ok) return;
+  closeSheet();
+  // A company document usually belongs on several sites: offer to send it to every site that needs it.
+  if(reqId.startsWith('lib:')) offerLibraryToSites(reqId.split(':')[2]);
+});
+function offerLibraryToSites(type){
+  const need = sitesNeedingLibrary(type);
+  if(!need.length) return;
+  const t = LIBRARY_TYPES.find(x=>x.id===type);
+  setTimeout(()=>openSheet(sheetHead('Send it to your sites?', t ? t.name : '')
+    +'<div class="site-card-sub">'+need.length+' site'+(need.length===1?' needs':'s need')+' this document. Submit your company copy to '+(need.length===1?'it':'all of them')+' now:</div>'
+    +'<div class="card" style="margin-top:10px;">'+need.map(n=>'<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+n.site.name+'</div><div class="reqrow-meta">'+badge(effectiveStatus(S.state.documents[n.req.id]))+'<span class="srctag">'+n.req.name+'</span></div></div></div>').join('')+'</div>'
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="library-send-all" data-type="'+type+'">Submit to '+(need.length===1?'this site':'all '+need.length+' sites')+'</button>'
+    +'<button class="btn secondary block" style="margin-top:8px;" data-action="close-sheet">Not now</button>'), 250);
+}
+async function submitLibraryCopy(reqId){
+  const a = await api.post(docUrl(reqId,'use-library'));
+  await api.post(docUrl(reqId,'submit'), { note: a.note, expiryDate: a.expiryDate });
+}
+on('use-library', async (el)=>{
+  if(await act(()=>submitLibraryCopy(el.dataset.req), 'Your company copy was submitted for review', el)) closeSheet();
+});
+on('library-send-all', async (el)=>{
+  if(el.disabled) return;
+  const need = sitesNeedingLibrary(el.dataset.type);
+  el.disabled = true; el.textContent = 'Submitting…';
+  let ok = 0; const failed = [];
+  for(const n of need){ try{ await submitLibraryCopy(n.req.id); ok++; }catch(e){ failed.push(n.site.name+': '+e.message); } }
+  await reload().catch(()=>{});
+  closeSheet();
+  showToast(ok+' site'+(ok===1?'':'s')+' updated'+(failed.length?' · '+failed.length+' couldn\'t be submitted — open them to see why':''));
 });
 on('approve-req', async (el)=>{ if(await act(()=>api.post(docUrl(el.dataset.req,'approve')), 'Approved', el)) closeSheet(); });
 on('correct-req', async (el)=>{
@@ -433,8 +470,13 @@ function renderPermitDetailSheet(siteId, permitId){
     +'<div class="divider"></div>';
   if(readOnly()) return body;
   if(eff==='pending' && canReview()){
-    body += '<label class="field-label" for="permitIssueFrom">Valid from</label><input type="datetime-local" id="permitIssueFrom">'
-      +'<label class="field-label" for="permitIssueTo">Valid to</label><input type="datetime-local" id="permitIssueTo">'
+    // Start from what was requested, or from now until the end of an 8-hour shift; the issuer adjusts if needed.
+    const local = (d)=>{ const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,16); };
+    const from = p.validFrom && new Date(p.validFrom) > new Date(Date.now() - 3600e3) ? new Date(p.validFrom) : new Date(Math.ceil(Date.now()/900e3)*900e3);
+    const to = p.validTo && new Date(p.validTo) > from ? new Date(p.validTo) : new Date(from.getTime() + 8*3600e3);
+    body += '<label class="field-label" for="permitIssueFrom">Valid from</label><input type="datetime-local" id="permitIssueFrom" value="'+local(from)+'">'
+      +'<label class="field-label" for="permitIssueTo">Valid to</label><input type="datetime-local" id="permitIssueTo" value="'+local(to)+'">'
+      +'<div class="site-card-sub" style="margin-top:4px;">Pre-filled '+(p.validTo ? 'with the requested times' : 'for one 8-hour shift')+' — change it if the work needs longer.</div>'
       +'<button class="btn primary block" style="margin-top:10px;" data-action="issue-permit" data-id="'+permitId+'">Issue this permit</button>'
       +'<button class="btn secondary block" style="margin-top:8px;" data-action="close-permit" data-id="'+permitId+'" data-refuse="1">Refuse request</button>';
   } else if(eff==='pending'){

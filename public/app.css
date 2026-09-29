@@ -591,3 +591,11 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .list-empty{padding:14px 4px; color:var(--grey); font-size:14px;}
 .group-head{display:flex; flex-direction:column; gap:1px; margin:16px 4px 8px; font-weight:700; font-size:14px; color:var(--ink);}
 .group-head .site-card-sub{font-weight:400;}
+.list-tools{display:flex; gap:10px; margin:0 0 12px; flex-wrap:wrap;}
+.list-tools label{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--grey); flex:1; min-width:140px;}
+.list-tools select{flex:1; min-width:0; padding:8px 10px; font-size:14px;}
+.avatar-sq{width:40px; height:40px; border-radius:12px; background:var(--sage-bg); color:var(--sage-strong); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex:none; margin-right:12px;}
+.kv{display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--grey-line); font-size:14px;}
+.kv:last-child{border-bottom:none;}
+.kv span{color:var(--grey);}
+.kv strong{text-align:right; font-weight:600; overflow-wrap:anywhere;}

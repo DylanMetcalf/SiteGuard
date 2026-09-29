@@ -319,6 +319,9 @@ export default async function siteRoutes(app: FastifyInstance) {
       })
       .parse(req.body);
     await withTx(async (db) => {
+      const linked = await one<{ linked_org_id: string | null }>(db, 'select linked_org_id from contractors where id = $1 and org_id = $2 for update', [id, ctx.org.id]);
+      if (!linked) throw notFound();
+      if (linked.linked_org_id) throw conflict('This contractor keeps its own company details up to date in SiteGuard, so they can\'t be changed here. Ask them to update their organisation settings.');
       const c = await one<{ name: string }>(
         db,
         `update contractors set name = coalesce($3, name), trade = coalesce($4, trade), contact_name = coalesce($5, contact_name),

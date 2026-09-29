@@ -80,7 +80,22 @@ export const LIBRARY_TYPES = [
   { id: 'insurance', category: 'Company Documents', name: 'Public liability insurance', source: 'client', why: 'Most sites require at least R5m cover; keep one current copy here.' },
   { id: 'she-policy', category: 'Company Documents', name: 'Health & Safety policy', source: 'legal', why: 'Required under the MHSA for every site you work on.' },
   { id: 'environmental-policy', category: 'Company Documents', name: 'Environmental policy', source: 'best_practice', why: 'Increasingly expected by sites working near environmentally sensitive areas.' },
+  { id: 'cipc', category: 'Company Documents', name: 'CIPC company registration', source: 'legal', why: 'Confirms the company is legally registered; sites and procurement ask for it.' },
+  { id: 'tax', category: 'Company Documents', name: 'Tax compliance status (SARS PIN)', source: 'client', why: 'Procurement departments need a valid tax compliance status before paying a contractor.' },
 ] as const;
+
+/** Which company document (if any) satisfies a site requirement, judged by its name. */
+const LIBRARY_MATCH: [string, RegExp][] = [
+  ['good-standing', /good\s*standing|\bcoid\b|compensation fund/i],
+  ['insurance', /liability\s+insurance|public\s+liability/i],
+  ['she-policy', /(health\s*(&|and)\s*safety|\bshe\b|\bohs\b|\bsheq?\b)\s+policy/i],
+  ['environmental-policy', /environmental\s+policy/i],
+  ['cipc', /\bcipc\b|company\s+registration/i],
+  ['tax', /tax\s+(compliance|clearance)|sars\s+pin/i],
+];
+export function libraryTypeFor(requirementName: string): string | null {
+  return LIBRARY_MATCH.find(([, re]) => re.test(requirementName))?.[0] ?? null;
+}
 
 export const INCIDENT_LABELS: Record<string, string> = {
   near_miss: 'Near miss',

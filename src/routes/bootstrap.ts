@@ -4,6 +4,7 @@
  * unchanged. Everything here is filtered server-side by tenant and role; the
  * client never receives data it isn't allowed to see.
  */
+import { libraryTypeFor } from '../lib/readiness.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
 import { features } from '../config.js';
@@ -81,7 +82,9 @@ export async function buildState(db: Db, ctx: OrgCtx) {
                  join sites s on s.id = r.site_id where s.contractor_id = c.id and rv.kind = 'correction')::int as corrections,
               (select count(*) from info_requests q join sites s on s.id = q.site_id where s.contractor_id = c.id and q.due_date is not null and q.status in ('submitted','completed'))::int as answered_with_due,
               (select count(*) from info_requests q join sites s on s.id = q.site_id where s.contractor_id = c.id and q.due_date is not null and q.status in ('submitted','completed') and q.responded_at::date <= q.due_date)::int as on_time
-              , lo.name as linked_org_name
+              , lo.name as linked_org_name, lo.reg_number as lo_reg, lo.coid_number as lo_coid, lo.trade as lo_trade, lo.address as lo_address,
+              (select u.name from memberships m join users u on u.id = m.user_id where m.org_id = lo.id and m.role = 'owner' order by m.created_at limit 1) as lo_contact,
+              (select u.email from memberships m join users u on u.id = m.user_id where m.org_id = lo.id and m.role = 'owner' order by m.created_at limit 1) as lo_email
          from contractors c left join organisations lo on lo.id = c.linked_org_id
         where c.org_id = $1 order by c.created_at`,
       [ctx.org.id],
@@ -90,9 +93,12 @@ export async function buildState(db: Db, ctx: OrgCtx) {
       const ftr = c.submissions >= 3 ? Math.max(0, Math.round(100 * (1 - c.corrections / c.submissions))) : 0;
       const onTime = c.answered_with_due ? Math.round((100 * c.on_time) / c.answered_with_due) : 0;
       const reliability = c.submissions >= 3 ? Math.round(onTime ? (ftr + onTime) / 2 : ftr) : 0;
+      // Once a contractor has its own account, its details come from its own profile (it keeps them up to date).
+      const own = <T,>(mine: T | null | undefined, theirs: T) => (c.linked_org_id && mine ? mine : theirs);
       state.contractors[c.id] = {
-        id: c.id, name: c.name, reg: c.reg_number, coid: c.coid_number, trade: c.trade, contact: c.contact_name,
-        contactEmail: c.contact_email, linked: !!c.linked_org_id, linkedOrgName: c.linked_org_name, reliability, onTimeRate: onTime, firstTimeRightRate: ftr,
+        id: c.id, name: c.name, reg: own(c.lo_reg, c.reg_number), coid: own(c.lo_coid, c.coid_number), trade: own(c.lo_trade, c.trade),
+        contact: own(c.lo_contact, c.contact_name), contactEmail: own(c.lo_email, c.contact_email), address: c.linked_org_id ? c.lo_address || '' : '',
+        linked: !!c.linked_org_id, linkedOrgName: c.linked_org_name, reliability, onTimeRate: onTime, firstTimeRightRate: ftr,
       };
     }
   } else {
@@ -137,7 +143,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
   if (activeIds.length) {
     // ---- requirements ----
     for (const r of await many(db, `select * from requirements where site_id = any($1::uuid[]) order by position, created_at`, [activeIds])) {
-      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, blueprint: blueprintForRequirement(r.name)?.id ?? null });
+      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name) });
     }
 
     // ---- documents (site requirements) ----
@@ -342,7 +348,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         reg: c.org.reg_number, coid: c.org.coid_number, vat: c.org.vat_number, address: c.org.address, trade: c.org.trade,
         role: c.role, roleLabel: roleLabel(c.org.kind, c.role), uiRole: uiRole(c),
         plan: plan.id, planName: plan.name, subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
-        currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo,
+        currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
         siteLimit: plan.siteLimit,
         branding: brandingOf(c),
       },

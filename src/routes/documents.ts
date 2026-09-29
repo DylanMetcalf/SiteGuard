@@ -8,7 +8,7 @@ import { actorRole, isUuid, loadSite, requireOrg, requireReviewer, requireWritab
 import { audit, clip } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { appUrl, queueToOrg } from '../lib/email.js';
-import { bumpVersion, effectiveStatus, LIBRARY_TYPES } from '../lib/readiness.js';
+import { bumpVersion, effectiveStatus, libraryTypeFor, LIBRARY_TYPES } from '../lib/readiness.js';
 import { sniffType, storage } from '../lib/storage.js';
 import { aiAllowed } from '../lib/plans.js';
 import { extractExpiryDate } from '../lib/ai.js';
@@ -170,6 +170,29 @@ export default async function documentRoutes(app: FastifyInstance) {
       await db.query('update documents set pending_file_id = $2 where id = $1', [doc.id, g.pdf_file_id]);
       await publishChange(db, [ctx.org.id]);
       return { fileId: g.pdf_file_id, note: `${g.doc_number} Rev ${g.revision}, prepared in SiteGuard Document Studio`, reviewDue: g.review_due };
+    });
+  });
+
+  /** Attaches the matching current company document (e.g. the COID letter) to a site requirement, ready to submit. */
+  app.post('/api/documents/:slot/use-library', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const s = await resolveSlot(pool, ctx, slotParam(req));
+    requireSubmitter(s);
+    if (s.kind !== 'site') throw badRequest('Only a site requirement can use a company document.');
+    const type = libraryTypeFor(s.name);
+    const t = LIBRARY_TYPES.find((x) => x.id === type);
+    if (!t) throw badRequest('None of your company documents matches this requirement. Upload the document instead.', 'no_match');
+    return withTx(async (db) => {
+      const lib = await one<{ status: string; expiry_date: string | null; current_file_id: string | null; version: string | null }>(
+        db, `select status, to_char(expiry_date, 'YYYY-MM-DD') as expiry_date, current_file_id, version from documents where library_org_id = $1 and library_type = $2`, [ctx.org.id, t.id]);
+      if (!lib?.current_file_id) throw badRequest(`Your ${t.name} isn't in your company documents yet. Add it there once, then use it for every site.`, 'no_library_copy');
+      if (effectiveStatus(lib) === 'expired') throw badRequest(`Your ${t.name} has expired. Upload the current one to your company documents first.`, 'library_expired');
+      const doc = await docFor(db, s);
+      if (doc.status === 'awaiting_review') throw conflict('This document is waiting on review. You can replace it if the reviewer asks for a correction.');
+      await db.query('update documents set pending_file_id = $2 where id = $1', [doc.id, lib.current_file_id]);
+      await publishChange(db, [ctx.org.id]);
+      return { fileId: lib.current_file_id, note: `Current ${t.name} from ${ctx.org.name}'s company documents${lib.version ? ` (${lib.version})` : ''}`, expiryDate: lib.expiry_date ?? '' };
     });
   });
 

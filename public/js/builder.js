@@ -4,7 +4,7 @@
 // Each document is created independently, so one failure never loses the rest.
 
 import { api } from './api.js';
-import { S, ICONS, escapeHtml, unescapeHtml, on, openSheet, sheetHead, showToast, render, reload, effectiveStatus, sheetEl } from './core.js';
+import { S, ICONS, escapeHtml, unescapeHtml, on, openSheet, sheetHead, showToast, render, reload, effectiveStatus, sheetEl, libraryCopyFor } from './core.js';
 import { loadCatalogPublic } from './studio.js';
 
 const NEEDS = ['missing', 'correction_required', 'expired'];
@@ -12,21 +12,24 @@ const NEEDS = ['missing', 'correction_required', 'expired'];
 /** Requirements on a site that Document Studio can write and that still need a document. */
 export function buildable(siteId){
   const reqs = (S.state.requirements[siteId] || []);
-  const out = [], manual = [];
+  const out = [], manual = [], fromLibrary = [];
   for(const r of reqs){
     const eff = effectiveStatus(S.state.documents[r.id]);
     if(!NEEDS.includes(eff)) continue;
-    if(r.blueprint) out.push({ req: r, eff }); else manual.push({ req: r, eff });
+    if(libraryCopyFor(r)) fromLibrary.push({ req: r, eff });
+    else if(r.blueprint) out.push({ req: r, eff });
+    else manual.push({ req: r, eff });
   }
-  return { out, manual };
+  return { out, manual, fromLibrary };
 }
 
 /** The card on the contractor's site screen. */
 export function builderCard(siteId){
-  const { out, manual } = buildable(siteId);
-  if(!out.length) return '';
+  const { out, manual, fromLibrary } = buildable(siteId);
+  if(!out.length && !fromLibrary.length) return '';
+  const total = out.length + manual.length + fromLibrary.length;
   return '<div class="card builder-card"><div class="chat-card-title">'+ICONS.sparkle+' Safety File Builder</div>'
-    +'<div class="site-card-title">SiteGuard can write '+out.length+' of the '+(out.length+manual.length)+' documents this site still needs</div>'
+    +'<div class="site-card-title">'+(out.length ? 'SiteGuard can write '+out.length+(fromLibrary.length ? ' and fill '+fromLibrary.length+' from your company documents —' : ' of the')+' '+total+' documents this site still needs' : fromLibrary.length+' of the '+total+' documents this site needs are already in your company documents')+'</div>'
     +'<div class="site-card-sub">Answer a few questions once and get a complete, branded document for each — then submit them all for review.</div>'
     +'<button class="btn primary" style="margin-top:12px;" data-action="builder-open" data-site="'+siteId+'">Build my safety file</button></div>';
 }
@@ -37,7 +40,7 @@ const GROUPS = [
 ];
 
 function fieldHtml(f, value){
-  const id = 'bf_'+f.id, v = escapeHtml(value || '');
+  const id = 'bf_'+(f.key||f.id), v = escapeHtml(value || '');
   const ph = f.placeholder ? ' placeholder="'+escapeHtml(f.placeholder)+'"' : '';
   const label = '<label class="field-label" for="'+id+'">'+escapeHtml(f.label.replace(/ \(optional\)$/i,''))+(f.required?'':' <span class="muted" style="font-weight:400;">(optional)</span>')+'</label>';
   if(f.type==='textarea' || f.type==='lines') return label+'<textarea id="'+id+'" rows="'+(f.type==='lines'?3:3)+'"'+ph+'>'+v+'</textarea>';
@@ -46,24 +49,48 @@ function fieldHtml(f, value){
 }
 
 function stepPick(b){
-  const { out, manual } = buildable(b.siteId);
+  const { out, manual, fromLibrary } = buildable(b.siteId);
   const site = S.state.sites[b.siteId];
   return sheetHead('Build my safety file', site.name)
     +'<div class="builder-steps"><span class="on">1 Documents</span><span>2 Questions</span><span>3 Create</span></div>'
     +'<div class="site-card-sub">Tick the documents to write. Each gets its own number, your logo and a sign-off block.</div>'
-    +'<div class="card" style="margin-top:10px;">'+out.map(({ req, eff })=>'<label class="toggle-row"><span><span class="qa-title" style="font-size:14px;">'+req.name+'</span><span class="site-card-sub" style="display:block;">'+(eff==='correction_required'?'Sent back for correction — write a fresh version':eff==='expired'?'Expired — write a current version':'Not submitted yet')+'</span></span><input type="checkbox" class="bld-pick" value="'+req.id+'" checked></label>').join('')+'</div>'
+    +(out.length ? '' : '<div class="notice" style="margin-top:10px;">Nothing here needs writing — just submit what you already have.</div>')
+    +(out.length ? '<div class="card" style="margin-top:10px;">'+out.map(({ req, eff })=>'<label class="toggle-row"><span><span class="qa-title" style="font-size:14px;">'+req.name+'</span><span class="site-card-sub" style="display:block;">'+(eff==='correction_required'?'Sent back for correction — write a fresh version':eff==='expired'?'Expired — write a current version':'Not submitted yet')+'</span></span><input type="checkbox" class="bld-pick" value="'+req.id+'" checked></label>').join('')+'</div>' : '')
+    +(fromLibrary.length ? '<div class="section-title">Already in your company documents</div><div class="card">'+fromLibrary.map(({ req })=>{ const l = libraryCopyFor(req); return '<label class="toggle-row"><span><span class="qa-title" style="font-size:14px;">'+req.name+'</span><span class="site-card-sub" style="display:block;">Your current copy'+(l.doc.expiryDate?', valid until '+l.doc.expiryDate:'')+' — submitted with the rest</span></span><input type="checkbox" class="bld-lib" value="'+req.id+'" checked></label>'; }).join('')+'</div>' : '')
     +(manual.length?'<details class="builder-manual"><summary>'+manual.length+' document'+(manual.length===1?'':'s')+' you\'ll still need to upload</summary><div class="site-card-sub">These are certificates and records from third parties (for example your COID letter or insurance), so they can\'t be written for you:</div><ul>'+manual.map(m=>'<li>'+m.req.name+'</li>').join('')+'</ul></details>':'')
-    +'<button class="btn primary block" style="margin-top:14px;" data-action="builder-next">Next: a few questions</button>';
+    +'<button class="btn primary block" style="margin-top:14px;" data-action="builder-next">'+(out.length ? 'Next: a few questions' : 'Submit them now')+'</button>';
+}
+
+/** A pick-list answer the requirement's own name already gives, e.g. "Harness and lanyard inspection register" → "Harness and lanyards". */
+function presetFor(f, reqName){
+  if(f.id!=='equipment' || f.type!=='select' || !f.options) return null;
+  const name = reqName.toLowerCase();
+  const hits = f.options.filter(o=>name.includes(o.toLowerCase().split(/\s+/)[0]));
+  return hits.length===1 ? hits[0] : null;
 }
 
 function stepQuestions(b){
+  // Questions shared by several documents are asked once. Two cases are kept apart:
+  // a pick-list the requirement's own name already answers (e.g. "Scaffolding inspection
+  // register" → Scaffolding) is filled in per document, and a question whose name clashes
+  // with a different kind of question in another document is asked separately.
   const byId = new Map();
+  const sig = (f)=>f.type+'|'+(f.options||[]).join('|');
+  b.keyMap = {};
   for(const it of b.items){
     const bp = b.catalog.blueprints.find(x=>x.id===it.blueprint);
+    it.presets = {};
     for(const f of bp.fields){
       if(f.id==='site') continue;
-      const cur = byId.get(f.id);
-      byId.set(f.id, cur ? { ...cur, required: cur.required || f.required } : { ...f });
+      const preset = presetFor(f, unescapeHtml(it.name));
+      if(preset){ it.presets[f.id] = preset; continue; }
+      let key = f.id;
+      const cur = byId.get(key);
+      if(cur && cur.sig!==sig(f)){ key = bp.id+'__'+f.id; }
+      b.keyMap[bp.id+':'+f.id] = key;
+      const existing = byId.get(key);
+      byId.set(key, existing ? { ...existing, required: existing.required || f.required }
+        : { ...f, key, sig: sig(f), label: key===f.id ? f.label : f.label+' — '+bp.name });
     }
   }
   const all = [...byId.values()];
@@ -74,7 +101,7 @@ function stepQuestions(b){
   return sheetHead('Build my safety file', S.state.sites[b.siteId].name)
     +'<div class="builder-steps"><span class="done">1 Documents</span><span class="on">2 Questions</span><span>3 Create</span></div>'
     +'<div class="site-card-sub">Answered once, used in all '+b.items.length+' documents. The site\'s name and client are filled in for you, and its emergency details when the site has added them.</div>'
-    + grouped.filter(([, fs])=>fs.length).map(([title, fs])=>'<div class="section-title">'+title+'</div>'+fs.map(f=>fieldHtml(f, b.values[f.id])).join('')).join('')
+    + grouped.filter(([, fs])=>fs.length).map(([title, fs])=>'<div class="section-title">'+title+'</div>'+fs.map(f=>fieldHtml(f, b.values[f.key])).join('')).join('')
     +(S.boot.features.ai?'<label class="toggle-row" style="border:none;margin-top:10px;"><span>Research the site\'s published requirements<br><span class="site-card-sub">Uses web search for each document; slower</span></span><input type="checkbox" id="bf_research"></label>':'')
     +'<div class="row-actions" style="margin-top:14px;"><button class="btn secondary" data-action="builder-back">Back</button><button class="btn primary" style="flex:1;" data-action="builder-go">Create '+b.items.length+' document'+(b.items.length===1?'':'s')+'</button></div>';
 }
@@ -127,19 +154,21 @@ on('builder-open', async (el)=>{
 on('builder-next', ()=>{
   const b = S.builder;
   const ids = [...document.querySelectorAll('.bld-pick:checked')].map(x=>x.value);
-  if(!ids.length){ showToast('Tick at least one document'); return; }
+  b.library = [...document.querySelectorAll('.bld-lib:checked')].map(x=>x.value);
+  if(!ids.length && !b.library.length){ showToast('Tick at least one document'); return; }
   const reqs = S.state.requirements[b.siteId];
+  if(!ids.length){ submitLibrary(b).then((n)=>{ showToast(n+' submitted from your company documents'); S.builder = null; import('./core.js').then(m=>m.closeSheet()); }); return; }
   b.items = ids.map(id=>{ const r = reqs.find(x=>x.id===id); return { reqId:id, name:r.name, blueprint:r.blueprint, state:'waiting' }; });
   b.step = 2; show();
 });
 function readValues(b){
-  for(const f of b.fields){ const el = document.getElementById('bf_'+f.id); if(el) b.values[f.id] = el.value.trim(); }
+  for(const f of b.fields){ const el = document.getElementById('bf_'+f.key); if(el) b.values[f.key] = el.value.trim(); }
 }
 on('builder-back', ()=>{ const b = S.builder; readValues(b); b.step = 1; show(); });
 on('builder-go', ()=>{
   const b = S.builder; readValues(b);
-  const missing = b.fields.find(f=>f.required && !b.values[f.id]);
-  if(missing){ showToast(missing.label.replace(/ \(optional\)$/i,'')+' is needed for at least one document'); const el = document.getElementById('bf_'+missing.id); if(el) el.focus(); return; }
+  const missing = b.fields.find(f=>f.required && !b.values[f.key]);
+  if(missing){ showToast(missing.label.replace(/ \(optional\)$/i,'')+' is needed for at least one document'); const el = document.getElementById('bf_'+missing.key); if(el) el.focus(); return; }
   if(!b.values.contractorSignatory && b.values.ceo) b.values.contractorSignatory = b.values.ceo;
   b.research = !!(document.getElementById('bf_research') || {}).checked;
   b.step = 3; run();
@@ -155,7 +184,10 @@ async function run(){
     it.state = 'writing'; show();
     const bp = b.catalog.blueprints.find(x=>x.id===it.blueprint);
     const values = {};
-    for(const f of bp.fields) if(b.values[f.id]) values[f.id] = b.values[f.id];
+    for(const f of bp.fields){
+      const v = (it.presets||{})[f.id] || b.values[(b.keyMap||{})[bp.id+':'+f.id] || f.id];
+      if(v) values[f.id] = v;
+    }
     const body = { blueprintId: it.blueprint, siteId: b.siteId, requirementId: it.reqId, values, research: b.research };
     try{
       try{ it.result = await api.post('/api/studio/documents', body); }
@@ -174,10 +206,24 @@ async function run(){
   showToast(done+' document'+(done===1?'':'s')+' ready to read and submit');
 }
 
+/** Submits the ticked company documents (once); returns how many went through. */
+async function submitLibrary(b){
+  let n = 0;
+  for(const reqId of (b.library||[])){
+    try{
+      const a = await api.post('/api/documents/'+encodeURIComponent(reqId)+'/use-library');
+      await api.post('/api/documents/'+encodeURIComponent(reqId)+'/submit', { note: a.note, expiryDate: a.expiryDate });
+      n++;
+    }catch{ /* shown as still missing on the site */ }
+  }
+  b.library = [];
+  await reload().catch(()=>{});
+  return n;
+}
 on('builder-submit', async (el)=>{
   const b = S.builder; if(!b || el.disabled) return;
   el.disabled = true; el.textContent = 'Submitting…';
-  let ok = 0, fail = 0;
+  let ok = await submitLibrary(b), fail = 0;
   for(const it of b.items){
     if(it.state!=='done' || it.submitted) continue;
     try{
