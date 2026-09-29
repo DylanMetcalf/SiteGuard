@@ -14,8 +14,8 @@ import { reviseWithContent } from '../lib/studio/generate.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
 
-async function allSectionsApproved(db: Parameters<typeof reviewPayload>[0], doc: GenRow, viewer: Parameters<typeof reviewPayload>[2]) {
-  const p = await reviewPayload(db, doc, viewer);
+async function allSectionsApproved(db: Parameters<typeof reviewPayload>[0], doc: GenRow, viewer: Parameters<typeof reviewPayload>[2], hostOrgId?: string) {
+  const p = await reviewPayload(db, doc, viewer, viewer.role === 'host' && hostOrgId ? { forHostOrgId: hostOrgId } : {});
   return p.summary.total > 0 && p.summary.approved === p.summary.total;
 }
 
@@ -85,8 +85,9 @@ export default async function reviewRoutes(app: FastifyInstance) {
 
   app.get('/api/review/:id', async (req) => {
     const ctx = requireOrg(req.ctx);
-    const { doc, viewer } = await resolveForUser(pool, ctx, (req.params as { id: string }).id);
-    const payload = await reviewPayload(pool, doc, viewer, viewer.role === 'host' ? { forHostOrgId: ctx.org.id } : {});
+    const reqId = (req.query as { req?: string }).req;
+    const { doc, viewer } = await resolveForUser(pool, ctx, (req.params as { id: string }).id, reqId);
+    const payload = await reviewPayload(pool, doc, viewer, viewer.role === 'host' ? { forHostOrgId: ctx.org.id, requirementId: reqId } : {});
     const links = viewer.role === 'owner'
       ? await many(pool, `select id, label, created_by_name as "createdBy", created_at as "createdAt", expires_at as "expiresAt", revoked_at as "revokedAt", last_used_at as "lastUsedAt"
                             from review_links where org_id = $1 and doc_number = $2 order by created_at desc`, [doc.org_id, doc.doc_number])
@@ -110,7 +111,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
           kind: 'review', title: `Changes requested: “${s.heading}”`,
           body: `${doc.title} (${doc.doc_number}) — ${ctx.org.name}${b.note ? `: ${b.note}` : ''}`, link: { kind: 'review', id: doc.id },
         });
-      } else if (await allSectionsApproved(db, doc, viewer)) {
+      } else if (await allSectionsApproved(db, doc, viewer, ctx.org.id)) {
         await notifyOrg(db, doc.org_id, null, {
           kind: 'review', title: `All sections approved: ${doc.title}`,
           body: `${doc.doc_number} Rev ${doc.revision} — ${ctx.org.name}`, link: { kind: 'review', id: doc.id },

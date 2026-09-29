@@ -197,4 +197,4 @@ function finishTutorial(){
   }
 })();
 
-on('open-review', (el)=>openReview(el.dataset.id));
+on('open-review', (el)=>openReview(el.dataset.id, el.dataset.req));

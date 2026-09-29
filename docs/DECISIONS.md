@@ -5,6 +5,18 @@ Newest first.
 
 ---
 
+**DECISION** Site Ready is withdrawn automatically when a file stops qualifying, rather than shown as "approved" until someone notices.
+**REASON** An independent audit found that an expired COID letter or a reported fatality left the public verification page saying "Site Ready". A live status protects the mine, the contractor and whoever checks the verification code.
+**DATE** 2026-09-29
+
+**DECISION** A mine's review counts only its own reviewers' section decisions.
+**REASON** The author can send review links to anyone, and several mines may review the same document; only the mine's own people can approve on its behalf.
+**DATE** 2026-09-29
+
+**DECISION** Removing a contractor from a shared site hides its file from the contractor but keeps it, with a reason the contractor sees; the mine can restore it.
+**REASON** Site codes get forwarded. The mine needs a way to remove someone without deleting the record of what they submitted.
+**DATE** 2026-09-29
+
 **DECISION** A site that many contractors join is a new `workplaces` record; each contractor's file for it stays an ordinary `sites` row.
 **REASON** Mines run one site with many contractors, each with its own safety file. Keeping the per-contractor file as the existing site record means review, the builder, exports, permits, readiness and every permission check keep working unchanged, and the change is purely additive (no existing data moves). Single emailed invitations still work.
 **DATE** 2026-09-29

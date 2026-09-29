@@ -1,3 +1,4 @@
+import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { many, one, pool, withTx, type Db } from '../db/pool.js';
@@ -133,7 +134,7 @@ export default async function siteRoutes(app: FastifyInstance) {
       await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
       const limit = planOf(ctx.org).siteLimit;
       if (limitsEnforced() && limit !== null) {
-        const n = Number((await one<{ n: number }>(db, `select count(*) as n from sites where org_id = $1 and status <> 'declined'`, [ctx.org.id]))!.n);
+        const n = Number((await one<{ n: number }>(db, `select (select count(*) from sites where org_id = $1 and status <> 'declined' and workplace_id is null) + (select count(*) from workplaces where org_id = $1) as n`, [ctx.org.id]))!.n);
         if (n >= limit) throw new HttpError(402, 'site_limit', `Your plan includes ${limit} active sites. Upgrade under Billing to add more.`);
       }
       const contractor = await resolveContractor(db, ctx, body.contractorId || undefined, body.newContractor);
@@ -246,6 +247,7 @@ export default async function siteRoutes(app: FastifyInstance) {
         [site.id, body.category, body.name, body.source, body.why],
       ))!;
       await audit(db, ctx, 'Added requirement', body.name, site.id);
+      await recheckSiteReady(db, site.id, `new requirement: ${body.name}`);
       await publishChange(db, parties);
       return { id: r.id };
     });
@@ -301,6 +303,7 @@ export default async function siteRoutes(app: FastifyInstance) {
       }
       const names = TEMPLATE_PACKS.filter((p) => packIds.includes(p.id)).map((p) => p.name).join(', ');
       await audit(db, ctx, 'Applied requirement pack', `${names} — ${items.length} requirement${items.length === 1 ? '' : 's'} added`, site.id);
+      await recheckSiteReady(db, site.id, `requirements added: ${names}`);
       await publishChange(db, parties);
       return { added: items.length };
     });

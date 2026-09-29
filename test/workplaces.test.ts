@@ -68,6 +68,8 @@ describe('sites contractors join with a site code', () => {
     const n = await mine.post(`/api/workplaces/${wid}/code`);
     assert.equal(n.status, 200);
     assert.equal((await late.post('/api/sites/join', { code })).status, 404, 'old code stops working');
+    assert.equal((await late.post('/api/sites/join', { code: n.body.code })).status, 403, 'a new code does not reopen a closed site');
+    assert.equal((await mine.patch(`/api/workplaces/${wid}`, { joinOpen: true })).status, 200);
     assert.equal((await late.post('/api/sites/join', { code: n.body.code })).status, 200);
   });
 });

@@ -88,6 +88,7 @@ refuse.
 | Create a site join code | ✓ | | | | |
 | Create a site contractors join with a site code; change its requirements, code or open/closed state | ✓ | | | | |
 | Join a site with its site code (creates the contractor's own file for the site) | | | | ✓ | |
+| Remove a contractor from a shared site, or restore it (with a reason the contractor sees) | ✓ | | | | |
 | Add its own extra documents to its file for a site | | | | ✓ | ✓ |
 | Join a site with a code | | | | ✓ | ✓ |
 | Download the bound safety file of a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -103,6 +104,18 @@ More rules the server enforces:
 - A site can be marked Site Ready only when every requirement is complete (none expiring) and there
   is no open lost-time injury or fatality. Closing an incident requires a root cause and corrective
   actions.
+- Site Ready is live (`lib/siteready.ts`): when a Site Ready file stops qualifying (a document
+  sent back, withdrawn or expired, a requirement added, an open lost-time injury or fatality) the
+  site returns to *in progress*, with a system audit entry and both sides notified; the background
+  job re-checks every Site Ready site with the compliance agent. The public verification page and
+  exports follow the status.
+- Approving a document can carry the version the reviewer read; a newer version returns 409.
+  Documents that lapse (COID letter, insurance, tax status, medicals, licences, load tests) and
+  worker certificates of fitness can't be submitted without an expiry date.
+- In the review workspace a mine counts only its own reviewers' section decisions and sees only
+  its own and the author's comments; opened from a requirement, it acts on that requirement.
+- Practice-space (demo) organisations and real ones can never join each other's sites.
+- A mine issuing a permit directly must set its end time.
 - A draft attachment (uploaded but not yet submitted) is visible only to the uploading company.
   Submitted versions stay visible to the host even if later withdrawn, because the history is part
   of the record.

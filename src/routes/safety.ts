@@ -1,3 +1,4 @@
+import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { one, withTx, type Db } from '../db/pool.js';
@@ -52,6 +53,7 @@ export default async function safetyRoutes(app: FastifyInstance) {
       ))!;
       const label = INCIDENT_LABELS[body.type];
       await audit(db, ctx, 'Reported incident', `${label} — ${clip(body.description)}`, site.id);
+      if (body.type === 'lost_time' || body.type === 'fatality') await recheckSiteReady(db, site.id, `${label} reported`);
       if (SEVERE_EMAIL.has(body.type)) {
         const lines = [
           `${ctx.user.name} (${ctx.org.name}) reported a ${label.toLowerCase()} on ${site.name}.`,
@@ -115,6 +117,7 @@ export default async function safetyRoutes(app: FastifyInstance) {
       const { site, side, parties } = await loadSite(db, ctx, id);
       // Contractors request; site reviewers issue directly.
       const issuing = side === 'host';
+      if (issuing && !body.validTo) throw badRequest('Set when the permit expires ("valid to") before issuing it.', 'valid_to_required');
       if (issuing) requireReviewer(ctx);
       const p = (await one<{ id: string }>(
         db,

@@ -1,3 +1,4 @@
+import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -17,6 +18,9 @@ import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 import { buildDocumentPack, statusLabel, type BundleItem } from '../lib/bundle.js';
 import { canReadFile } from './files.js';
 import { contentDisposition } from '../lib/storage.js';
+
+/** Documents that always have a valid-until date (COID letter, insurance, tax status, medicals, licences, load tests). */
+export const MUST_EXPIRE = /good\s*standing|\bcoid\b|insurance|tax\s+(compliance|clearance)|sars\s+pin|medical|fitness|licen[cs]e|load\s+test/i;
 
 export interface Slot {
   kind: 'site' | 'library';
@@ -190,6 +194,9 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (effectiveStatus(lib) === 'expired') throw badRequest(`Your ${t.name} has expired. Upload the current one to your company documents first.`, 'library_expired');
       const doc = await docFor(db, s);
       if (doc.status === 'awaiting_review') throw conflict('This document is waiting on review. You can replace it if the reviewer asks for a correction.');
+      if (doc.status === 'correction_required' && doc.current_file_id === lib.current_file_id) {
+        throw conflict(`The site sent this exact copy back. Put a corrected or newer ${t.name} in your company documents first, or upload one here.`);
+      }
       await db.query('update documents set pending_file_id = $2 where id = $1', [doc.id, lib.current_file_id]);
       await publishChange(db, [ctx.org.id]);
       return { fileId: lib.current_file_id, note: `Current ${t.name} from ${ctx.org.name}'s company documents${lib.version ? ` (${lib.version})` : ''}`, expiryDate: lib.expiry_date ?? '' };
@@ -219,6 +226,8 @@ export default async function documentRoutes(app: FastifyInstance) {
       // A common slip is typing last year; an already-expired document can never count.
       if (expiry && expiry < new Date().toISOString().slice(0, 10)) throw badRequest('That expiry date has already passed — check the date (especially the year) and try again.', 'expired_date');
       if (expiry && expiry > `${new Date().getFullYear() + 25}-12-31`) throw badRequest('That expiry date is too far in the future — check the year.', 'bad_date');
+      // Documents that lapse must carry their date, or nobody gets warned before they do.
+      if (!expiry && MUST_EXPIRE.test(s.name)) throw badRequest(`Add the expiry (valid-until) date printed on the ${s.name} — without it SiteGuard can't warn anyone before it lapses.`, 'expiry_required');
       await db.query(
         `insert into document_versions (document_id, version, file_id, note, expiry_date, ai_drafted, submitted_by, submitted_by_name)
          values ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -257,6 +266,8 @@ export default async function documentRoutes(app: FastifyInstance) {
     requireReviewer(ctx);
     requireWritable(ctx);
     const slot = slotParam(req);
+    // The version the reviewer actually read; if the contractor has since swapped the file, approving is refused.
+    const { version } = z.object({ version: z.string().max(20).optional() }).parse(req.body ?? {});
     return withTx(async (db) => {
       const s = await resolveSlot(db, ctx, slot);
       if (s.side !== 'host') throw forbidden();
@@ -264,6 +275,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (!['awaiting_review', 'correction_required'].includes(doc.status) || !doc.current_file_id) {
         throw conflict('There is no submitted version to approve.');
       }
+      if (version && version !== doc.version) throw conflict(`The contractor submitted a newer version (${doc.version}) while you were reading ${version}. Open it again and check the new version before approving.`);
       await db.query(`update documents set status = 'complete', updated_at = now() where id = $1`, [doc.id]);
       await audit(db, ctx, 'Approved document', `${s.name} (${doc.version})`, s.siteId);
       if (s.contractorOrgId) await notifyOrg(db, s.contractorOrgId, null, { kind: 'approved', title: `Approved: ${s.name}`, body: `${s.siteName} · approved by ${ctx.user.name}, ${ctx.org.name}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
@@ -288,6 +300,7 @@ export default async function documentRoutes(app: FastifyInstance) {
         [doc.id, ctx.user.id, ctx.user.name, actorRole(ctx), text],
       );
       await audit(db, ctx, 'Requested correction', `${s.name} — "${clip(text)}"`, s.siteId);
+      if (s.siteId) await recheckSiteReady(db, s.siteId, `${s.name} sent back`);
       if (s.contractorOrgId) {
         // A document written in SiteGuard opens straight in the review workspace, where the notes and highlights are.
         const studio = doc.current_file_id
@@ -343,6 +356,7 @@ export default async function documentRoutes(app: FastifyInstance) {
         [doc.id],
       );
       await audit(db, ctx, 'Withdrew document', s.name, s.siteId);
+      if (s.siteId) await recheckSiteReady(db, s.siteId, `${s.name} withdrawn`);
       await publishChange(db, s.parties);
       return { ok: true };
     });

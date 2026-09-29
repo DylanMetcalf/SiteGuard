@@ -8,7 +8,8 @@ import path from 'node:path';
 import { deliverPendingEmail } from '../lib/email.js';
 import { cleanupExpired, runReminders } from './reminders.js';
 import { purgeOldDemos } from '../routes/demo.js';
-import { pool } from '../db/pool.js';
+import { pool, withTx } from '../db/pool.js';
+import { recheckAllSiteReady } from '../lib/siteready.js';
 import { runAgent, sendWeeklySummaries } from '../lib/agent.js';
 
 export function startJobs(log: (msg: string) => void = console.log): () => void {
@@ -49,6 +50,8 @@ export function startJobs(log: (msg: string) => void = console.log): () => void 
     reviewing = true;
     try {
       await runAgent();
+      // Documents expire overnight: withdraw Site Ready where a file no longer qualifies.
+      await withTx((db) => recheckAllSiteReady(db));
     } catch (err) {
       log(`compliance agent error: ${(err as Error).message}`);
     } finally {

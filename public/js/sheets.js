@@ -195,7 +195,7 @@ function renderReqSheet(reqId){
   if(doc.studioDocId){
     body += '<div class="card" style="margin-top:10px;background:var(--brand-bg);border-color:transparent;"><div class="chat-card-title" style="color:var(--brand);">'+ICONS.passport+' Document Studio document</div>'
       +'<div class="site-card-sub" style="color:var(--ink-soft);">'+(canReview() && (eff==='awaiting_review'||eff==='correction_required') ? 'Review it section by section: approve each part, highlight text and leave comments.' : isContractor() ? 'Read the feedback section by section, edit it in the app and resubmit.' : 'Read it section by section, with all comments.')+'</div>'
-      +'<button class="btn primary small" style="margin-top:10px;" data-action="open-review" data-id="'+doc.studioDocId+'">'+(canReview() && eff==='awaiting_review' ? 'Review section by section' : 'Open in review workspace')+'</button></div>';
+      +'<button class="btn primary small" style="margin-top:10px;" data-action="open-review" data-id="'+doc.studioDocId+'" data-req="'+reqId+'">'+(canReview() && eff==='awaiting_review' ? 'Review section by section' : 'Open in review workspace')+'</button></div>';
   }
   if(doc.history && doc.history.length){
     body += '<details style="margin-top:8px;"><summary style="font-size:12.5px;color:var(--grey);cursor:pointer;">Version history ('+doc.history.length+' earlier)</summary>'
@@ -236,7 +236,7 @@ function renderReqSheet(reqId){
     }
   } else if(canReview() && !ro){
     if((eff==='awaiting_review' || eff==='correction_required') && doc.assetUrl){
-      body += '<button class="btn primary block" data-action="approve-req" data-req="'+reqId+'" style="margin-bottom:8px;">Approve</button>'
+      body += '<button class="btn primary block" data-action="approve-req" data-req="'+reqId+'" data-version="'+(doc.version||'')+'" style="margin-bottom:8px;">Approve '+(doc.version||'')+'</button>'
         +'<label class="field-label" for="correctionNote">Request correction</label><textarea id="correctionNote" placeholder="What needs to change?"></textarea>'
         +'<button class="btn secondary block" style="margin-top:8px;" data-action="correct-req" data-req="'+reqId+'">Request correction</button>';
     } else if(eff==='missing') body += '<p class="site-card-sub">Not yet submitted by the contractor.</p>';
@@ -306,7 +306,7 @@ on('library-send-all', async (el)=>{
   closeSheet();
   showToast(ok+' site'+(ok===1?'':'s')+' updated'+(failed.length?' · '+failed.length+' couldn\'t be submitted — open them to see why':''));
 });
-on('approve-req', async (el)=>{ if(await act(()=>api.post(docUrl(el.dataset.req,'approve')), 'Approved', el)) closeSheet(); });
+on('approve-req', async (el)=>{ if(await act(()=>api.post(docUrl(el.dataset.req,'approve'), el.dataset.version ? { version: unescapeHtml(el.dataset.version) } : {}), 'Approved', el)) closeSheet(); });
 on('correct-req', async (el)=>{
   const text = val('correctionNote');
   if(!text){ document.getElementById('correctionNote').focus(); return; }
@@ -437,16 +437,29 @@ on('save-investigation', async (el)=>{
 });
 
 /* ============ PERMITS ============ */
+const localInput = (d)=>{ const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,16); };
+const shiftStart = ()=>localInput(Math.ceil(Date.now()/900e3)*900e3);
+const shiftEnd = ()=>localInput(Math.ceil(Date.now()/900e3)*900e3 + 8*3600e3);
+/** Before a permit is issued: is this contractor's file actually in order? */
+function readinessWarning(siteId){
+  const site = S.state.sites[siteId];
+  if(!site || site.status==='site_ready') return '';
+  const r = computeReadiness(siteId);
+  const out = (r.counts.missing||0)+(r.counts.expired||0)+(r.counts.correction_required||0);
+  return '<div class="notice" style="background:var(--amber-bg);color:var(--amber);margin-bottom:8px;"><strong>Not Site Ready.</strong> '+(out ? out+' document'+(out===1?' is':'s are')+' outstanding or expired' : 'The safety file is still being reviewed')+'. Check that the crew doing this work is covered before issuing.</div>';
+}
 function renderNewPermitSheet(siteId){
   const requesting = isContractor();
   return sheetHead(requesting?'Request a permit':'Issue a permit', S.state.sites[siteId].name)
+    + (!requesting ? readinessWarning(siteId) : '')
     +'<label class="field-label" for="permitType">Permit type</label><select id="permitType" class="field">'+PERMIT_TYPES.map(t=>'<option value="'+t.id+'">'+t.label+'</option>').join('')+'</select>'
     +'<label class="field-label" for="permitLocation">Location / work area</label><input type="text" id="permitLocation" placeholder="e.g. Conveyor drive station, level 2">'
     +'<label class="field-label" for="permitDescription">Description of work</label><textarea id="permitDescription" placeholder="What work is being done, and by whom"></textarea>'
     +'<label class="field-label" for="permitPrecautions">Precautions / controls in place</label><textarea id="permitPrecautions" placeholder="Isolation confirmed, fire watch posted, gas tested, etc."></textarea>'
     +'<label class="field-label" for="permitIssuedTo">Issued to (person/crew)</label><input type="text" id="permitIssuedTo" placeholder="e.g. Crew supervisor name">'
-    +'<label class="field-label" for="permitFrom">Valid from</label><input type="datetime-local" id="permitFrom">'
-    +'<label class="field-label" for="permitTo">Valid to</label><input type="datetime-local" id="permitTo">'
+    +'<label class="field-label" for="permitFrom">Valid from</label><input type="datetime-local" id="permitFrom" value="'+(requesting?'':shiftStart())+'">'
+    +'<label class="field-label" for="permitTo">Valid to</label><input type="datetime-local" id="permitTo" value="'+(requesting?'':shiftEnd())+'">'
+    +(requesting?'<div class="site-card-sub" style="margin-top:4px;">Optional — the site sets the final times when it issues the permit.</div>':'<div class="site-card-sub" style="margin-top:4px;">Pre-filled for one 8-hour shift.</div>')
     +'<button class="btn primary block" style="margin-top:12px;" data-action="save-permit" data-site="'+siteId+'">'+(requesting?'Submit request':'Issue permit')+'</button>';
 }
 const localToIso = (v) => v ? new Date(v).toISOString() : '';
@@ -470,6 +483,7 @@ function renderPermitDetailSheet(siteId, permitId){
     +'<div class="divider"></div>';
   if(readOnly()) return body;
   if(eff==='pending' && canReview()){
+    body += readinessWarning(siteId);
     // Start from what was requested, or from now until the end of an 8-hour shift; the issuer adjusts if needed.
     const local = (d)=>{ const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,16); };
     const from = p.validFrom && new Date(p.validFrom) > new Date(Date.now() - 3600e3) ? new Date(p.validFrom) : new Date(Math.ceil(Date.now()/900e3)*900e3);

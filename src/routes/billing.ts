@@ -40,7 +40,7 @@ async function ensureCustomer(ctx: OrgCtx): Promise<string> {
 }
 
 async function activeSites(orgId: string): Promise<number> {
-  return Number((await one<{ n: number }>(pool, `select count(*) as n from sites where org_id = $1 and status <> 'declined'`, [orgId]))!.n);
+  return Number((await one<{ n: number }>(pool, `select (select count(*) from sites where org_id = $1 and status <> 'declined' and workplace_id is null) + (select count(*) from workplaces where org_id = $1) as n`, [orgId]))!.n);
 }
 
 const STATUS_MAP: Record<string, string> = {

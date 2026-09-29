@@ -7,12 +7,13 @@
  * requirements copied in, so review, the builder, exports and permits all work
  * per contractor exactly as before.
  */
+import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { many, one, withTx, type Db } from '../db/pool.js';
 import { canAdminOrg, isUuid, limitsEnforced, requireHostAdmin, requireOrg, requireWritable, type OrgCtx } from '../lib/authz.js';
-import { conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
+import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { planOf } from '../lib/plans.js';
@@ -68,7 +69,7 @@ async function addToFiles(db: Db, workplaceId: string, items: Item[]): Promise<n
       if (have.has(r.name.toLowerCase())) continue;
       await db.query(`insert into requirements (site_id, category, name, source, why, position) values ($1, $2, $3, $4, $5, $6)`, [f.id, r.category, r.name, r.source, r.why, pos + i++]);
     }
-    if (i) touched++;
+    if (i) { touched++; await recheckSiteReady(db, f.id, 'new site requirement'); }
   }
   return touched;
 }
@@ -175,14 +176,59 @@ export default async function workplaceRoutes(app: FastifyInstance) {
     const ctx = requireOrg(req.ctx);
     requireHostAdmin(ctx);
     requireWritable(ctx);
-    const { name } = z.object({ name: text(200).min(1) }).parse(req.body);
+    const { name, fromFiles } = z.object({ name: text(200).min(1), fromFiles: z.boolean().default(false) }).parse(req.body);
     return withTx(async (db) => {
       const w = await loadWorkplace(db, ctx, (req.params as { id: string }).id, true);
       const left = w.requirements.filter((r) => r.name.toLowerCase() !== name.toLowerCase());
       if (left.length === w.requirements.length) throw notFound();
       await db.query('update workplaces set requirements = $2 where id = $1', [w.id, JSON.stringify(left)]);
-      await audit(db, ctx, 'Removed site requirement', `${w.name}: ${name}`);
-      await publishChange(db, [ctx.org.id]);
+      // Optionally also from contractors' files where nothing was ever submitted for it (history is never deleted).
+      let removedFrom = 0;
+      if (fromFiles) {
+        const r = await db.query(
+          `delete from requirements r using sites s
+            where r.site_id = s.id and s.workplace_id = $1 and lower(r.name) = lower($2)
+              and not exists (select 1 from documents d join document_versions v on v.document_id = d.id where d.requirement_id = r.id)`,
+          [w.id, name],
+        );
+        removedFrom = r.rowCount ?? 0;
+      }
+      await audit(db, ctx, 'Removed site requirement', `${w.name}: ${name}${fromFiles ? ` (also from ${removedFrom} contractor file${removedFrom === 1 ? '' : 's'} with nothing submitted)` : ''}`);
+      const files = await filesOf(db, w.id);
+      await publishChange(db, [ctx.org.id, ...files.map((f) => f.linked_org_id).filter((x): x is string => !!x)]);
+      return { ok: true, removedFrom };
+    });
+  });
+
+  /** Mine: remove a contractor from a shared site (its file is kept but hidden from the contractor), or restore it. */
+  app.post('/api/workplaces/files/:siteId/:action', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireHostAdmin(ctx);
+    requireWritable(ctx);
+    const { siteId, action } = req.params as { siteId: string; action: string };
+    if (action !== 'remove' && action !== 'restore') throw notFound();
+    const { reason } = z.object({ reason: text(300).default('') }).parse(req.body ?? {});
+    if (action === 'remove' && reason.length < 3) throw badRequest('Say why the contractor is being removed — they will see this.');
+    return withTx(async (db) => {
+      const f = await one<{ id: string; name: string; status: string; workplace_id: string | null; linked_org_id: string | null; contractor_name: string }>(
+        db,
+        `select s.id, s.name, s.status, s.workplace_id, c.linked_org_id, c.name as contractor_name from sites s join contractors c on c.id = s.contractor_id
+          where s.id = $1 and s.org_id = $2 for update of s`,
+        [isUuid(siteId) ? siteId : '00000000-0000-0000-0000-000000000000', ctx.org.id],
+      );
+      if (!f || !f.workplace_id) throw notFound();
+      if (action === 'remove') {
+        if (f.status === 'declined') throw conflict('Already removed.');
+        await db.query(`update sites set status = 'declined' where id = $1`, [f.id]);
+        await audit(db, ctx, 'Removed contractor from site', `${f.contractor_name} — ${reason}`, f.id);
+        if (f.linked_org_id) await notifyOrg(db, f.linked_org_id, null, { kind: 'correction', title: `Removed from ${f.name}`, body: `${ctx.org.name}: ${reason}` });
+      } else {
+        if (f.status !== 'declined') throw conflict('This contractor is already on the site.');
+        await db.query(`update sites set status = 'in_progress' where id = $1`, [f.id]);
+        await audit(db, ctx, 'Restored contractor to site', f.contractor_name, f.id);
+        if (f.linked_org_id) await notifyOrg(db, f.linked_org_id, null, { kind: 'site', title: `You're back on ${f.name}`, body: `${ctx.org.name} restored your safety file for this site.`, link: { kind: 'site', siteId: f.id } });
+      }
+      await publishChange(db, [ctx.org.id, ...(f.linked_org_id ? [f.linked_org_id] : [])]);
       return { ok: true };
     });
   });
@@ -195,7 +241,7 @@ export default async function workplaceRoutes(app: FastifyInstance) {
     return withTx(async (db) => {
       const w = await loadWorkplace(db, ctx, (req.params as { id: string }).id, true);
       const code = await uniqueCode(db);
-      await db.query('update workplaces set join_code = $2, join_open = true where id = $1', [w.id, code]);
+      await db.query('update workplaces set join_code = $2 where id = $1', [w.id, code]);
       await audit(db, ctx, 'Replaced site code', `${w.name} — the old code no longer works`);
       await publishChange(db, [ctx.org.id]);
       return { code };
@@ -213,9 +259,11 @@ export async function joinWorkplaceByCode(db: Db, ctx: OrgCtx, code: string): Pr
   if (clean.length !== 8) return null;
   const w = await one<Workplace>(db, 'select * from workplaces where join_code = $1 for update', [`${clean.slice(0, 4)}-${clean.slice(4)}`]);
   if (!w) return null;
-  if (!w.join_open) throw forbidden(`${w.name} isn't taking new contractors at the moment. Ask the site to open it again.`);
-  if (w.org_id === ctx.org.id) throw forbidden('That is your own site.');
+  // Practice spaces and real companies never meet: to either side the other's code simply doesn't exist.
+  const host = await one<{ is_demo: boolean }>(db, 'select is_demo from organisations where id = $1', [w.org_id]);
+  if (!host || host.is_demo !== ctx.org.is_demo) return null;
   if (!canAdminOrg(ctx)) throw forbidden('Ask an owner or admin of your company to join sites.');
+  if (w.org_id === ctx.org.id) throw forbidden('That is your own site.');
   // The mine's directory entry for this contractor company.
   let c = await one<{ id: string }>(db, 'select id from contractors where org_id = $1 and linked_org_id = $2', [w.org_id, ctx.org.id]);
   if (!c) {
@@ -226,8 +274,10 @@ export async function joinWorkplaceByCode(db: Db, ctx: OrgCtx, code: string): Pr
       [w.org_id, ctx.org.name, ctx.org.trade ?? '', ctx.org.reg_number ?? '', ctx.org.coid_number ?? '', owner?.name ?? '', owner?.email ?? null, ctx.org.id],
     ))!;
   }
-  const existing = await one<{ id: string }>(db, 'select id from sites where workplace_id = $1 and contractor_id = $2', [w.id, c.id]);
+  const existing = await one<{ id: string; status: string }>(db, 'select id, status from sites where workplace_id = $1 and contractor_id = $2', [w.id, c.id]);
+  if (existing?.status === 'declined') throw forbidden(`${w.name} has removed your company from this site. Contact the site if you should be working there.`);
   if (existing) return { siteId: existing.id, hostOrgId: w.org_id, already: true };
+  if (!w.join_open) throw forbidden(`${w.name} isn't taking new contractors at the moment. Ask the site to open it again.`);
   const site = (await one<{ id: string }>(
     db,
     `insert into sites (org_id, name, location, contractor_id, status, emergency, workplace_id) values ($1, $2, $3, $4, 'in_progress', $5, $6) returning id`,

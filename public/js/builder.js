@@ -16,7 +16,7 @@ export function buildable(siteId){
   for(const r of reqs){
     const eff = effectiveStatus(S.state.documents[r.id]);
     if(!NEEDS.includes(eff)) continue;
-    if(libraryCopyFor(r)) fromLibrary.push({ req: r, eff });
+    if(libraryCopyFor(r) && eff!=='correction_required') fromLibrary.push({ req: r, eff });
     else if(r.blueprint) out.push({ req: r, eff });
     else manual.push({ req: r, eff });
   }
@@ -121,7 +121,7 @@ function stepRun(b){
       +(it.state==='done'?'<button class="btn secondary small" data-action="open-review" data-id="'+it.result.id+'">Read</button>':'')
       +(it.state==='failed'?'<button class="btn secondary small" data-action="builder-retry" data-i="'+i+'">Retry</button>':'')+'</div>').join('')+'</div>'
     +(!running && done ? '<div class="site-card-sub" style="margin-top:10px;">Read each document before submitting: check the details and sign the approval block. You can edit any section in the app.</div>'
-      +(done > submitted ? '<button class="btn primary block" style="margin-top:12px;" data-action="builder-submit">Submit '+(done-submitted)+' for review</button>' : '<div class="notice" style="margin-top:12px;background:var(--green-bg);color:var(--green);">All created documents are submitted. The site has been notified.</div>')
+      +(done > submitted ? '<label class="toggle-row" style="border:none;margin-top:10px;"><span>I have read these documents; they are correct for this site and signed where needed</span><input type="checkbox" id="bldConfirm"></label>'+'<button class="btn primary block" style="margin-top:12px;" data-action="builder-submit">Submit '+(done-submitted)+' for review</button>' : '<div class="notice" style="margin-top:12px;background:var(--green-bg);color:var(--green);">All created documents are submitted. The site has been notified.</div>')
       +'<button class="btn secondary block" style="margin-top:8px;" data-action="builder-close">Close</button>' : '');
 }
 
@@ -222,6 +222,8 @@ async function submitLibrary(b){
 }
 on('builder-submit', async (el)=>{
   const b = S.builder; if(!b || el.disabled) return;
+  const c = document.getElementById('bldConfirm');
+  if(c && !c.checked){ showToast('Read each document first, then tick the box to confirm'); c.focus(); return; }
   el.disabled = true; el.textContent = 'Submitting…';
   let ok = await submitLibrary(b), fail = 0;
   for(const it of b.items){

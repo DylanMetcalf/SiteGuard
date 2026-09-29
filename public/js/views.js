@@ -375,7 +375,8 @@ function renderSiteDetail(siteId){
     +'<button class="btn secondary small" data-action="back-sites">'+(isHost() && site.workplaceId && (S.state.workplaces||{})[site.workplaceId] ? '← '+S.state.workplaces[site.workplaceId].name : '← Sites')+'</button>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
     +'<button class="btn danger small icon" data-action="open-emergency" data-site="'+siteId+'" title="Emergency info" aria-label="Emergency info">'+ICONS.emergency+'</button>'
-    +(isHost() && isOrgAdmin() && !readOnly() ? '<button class="btn secondary small" data-action="edit-site" data-site="'+siteId+'">Edit</button>' : '')
+    +(isHost() && isOrgAdmin() && !readOnly() && !site.workplaceId ? '<button class="btn secondary small" data-action="edit-site" data-site="'+siteId+'">Edit</button>' : '')
+    +(isHost() && isOrgAdmin() && !readOnly() && site.workplaceId && site.status!=='declined' ? '<button class="btn secondary small" data-action="wp-remove-contractor" data-site="'+siteId+'">Remove</button>' : '')
     +(canShare && site.status!=='declined' ? '<button class="btn secondary small" data-action="new-share-link" data-site="'+siteId+'">Share</button>' : '')
     +'<button class="btn secondary small" data-action="export-site" data-site="'+siteId+'">Export</button></div></div>'
     +'<div class="view-head"><h1>'+site.name+'</h1><p>'+[site.location, isContractor()?site.hostName:contractor.name].filter(Boolean).join(' · ')+'</p></div>'

@@ -17,7 +17,8 @@ function plan(siteId){
   const st = (r)=>effectiveStatus(S.state.documents[r.id]);
   const company = reqs.filter(r=>r.library);
   const companyNeeds = company.filter(r=>NEEDS.includes(st(r)));
-  const fromLibrary = companyNeeds.filter(r=>libraryCopyFor(r));
+  // A copy the site sent back isn't offered again in bulk; the contractor fixes it one by one.
+  const fromLibrary = companyNeeds.filter(r=>libraryCopyFor(r) && st(r)!=='correction_required');
   const { out, manual } = buildable(siteId);
   const uploads = manual.map(m=>m.req).filter(r=>!r.library);
   const assigned = ((S.state.siteWorkers||{})[siteId] || []).map(id=>(S.state.workers||{})[id]).filter(Boolean);
@@ -59,7 +60,7 @@ function render(siteId, fresh){
   const compDone = p.company.length && !p.companyNeeds.length;
   html += step(1, compDone, 'Company documents', p.company.length ? (p.company.length - p.companyNeeds.length)+' of '+p.company.length+' handed in — COID letter, insurance, registration and policies' : 'This site didn\'t ask for company documents.',
     (p.fromLibrary.length && !ro ? '<button class="btn primary small" style="margin-top:8px;" data-action="guide-lib" data-site="'+siteId+'">Submit '+p.fromLibrary.length+' from my company documents</button>' : '')
-    + p.companyNeeds.filter(r=>!libraryCopyFor(r)).map(reqLink).join(''));
+    + p.companyNeeds.filter(r=>!p.fromLibrary.includes(r)).map(reqLink).join(''));
 
   // 2. People
   const peopleDone = p.assigned.length && !p.noMedical.length;

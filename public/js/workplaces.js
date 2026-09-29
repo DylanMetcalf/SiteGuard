@@ -13,7 +13,8 @@ import { loadPacks, packPicker, checkedPacks, PACK_NOTE, openNewSite } from './s
 
 const W = () => S.state.workplaces || {};
 /** Each contractor's file for this site (one per contractor). */
-export const filesOf = (wid) => Object.values(S.state.sites).filter(s=>s.workplaceId===wid);
+export const filesOf = (wid) => Object.values(S.state.sites).filter(s=>s.workplaceId===wid && s.status!=='declined');
+const removedOf = (wid) => Object.values(S.state.sites).filter(s=>s.workplaceId===wid && s.status==='declined');
 
 function stats(wid){
   const files = filesOf(wid);
@@ -67,7 +68,11 @@ export function renderWorkplace(wid){
     .map(([t,l])=>'<button role="tab" data-action="wp-tab" data-tab="'+t+'" class="'+(tab===t?'active':'')+'" aria-selected="'+(tab===t)+'">'+l+'</button>').join('')+'</div>';
   if(tab==='queue') return html + queueHtml(st.files);
   if(tab==='requirements') return html + requirementsHtml(w, admin);
-  return html + contractorsHtml(w, st.files);
+  const removed = removedOf(wid);
+  return html + contractorsHtml(w, st.files)
+    + (removed.length ? '<div class="section-title">Removed from this site · '+removed.length+'</div><div class="card">'+removed.map(f=>{ const c = S.state.contractors[f.contractorId] || { name:'Contractor' };
+        return '<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+c.name+'</div><div class="reqrow-meta"><span class="badge grey">Removed</span><span class="srctag">Can\'t see or submit anything for this site</span></div></div>'
+          +(admin?'<button class="btn secondary small" data-action="wp-restore" data-site="'+f.id+'">Restore</button>':'')+'</div>'; }).join('')+'</div>' : '');
 }
 
 function contractorsHtml(w, files){
@@ -104,7 +109,7 @@ function queueHtml(files){
   return '<div class="site-card-sub" style="margin:4px 2px 10px;">Tap a document to read it and approve it or send it back. Documents written in SiteGuard open section by section, so you can approve each part and highlight what needs changing.</div>'
     + groups.map(({ f, c, items })=>'<div class="section-title">'+c.name+' · '+items.length+'</div><div class="card">'+items.map(r=>{
       const d = S.state.documents[r.id]||{};
-      return '<div class="reqrow" data-action="'+(d.studioDocId?'open-review':'open-req')+'" '+(d.studioDocId?'data-id="'+d.studioDocId+'"':'data-req="'+r.id+'"')+' role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main"><div class="reqrow-name">'+r.name+'</div>'
+      return '<div class="reqrow" data-action="'+(d.studioDocId?'open-review':'open-req')+'" '+(d.studioDocId?'data-id="'+d.studioDocId+'" data-req="'+r.id+'"':'data-req="'+r.id+'"')+' role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main"><div class="reqrow-name">'+r.name+'</div>'
         +'<div class="reqrow-meta">'+badge('awaiting_review')+'<span class="srctag">'+r.category+'</span>'+(d.version?'<span class="srctag">'+d.version+'</span>':'')+(d.studioDocId?'<span class="srctag">Written in SiteGuard</span>':'')+'</div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
     }).join('')+'</div>').join('');
 }
@@ -218,6 +223,26 @@ on('wp-save-own', async (el)=>{
   if(r){ closeSheet(); showToast('Added'+(r.contractorsUpdated?' — now in '+r.contractorsUpdated+' contractor'+(r.contractorsUpdated===1?'\'s file':'s\' files'):'')); }
 });
 on('wp-remove', async (el)=>{
-  if(!confirm('Take “'+unescapeHtml(el.dataset.name)+'” off this site\'s list? Contractors who join from now on won\'t be asked for it. Files of contractors already on the site keep it and its history.')) return;
-  await act(()=>api.post('/api/workplaces/'+el.dataset.id+'/requirements/remove', { name: unescapeHtml(el.dataset.name) }), 'Removed from the site\'s list', el);
+  if(!confirm('Take “'+unescapeHtml(el.dataset.name)+'” off this site\'s list? Contractors who join from now on won\'t be asked for it.')) return;
+  const fromFiles = confirm('Also remove it from contractors already on the site who haven\'t submitted it yet?\n\nOK = remove it from them too. Cancel = keep it in their files. Anything already submitted is always kept.');
+  const r = await act(()=>api.post('/api/workplaces/'+el.dataset.id+'/requirements/remove', { name: unescapeHtml(el.dataset.name), fromFiles }), null, el);
+  if(r) showToast('Removed from the site\'s list'+(fromFiles ? ' and from '+r.removedFrom+' contractor file'+(r.removedFrom===1?'':'s') : ''));
 });
+
+/* ---------- Removing a contractor from a site ---------- */
+on('wp-remove-contractor', (el)=>{
+  const f = S.state.sites[el.dataset.site]; const c = S.state.contractors[f.contractorId] || { name:'this contractor' };
+  openSheet(sheetHead('Remove '+c.name+'?', f.name)
+    +'<div class="site-card-sub">They lose access to this site straight away: no documents, permits or updates. Their file and its history are kept, and you can restore them later.</div>'
+    +'<label class="field-label" for="wpRemoveWhy">Reason (they will see this)</label><textarea id="wpRemoveWhy" placeholder="e.g. Contract ended on 30 September; or joined the wrong site"></textarea>'
+    +'<button class="btn danger block" style="margin-top:12px;" data-action="wp-remove-go" data-site="'+f.id+'">Remove from site</button>');
+});
+on('wp-remove-go', async (el)=>{
+  const reason = val('wpRemoveWhy');
+  if(reason.length < 3){ showToast('Say why — the contractor will see the reason'); document.getElementById('wpRemoveWhy').focus(); return; }
+  const f = S.state.sites[el.dataset.site];
+  if(await act(()=>api.post('/api/workplaces/files/'+el.dataset.site+'/remove', { reason }), 'Removed from the site', el)){
+    closeSheet(); S.activeSiteId = null; S.activeWorkplaceId = f.workplaceId; render(); window.scrollTo(0,0);
+  }
+});
+on('wp-restore', async (el)=>{ await act(()=>api.post('/api/workplaces/files/'+el.dataset.site+'/restore'), 'Restored to the site', el); });

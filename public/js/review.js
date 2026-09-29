@@ -9,9 +9,10 @@ import { S, ICONS, escapeHtml, on, render, reload, showToast, isContractor, open
 const R = () => (S.review ??= { id: null, token: null, data: null, drafts: {}, editing: null, form: null, keep: {}, loading: false, error: '' });
 
 /* ---------- Loading ---------- */
-export function openReview(id){
+/** Opens a document; `reqId` ties it to one requirement (the one the mine is vetting). */
+export function openReview(id, reqId){
   const r = R();
-  if(r.id !== id){ S.review = { id, token: null, data: null, drafts: {}, editing: null, form: null, keep: {}, loading: false, error: '' }; }
+  if(r.id !== id || (r.req || null) !== (reqId || null)){ S.review = { id, req: reqId || null, token: null, data: null, drafts: {}, editing: null, form: null, keep: {}, loading: false, error: '' }; }
   closeSheet(true);
   S.nav = 'review';
   render(); window.scrollTo(0,0);
@@ -26,7 +27,7 @@ async function load(){
   if(r.loading) return;
   r.loading = true;
   try{
-    r.data = await api.get(r.token ? '/api/review-links/'+encodeURIComponent(r.token) : '/api/review/'+r.id);
+    r.data = await api.get(r.token ? '/api/review-links/'+encodeURIComponent(r.token) : '/api/review/'+r.id+(r.req ? '?req='+encodeURIComponent(r.req) : ''));
     if(!r.token && r.data.doc.id !== r.id) r.id = r.data.doc.id;
     r.error = '';
   }catch(e){ r.error = e.status===404 ? 'This document isn\'t available — the link may have expired or been withdrawn.' : e.message; }

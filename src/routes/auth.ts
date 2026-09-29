@@ -59,6 +59,8 @@ export async function acceptSiteInvitation(db: Db, ctx: OrgCtx, invitationId: st
   if (!canAdminOrg(ctx)) throw forbidden('Only contractor owners and admins can accept site invitations.');
   if (inv.linked_org_id && inv.linked_org_id !== ctx.org.id) throw forbidden('This invitation was sent to a different contractor company.');
   if (inv.org_id === ctx.org.id) throw forbidden('An organisation cannot accept its own invitation.');
+  const hostOrg = await one<{ is_demo: boolean }>(db, 'select is_demo from organisations where id = $1', [inv.org_id]);
+  if (!hostOrg || hostOrg.is_demo !== ctx.org.is_demo) throw notFound('That invitation no longer exists.');
   if (!inv.linked_org_id) {
     const clash = await one(db, 'select 1 from contractors where org_id = $1 and linked_org_id = $2', [inv.org_id, ctx.org.id]);
     if (clash) {
