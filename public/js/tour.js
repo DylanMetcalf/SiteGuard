@@ -179,7 +179,12 @@ let offered = false;
 export function maybeOfferTour(){
   if(offered || !S.state || !S.boot || !S.boot.org) return;
   offered = true;
-  if(/[?&]tour=1\b/.test(location.search)){ setTimeout(() => startTour({ autoplay: /[?&]autoplay=1\b/.test(location.search) }), 300); return; }
+  if(/[?&]tour=1\b/.test(location.search)){
+    const autoplay = /[?&]autoplay=1\b/.test(location.search);
+    history.replaceState(history.state, '', location.pathname);
+    setTimeout(() => startTour({ autoplay }), 300);
+    return;
+  }
   let seen = false;
   try{ seen = localStorage.getItem('sg_tutorial_seen') === '1'; }catch{ seen = true; }
   if(seen) return;
