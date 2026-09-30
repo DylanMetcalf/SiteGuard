@@ -139,6 +139,8 @@ export interface SiteAccess {
     contractor_name: string;
     linked_org_id: string | null;
     host_name: string;
+    /** A contractor's own project: the "host" is a private client record the contractor manages. */
+    project: boolean;
   };
   side: 'host' | 'contractor';
   /** Organisations that should be told when this site changes. */
@@ -160,7 +162,7 @@ export async function loadSite(
   const site = await one<SiteAccess['site']>(
     db,
     `select s.id, s.org_id, s.name, s.location, s.contractor_id, s.status, s.emergency,
-            c.name as contractor_name, c.linked_org_id, o.name as host_name
+            c.name as contractor_name, c.linked_org_id, o.name as host_name, (o.managed_by_org is not null) as project
        from sites s
        join contractors c on c.id = s.contractor_id
        join organisations o on o.id = s.org_id

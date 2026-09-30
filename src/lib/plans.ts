@@ -8,6 +8,8 @@ export interface Plan {
   kind: OrgKind;
   /** Maximum active sites (host plans). null = unlimited. */
   siteLimit: number | null;
+  /** Contractor projects (safety files for clients not on SiteGuard). null = unlimited. Only enforced with billing on. */
+  projectLimit: number | null;
   /** Seats given on a fresh org / free plan. Paid plans bill per seat. */
   defaultSeats: number;
   maxSeats: number;
@@ -24,6 +26,7 @@ export const PLANS: Record<string, Plan> = {
     name: 'Site Starter',
     kind: 'host',
     siteLimit: 5,
+    projectLimit: null,
     defaultSeats: 5,
     maxSeats: 25,
     ai: false,
@@ -36,6 +39,7 @@ export const PLANS: Record<string, Plan> = {
     name: 'Site Professional',
     kind: 'host',
     siteLimit: null,
+    projectLimit: null,
     defaultSeats: 10,
     maxSeats: 500,
     ai: true,
@@ -48,23 +52,25 @@ export const PLANS: Record<string, Plan> = {
     name: 'Contractor Free',
     kind: 'contractor',
     siteLimit: null,
+    projectLimit: 2,
     defaultSeats: 3,
     maxSeats: 3,
     ai: false,
     paid: false,
-    blurb: 'Respond to site invitations and submit safety files. Always free.',
+    blurb: 'Respond to site invitations, submit safety files, and build up to 2 of your own project files. Always free.',
   },
   contractor_pro: {
     id: 'contractor_pro',
     name: 'Contractor Pro',
     kind: 'contractor',
     siteLimit: null,
+    projectLimit: null,
     defaultSeats: 5,
     maxSeats: 200,
     ai: true,
     paid: true,
     stripePrice: config.STRIPE_PRICE_CONTRACTOR_PRO,
-    blurb: 'More seats, AI document drafting, expiry detection and share links.',
+    blurb: 'Unlimited project files, more seats, AI document drafting, expiry detection and share links.',
   },
 };
 
