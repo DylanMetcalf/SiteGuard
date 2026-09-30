@@ -32,6 +32,7 @@ const AMBER = '#8A5200';
 const RED = '#9E2A21';
 const NAVY = '#16325C';
 const INCLUDED: DocStatus[] = ['complete', 'expiring', 'awaiting_review'];
+const SESSION_TYPE: Record<string, string> = { toolbox: 'Toolbox talk', induction: 'Site induction', awareness: 'Awareness training', briefing: 'Site briefing', meeting: 'Safety meeting', training: 'Training' };
 const LABEL: Record<DocStatus, [string, string]> = {
   complete: ['Approved', GREEN], expiring: ['Approved (expiring soon)', AMBER], awaiting_review: ['Awaiting review', NAVY],
   missing: ['Missing', RED], expired: ['Expired', RED], correction_required: ['Correction needed', RED],
@@ -324,7 +325,7 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
   const incidents = await many<any>(db, `select type, occurred_on, status, description, root_cause, corrective_actions from incidents where site_id = $1 order by occurred_on`, [siteId]);
   const talks = await many<any>(
     db,
-    `select t.topic, t.held_on, t.presenter_name, (select string_agg(a.attendee_name, ', ' order by a.attendee_name) from toolbox_attendance a where a.talk_id = t.id) as attendees
+    `select t.topic, t.held_on, t.presenter_name, t.kind, (select string_agg(a.attendee_name, ', ' order by a.attendee_name) from toolbox_attendance a where a.talk_id = t.id) as attendees
        from toolbox_talks t where t.site_id = $1 order by t.held_on`,
     [siteId],
   );
@@ -356,9 +357,9 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
     ...table('Incidents', ['14%', '16%', '12%', '*', '24%'], ['Date', 'Type', 'Status', 'Description', 'Root cause / actions'],
       incidents.map((i) => [c(fmt(i.occurred_on)), c(nice(i.type)), c(nice(i.status)), c(i.description), c([i.root_cause, i.corrective_actions].filter(Boolean).join(' — '))]),
       'No incidents recorded.'),
-    ...table('Toolbox talks', ['14%', '*', '20%', '34%'], ['Date', 'Topic', 'Presenter', 'Attendees (signed)'],
-      talks.map((x) => [c(fmt(x.held_on)), c(x.topic), c(x.presenter_name), c(x.attendees)]),
-      'No toolbox talks recorded.'),
+    ...table('Toolbox talks, inductions and training', ['12%', '14%', '*', '18%', '30%'], ['Date', 'Type', 'Topic', 'Presenter', 'Attendees (signed)'],
+      talks.map((x) => [c(fmt(x.held_on)), c(SESSION_TYPE[x.kind] ?? 'Toolbox talk'), c(x.topic), c(x.presenter_name), c(x.attendees)]),
+      'No toolbox talks, inductions or training recorded.'),
     ...table('Site audits', ['14%', '18%', '10%', '*'], ['Date', 'Auditor', 'Score', 'Findings (status)'],
       audits.map((a) => [c(fmt(a.audited_on)), c(a.auditor_name), c(`${a.score}%`), c(a.findings || a.summary || 'No findings')]),
       'No site audits recorded.'),

@@ -44,7 +44,11 @@ export async function gateRows(db: Db, siteIds: string[]): Promise<GateRow[]> {
     `select s.id as site_id, s.name as site_name, s.status as site_status, c.name as company, c.trade, c.suspended_at, c.suspended_reason,
             o.settings as host_settings, w.id as worker_id, w.full_name, w.occupation, w.employee_no, w.active, sw.gate_token,
             coalesce((select json_agg(json_build_object('kind', wc.kind, 'issued_on', wc.issued_on, 'expires_on', wc.expires_on))
-                        from worker_certificates wc where wc.worker_id = w.id and wc.kind in ('medical_fitness', 'induction')), '[]') as certs
+                        from worker_certificates wc where wc.worker_id = w.id and wc.kind in ('medical_fitness', 'induction')), '[]')::jsonb
+            -- A signed induction session held for this file counts as an induction on the day it was held.
+            || coalesce((select json_agg(json_build_object('kind', 'induction', 'issued_on', t.held_on, 'expires_on', null))
+                        from toolbox_attendance a join toolbox_talks t on t.id = a.talk_id
+                       where a.worker_id = w.id and t.site_id = s.id and t.kind = 'induction'), '[]')::jsonb as certs
        from site_workers sw join sites s on s.id = sw.site_id join contractors c on c.id = s.contractor_id
        join organisations o on o.id = s.org_id join workers w on w.id = sw.worker_id
       where sw.site_id = any($1) and s.status <> 'declined'

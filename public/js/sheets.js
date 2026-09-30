@@ -944,15 +944,21 @@ on('open-appointment', (el)=>{
 on('revoke-appointment', async (el)=>{ if(confirm('Revoke this appointment? It stays on the register as revoked.') && await act(()=>api.post('/api/appointments/'+el.dataset.id+'/revoke'), 'Appointment revoked', el)) closeSheet(); });
 
 /* ============ TOOLBOX TALKS ============ */
-function renderNewToolboxSheet(siteId){
-  return sheetHead('Record a toolbox talk', S.state.sites[siteId].name)
+export const SESSION_KINDS = [['toolbox','Toolbox talk'],['induction','Site induction'],['awareness','Awareness training'],['briefing','Site briefing'],['meeting','Safety meeting'],['training','Training session']];
+export const sessionLabel = (k)=>(SESSION_KINDS.find(x=>x[0]===k)||SESSION_KINDS[0])[1];
+function renderNewToolboxSheet(siteId, kind){
+  return sheetHead('Record a session', S.state.sites[siteId].name)
+    +'<label class="field-label" for="ttKind">Type</label><select id="ttKind" class="field" data-action-change="tt-kind">'+SESSION_KINDS.map(([k,l])=>'<option value="'+k+'"'+(k===(kind||'toolbox')?' selected':'')+'>'+l+'</option>').join('')+'</select>'
+    +'<div class="site-card-sub" id="ttKindHelp" style="margin-top:4px;">'+(kind==='induction'?'Each worker who signs is recorded as inducted for this site on this date, which counts at the gate.':'Everyone attending signs on this device afterwards.')+'</div>'
     +'<label class="field-label" for="ttTopic">Topic</label><input type="text" id="ttTopic" placeholder="e.g. Isolation and lock-out before work on the drive station">'
-    +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="ttPresenter">Presented by</label><input type="text" id="ttPresenter" value="'+myName()+'"></div></div>'
-    +'<label class="field-label" for="ttContent">Talk content / key points</label><textarea id="ttContent" style="min-height:110px;" placeholder="What was covered"></textarea>'
+    +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="ttDuration">Minutes</label><input type="number" id="ttDuration" min="1" max="1440" inputmode="numeric" placeholder="15"></div></div>'
+    +'<label class="field-label" for="ttPresenter">Presented by</label><input type="text" id="ttPresenter" value="'+myName()+'">'
+    +'<label class="field-label" for="ttContent">Content / key points</label><textarea id="ttContent" style="min-height:110px;" placeholder="What was covered"></textarea>'
     +'<button class="btn secondary small" style="margin-top:6px;" data-action="draft-toolbox">'+ICONS.sparkle+(S.boot.features.ai?' Draft content with AI':' Draft talk from topic')+'</button>'
     +'<button class="btn primary block" style="margin-top:12px;" data-action="save-toolbox" data-site="'+siteId+'">Save and collect signatures</button>';
 }
-on('new-toolbox-talk', (el)=>openSheet(renderNewToolboxSheet(el.dataset.site)));
+on('new-toolbox-talk', (el)=>openSheet(renderNewToolboxSheet(el.dataset.site, el.dataset.kind)));
+on('tt-kind', (el)=>{ const h = document.getElementById('ttKindHelp'); if(h) h.textContent = el.value==='induction' ? 'Each worker who signs is recorded as inducted for this site on this date, which counts at the gate.' : 'Everyone attending signs on this device afterwards.'; });
 on('draft-toolbox', async (el)=>{
   const topic = (val('ttTopic'));
   if(!topic){ document.getElementById('ttTopic').focus(); return; }
@@ -965,7 +971,8 @@ on('draft-toolbox', async (el)=>{
 on('save-toolbox', async (el)=>{
   const topic = (val('ttTopic'));
   if(!topic){ document.getElementById('ttTopic').focus(); return; }
-  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/toolbox-talks', { topic, heldOn: val('ttDate'), presenter: (val('ttPresenter')), content: document.getElementById('ttContent').value }), 'Toolbox talk saved', el);
+  const kind = val('ttKind') || 'toolbox', mins = parseInt(val('ttDuration'), 10);
+  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/toolbox-talks', { topic, kind, durationMinutes: mins > 0 ? mins : undefined, heldOn: val('ttDate'), presenter: (val('ttPresenter')), content: document.getElementById('ttContent').value }), sessionLabel(kind)+' saved', el);
   if(r) openToolbox(el.dataset.site, r.id);
 });
 function renderToolboxSheet(siteId, talkId){
@@ -973,7 +980,8 @@ function renderToolboxSheet(siteId, talkId){
   if(!t) return sheetHead('Not found');
   const workers = ((S.state.siteWorkers||{})[siteId]||[]).map(id=>S.state.workers[id]).filter(Boolean);
   const signed = new Set(t.attendance.map(a=>a.workerId).filter(Boolean));
-  let body = sheetHead(t.topic, timeAgo(t.heldOn)+' · presented by '+t.presenter+' · '+t.orgName);
+  let body = sheetHead(t.topic, sessionLabel(t.kind)+' · '+timeAgo(t.heldOn)+(t.durationMinutes?' · '+t.durationMinutes+' min':'')+' · presented by '+t.presenter+' · '+t.orgName);
+  if(t.kind==='induction') body += '<div class="notice">Workers chosen from the list who sign here are recorded as inducted for this site from '+t.heldOn+'. Gate clearance counts it'+(isHost()?' under your induction validity rule':'')+'.</div>';
   if(t.content) body += '<details><summary style="font-size:12.5px;color:var(--grey);cursor:pointer;">Talk content</summary><div class="ai-output">'+t.content+'</div></details>';
   body += '<div class="section-title">Attendance ('+t.attendance.length+')</div>';
   body += t.attendance.length ? t.attendance.map(a=>'<div class="cert-row"><div><div style="font-weight:600;">'+a.name+'</div><div class="site-card-sub">'+dateTime(a.signedAt)+'</div></div><img class="sig-thumb" src="'+a.signatureUrl+'" alt="Signature of '+a.name+'"></div>').join('')

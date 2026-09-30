@@ -21,6 +21,12 @@ const optUuid = z.string().uuid().optional().or(z.literal('').transform(() => un
 
 const d = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
 
+/** Kinds of session that share one attendance register. An induction session counts at the gate. */
+export const SESSION_KINDS = ['toolbox', 'induction', 'awareness', 'briefing', 'meeting', 'training'] as const;
+export const SESSION_LABELS: Record<(typeof SESSION_KINDS)[number], string> = {
+  toolbox: 'Toolbox talk', induction: 'Site induction', awareness: 'Awareness training', briefing: 'Site briefing', meeting: 'Safety meeting', training: 'Training session',
+};
+
 /** Site viewers ("Site Staff") on the host side can't manage records. */
 function requireEditor(ctx: OrgCtx) {
   if (isHost(ctx) && ctx.role === 'member') throw forbidden('Your role is view-only for this.');
@@ -114,7 +120,10 @@ export async function workforceState(db: Db, ctx: OrgCtx, activeSiteIds: string[
     );
     const byId: Record<string, any> = {};
     for (const tt of talks) {
-      byId[tt.id] = { id: tt.id, siteId: tt.site_id, topic: tt.topic, content: tt.content, presenter: tt.presenter_name, heldOn: tt.held_on, orgName: tt.org_name, attendance: [] };
+      byId[tt.id] = {
+        id: tt.id, siteId: tt.site_id, topic: tt.topic, content: tt.content, presenter: tt.presenter_name, heldOn: tt.held_on, orgName: tt.org_name,
+        kind: tt.kind, durationMinutes: tt.duration_minutes, attendance: [],
+      };
       toolboxTalks[tt.site_id].push(byId[tt.id]);
     }
     if (talks.length) {
@@ -335,16 +344,23 @@ export default async function workforceRoutes(app: FastifyInstance) {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
     requireEditor(ctx);
-    const b = z.object({ topic: t(300).min(1), content: t(20000).default(''), heldOn: optDate, presenter: t(200).optional() }).parse(req.body);
+    const b = z
+      .object({
+        topic: t(300).min(1), content: t(20000).default(''), heldOn: optDate, presenter: t(200).optional(),
+        kind: z.enum(SESSION_KINDS).default('toolbox'),
+        durationMinutes: z.number().int().min(1).max(1440).optional(),
+      })
+      .parse(req.body);
     const { id } = req.params as { id: string };
     return withTx(async (db) => {
       const { site, parties } = await loadSite(db, ctx, id);
       const tt = (await one<{ id: string }>(
         db,
-        `insert into toolbox_talks (site_id, org_id, topic, content, presenter_name, held_on) values ($1, $2, $3, $4, $5, coalesce($6::date, current_date)) returning id`,
-        [site.id, ctx.org.id, b.topic, b.content, b.presenter || ctx.user.name, b.heldOn ?? null],
+        `insert into toolbox_talks (site_id, org_id, topic, content, presenter_name, held_on, kind, duration_minutes)
+         values ($1, $2, $3, $4, $5, coalesce($6::date, current_date), $7, $8) returning id`,
+        [site.id, ctx.org.id, b.topic, b.content, b.presenter || ctx.user.name, b.heldOn ?? null, b.kind, b.durationMinutes ?? null],
       ))!;
-      await audit(db, ctx, 'Recorded toolbox talk', b.topic, site.id);
+      await audit(db, ctx, `Recorded ${SESSION_LABELS[b.kind].toLowerCase()}`, b.topic, site.id);
       await publishChange(db, parties);
       return { id: tt.id };
     });
@@ -380,7 +396,7 @@ export default async function workforceRoutes(app: FastifyInstance) {
         `insert into toolbox_attendance (talk_id, worker_id, attendee_name, signature) values ($1, $2, $3, $4) returning id`,
         [id, b.workerId ?? null, b.attendeeName, b.signature],
       ))!;
-      await audit(db, ctx, 'Signed toolbox talk attendance', `${b.attendeeName} — ${clip(tt.topic)}`, tt.site_id);
+      await audit(db, ctx, 'Signed attendance', `${b.attendeeName} — ${clip(tt.topic)}`, tt.site_id);
       await publishChange(db, parties);
       return { id: a.id };
     });

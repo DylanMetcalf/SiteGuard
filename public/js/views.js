@@ -9,7 +9,7 @@ import {
   openSafetyIssues, orgOpenSafetyIssuesCount, incidentTypeInfo, permitTypeInfo, permitEffectiveStatus, effectiveStatus, certStatus,
   libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, openSheet, sheetHead, closeSheet, searchBox, matchSearch, searching, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq,
 } from './core.js';
-import { computeTasks } from './sheets.js';
+import { computeTasks, sessionLabel } from './sheets.js';
 import { renderStudio } from './studio.js';
 import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
@@ -563,11 +563,13 @@ function renderSitePeople(siteId){
   if(workers.length && !isProject(S.state.sites[siteId])) html += gateSection(siteId);
 
   const talks = (S.state.toolboxTalks||{})[siteId] || [];
-  html += '<div class="section-title">Toolbox talks</div>';
-  if(canEdit() && !ro) html += '<button class="btn secondary block" data-action="new-toolbox-talk" data-site="'+siteId+'" style="margin-bottom:10px;">+ Record a toolbox talk</button>';
+  html += '<div class="section-title">Toolbox talks, inductions &amp; training</div>';
+  if(canEdit() && !ro) html += '<div class="row-actions" style="margin:0 0 10px;"><button class="btn secondary" style="flex:1;" data-action="new-toolbox-talk" data-site="'+siteId+'">+ Toolbox talk</button>'
+    +'<button class="btn secondary" style="flex:1;" data-action="new-toolbox-talk" data-kind="induction" data-site="'+siteId+'">+ Site induction</button>'
+    +'<button class="btn secondary" style="flex:1;" data-action="new-toolbox-talk" data-kind="training" data-site="'+siteId+'">+ Other session</button></div>';
   html += talks.length ? '<div class="card">' + talks.map(t=>'<div class="reqrow" data-action="open-toolbox-talk" data-site="'+siteId+'" data-id="'+t.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main"><div class="reqrow-name">'+t.topic+'</div>'
-      +'<div class="reqrow-meta"><span class="srctag">'+timeAgo(t.heldOn)+' · '+t.presenter+'</span><span class="badge '+(t.attendance.length?'complete':'missing')+'">'+t.attendance.length+' signed</span></div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>').join('')+'</div>'
-    : '<div class="card"><div class="site-card-sub">No toolbox talks recorded. Record the talk, then pass the device round so each attendee signs.</div></div>';
+      +'<div class="reqrow-meta"><span class="srctag">'+sessionLabel(t.kind)+'</span><span class="srctag">'+timeAgo(t.heldOn)+' · '+t.presenter+'</span><span class="badge '+(t.attendance.length?'complete':'missing')+'">'+t.attendance.length+' signed</span></div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>').join('')+'</div>'
+    : '<div class="card"><div class="site-card-sub">Nothing recorded yet. Record the session, then pass the device round so each attendee signs. A signed site induction counts as that worker\'s induction at the gate.</div></div>';
 
   const appts = (S.state.appointments||[]).filter(a=>a.siteId===siteId);
   html += '<div class="section-title">Appointments for this site</div>';
