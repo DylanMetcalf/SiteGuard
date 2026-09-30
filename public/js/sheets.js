@@ -180,7 +180,11 @@ function renderReqSheet(reqId){
   const ro = readOnly();
 
   let body = sheetHead(req.name, req.category + (site?' · '+site.name:''));
-  body += '<div style="margin:10px 0;">'+badge(eff)+' <span class="srctag" style="margin-left:6px;">'+SOURCE_LABEL[req.source]+'</span></div>';
+  body += '<div style="margin:10px 0;">'+badge(eff)+' <span class="srctag" style="margin-left:6px;">'+SOURCE_LABEL[req.source]+'</span>'+(req.optional?'<span class="srctag" style="margin-left:6px;">Optional</span>':'')+'</div>';
+  // The mine decides what's required on its sites; the contractor's admins do on their own projects.
+  const canSetOptional = site && !ro && ((isHost() && isOrgAdmin()) || (site.project && isOrgAdmin()));
+  if(canSetOptional) body += '<div class="toggle-row" style="border:none;padding:0 0 6px;"><span>'+(req.optional ? 'Optional — welcome in the file but doesn\'t hold up readiness' : 'Required — counts towards '+(site.project?'the file being complete':'Site Ready'))+'</span>'
+    +'<button class="btn secondary small" data-action="req-optional" data-req="'+reqId+'" data-optional="'+(req.optional?'0':'1')+'">'+(req.optional?'Make required':'Make optional')+'</button></div>';
   if(req.why) body += '<p style="font-size:13.5px;color:var(--ink-soft);">'+req.why+'</p>';
   if(doc.version){
     body += '<div class="divider"></div><div class="site-card-sub">Version '+doc.version+' · updated '+timeAgo(doc.updatedAt)+'</div>';
@@ -320,6 +324,10 @@ on('comment-req', async (el)=>{
 on('withdraw-doc', async (el)=>{
   if(!confirm('Remove this document? Earlier versions stay in the history.')) return;
   if(await act(()=>api.del(docUrl(el.dataset.req)), 'Removed', el)) closeSheet();
+});
+on('req-optional', async (el)=>{
+  const optional = el.dataset.optional === '1';
+  if(await act(()=>api.post('/api/requirements/'+el.dataset.req+'/optional', { optional }), optional ? 'Now optional' : 'Now required', el)) openReqSheet(el.dataset.req);
 });
 on('remove-requirement', async (el)=>{
   if(!confirm('Remove this requirement from the site?')) return;
@@ -681,7 +689,7 @@ export function packPicker(packs, checked, existingNames){
   }).join('');
 }
 export const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
-export const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
+export const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">South African lists, researched from published legislation and guidance (September 2026). A starting point, not legal advice: every item stays editable, and each can be made optional. Confirm the final list with your SHE advisor.</div>';
 
 function renderNewSiteSheet(packs, prefill){
   const pf = prefill || {};

@@ -453,7 +453,7 @@ function renderSiteDetail(siteId){
     grouped[cat].forEach(it=>{
       html += '<div class="reqrow" data-action="open-req" data-req="'+it.req.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main">'
         +'<div class="reqrow-name">'+it.req.name+'</div>'
-        +'<div class="reqrow-meta">'+badge(it.status)+'<span class="srctag">'+SOURCE_LABEL[it.req.source]+'</span>'+(it.doc.expiryDate?'<span class="srctag">expires '+timeAgo(it.doc.expiryDate)+'</span>':'')+'</div>'
+        +'<div class="reqrow-meta">'+(it.req.optional && !it.counted ? '<span class="badge grey">Optional</span>' : badge(it.status))+'<span class="srctag">'+SOURCE_LABEL[it.req.source]+(it.req.optional?' · optional':'')+'</span>'+(it.doc.expiryDate?'<span class="srctag">expires '+timeAgo(it.doc.expiryDate)+'</span>':'')+'</div>'
         +'</div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
     });
     html += '</div>';
@@ -1151,8 +1151,13 @@ on('export-register', (el)=>{ closeSheet(); exportSafetyFile(el.dataset.site); }
 on('export-bundle', (el)=>{
   const siteId = el.dataset.site, site = S.state.sites[siteId];
   const { items, total, counts } = computeReadiness(siteId);
-  const list = (st)=>items.filter(i=>i.status===st).map(i=>i.req.name);
+  const list = (st)=>items.filter(i=>i.counted && i.status===st).map(i=>i.req.name);
   const missing = list('missing'), expired = list('expired'), back = list('correction_required');
+  const optionalOut = items.filter(i=>!i.counted).map(i=>i.req.name);
+  // Documents with a file in them can be left out of this PDF; the rest are listed as gaps either way.
+  const filed = items.filter(i=>['complete','expiring','awaiting_review'].includes(i.status));
+  const appts = (S.state.appointments||[]).filter(a=>a.siteId===siteId).length;
+  const certs = ((S.state.siteWorkers||{})[siteId]||[]).reduce((n, id)=>n + (((S.state.workers[id]||{}).certificates)||[]).length, 0);
   const workers = ((S.state.siteWorkers||{})[siteId]||[]).map(id=>S.state.workers[id]).filter(Boolean);
   const noMedical = workers.filter(w=>!w.certificates.some(c=>c.kind==='medical_fitness' && certStatus(c)!=='expired'));
   const inFile = (counts.complete||0)+(counts.expiring||0)+(counts.awaiting_review||0);
@@ -1166,10 +1171,30 @@ on('export-bundle', (el)=>{
     +(missing.length ? '<div class="section-title">Missing</div>'+names(missing) : '')
     +(expired.length+back.length ? '<div class="section-title">Expired or sent back</div>'+names(expired.concat(back)) : '')
     +(noMedical.length ? '<div class="section-title">Workers without a valid medical</div>'+names(noMedical.map(w=>w.name)) : '')
+    +(optionalOut.length ? '<div class="section-title">Optional, not in the file</div>'+names(optionalOut) : '')
     +(gaps ? '<div class="notice alert-red" style="margin-top:12px;">The PDF lists every gap on its contents page, so the reader sees exactly what\'s outstanding. It is not presented as complete.</div>'
       : '<div class="notice alert-green" style="margin-top:12px;">Everything required is in the file.</div>')
-    +'<a class="btn primary block" style="margin-top:12px;" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download>'+(gaps?'Download with the gaps listed':'Download the safety file')+'</a>'
+    +(filed.length ? '<details class="sfr-pick"><summary>Choose what goes in this PDF</summary>'
+      +'<div class="site-card-sub" style="margin:6px 0;">Untick anything you don\'t want in this copy. A copy with documents left out says so on its cover and doesn\'t count as a new revision.</div>'
+      +'<div class="sfr-list">'+filed.map(i=>'<label class="toggle-row"><span>'+i.req.name+'<span class="site-card-sub" style="display:block;">'+i.req.category+'</span></span><input type="checkbox" class="sfr-doc" value="'+i.req.id+'" checked></label>').join('')
+      +(appts?'<label class="toggle-row"><span>Appointment letters ('+appts+')</span><input type="checkbox" id="sfrAppts" checked></label>':'')
+      +(certs?'<label class="toggle-row"><span>Workforce certificates ('+certs+')</span><input type="checkbox" id="sfrCerts" checked></label>':'')
+      +'</div></details>' : '')
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="safety-file-download" data-site="'+siteId+'">'+(gaps?'Download with the gaps listed':'Download the safety file')+'</button>'
     +(gaps && isContractor() ? '<button class="btn secondary block" style="margin-top:8px;" data-action="guide-open" data-site="'+siteId+'">Fill the gaps first</button>' : ''));
+});
+on('safety-file-download', (el)=>{
+  const all = [...document.querySelectorAll('.sfr-doc')];
+  const picked = all.filter(x=>x.checked).map(x=>x.value);
+  const a = document.getElementById('sfrAppts'), c = document.getElementById('sfrCerts');
+  const q = new URLSearchParams();
+  if(picked.length < all.length) q.set('only', picked.join(','));
+  if(a && !a.checked) q.set('appointments', '0');
+  if(c && !c.checked) q.set('certificates', '0');
+  if(all.length && !picked.length && !q.has('appointments') && !q.has('certificates') && !confirm('No documents are ticked, so the PDF will list the file\'s contents only. Continue?')) return;
+  closeSheet();
+  showToast('Preparing the safety file — the download starts in a moment');
+  window.location.href = '/api/sites/'+encodeURIComponent(el.dataset.site)+'/safety-file.pdf'+(q.toString() ? '?'+q.toString() : '');
 });
 on('approve-site', (el)=>act(()=>api.post('/api/sites/'+el.dataset.site+'/approve'), 'Site marked Site Ready', el));
 on('invitation-decide', async (el)=>{

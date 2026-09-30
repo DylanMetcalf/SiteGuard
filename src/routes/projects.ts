@@ -89,15 +89,15 @@ export default async function projectRoutes(app: FastifyInstance) {
         [clientId, body.name, body.location, contractor.id, JSON.stringify(body.emergency ?? {}), body.clientContact, ctx.user.id],
       ))!;
       // Requirements: copied from one of the contractor's own files if asked, then any starter packs, then anything typed.
-      let reqs: { category: string; name: string; source: string; why: string }[] = [];
+      let reqs: { category: string; name: string; source: string; why: string; optional?: boolean }[] = [];
       if (body.copyFromSiteId) {
         const from = await loadSite(db, ctx, body.copyFromSiteId);
-        reqs = await many(db, 'select category, name, source, why from requirements where site_id = $1 order by position, created_at', [from.site.id]);
+        reqs = await many(db, 'select category, name, source, why, optional from requirements where site_id = $1 order by position, created_at', [from.site.id]);
       }
       reqs = reqs.concat(itemsFromPacks(body.packIds, reqs.map((r) => r.name)));
       for (const r of body.requirements) if (!reqs.some((x) => x.name.toLowerCase() === r.name.toLowerCase())) reqs.push(r);
       for (const [i, r] of reqs.entries()) {
-        await db.query(`insert into requirements (site_id, category, name, source, why, position) values ($1, $2, $3, $4, $5, $6)`, [site.id, r.category, r.name, r.source, r.why, i]);
+        await db.query(`insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`, [site.id, r.category, r.name, r.source, r.why, i, !!r.optional]);
       }
       await audit(db, ctx, 'Created project', `${body.name} for ${body.clientName} (${reqs.length} requirement${reqs.length === 1 ? '' : 's'})`, site.id);
       await publishChange(db, [ctx.org.id]);
@@ -155,9 +155,9 @@ export default async function projectRoutes(app: FastifyInstance) {
       if (!add.length) throw badRequest('Those requirements are already on this project.');
       for (const r of add) {
         await db.query(
-          `insert into requirements (site_id, category, name, source, why, position)
-           values ($1, $2, $3, $4, $5, coalesce((select max(position) + 1 from requirements where site_id = $1), 0))`,
-          [site.id, r.category, r.name, r.source, r.why],
+          `insert into requirements (site_id, category, name, source, why, position, optional)
+           values ($1, $2, $3, $4, $5, coalesce((select max(position) + 1 from requirements where site_id = $1), 0), $6)`,
+          [site.id, r.category, r.name, r.source, r.why, !!(r as { optional?: boolean }).optional],
         );
       }
       await audit(db, ctx, 'Added project requirements', add.map((r) => r.name).slice(0, 10).join(', ') + (add.length > 10 ? ` and ${add.length - 10} more` : ''), site.id);

@@ -67,7 +67,7 @@ async function addToFiles(db: Db, workplaceId: string, items: Item[]): Promise<n
     let i = 0;
     for (const r of items) {
       if (have.has(r.name.toLowerCase())) continue;
-      await db.query(`insert into requirements (site_id, category, name, source, why, position) values ($1, $2, $3, $4, $5, $6)`, [f.id, r.category, r.name, r.source, r.why, pos + i++]);
+      await db.query(`insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`, [f.id, r.category, r.name, r.source, r.why, pos + i++, !!r.optional]);
     }
     if (i) { touched++; await recheckSiteReady(db, f.id, 'new site requirement'); }
   }
@@ -168,6 +168,30 @@ export default async function workplaceRoutes(app: FastifyInstance) {
       }
       await publishChange(db, [ctx.org.id, ...files.map((f) => f.linked_org_id).filter((x): x is string => !!x)]);
       return { added: items.length, contractorsUpdated: touched };
+    });
+  });
+
+  /** Mine: make a site requirement optional or required, for the site and every contractor's file on it. */
+  app.post('/api/workplaces/:id/requirements/optional', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireHostAdmin(ctx);
+    requireWritable(ctx);
+    const { name, optional } = z.object({ name: text(200).min(1), optional: z.boolean() }).parse(req.body);
+    return withTx(async (db) => {
+      const w = await loadWorkplace(db, ctx, (req.params as { id: string }).id, true);
+      if (!w.requirements.some((r) => r.name.toLowerCase() === name.toLowerCase())) throw notFound();
+      const next = w.requirements.map((r) => (r.name.toLowerCase() === name.toLowerCase() ? { ...r, optional } : r));
+      await db.query('update workplaces set requirements = $2 where id = $1', [w.id, JSON.stringify(next)]);
+      const files = await filesOf(db, w.id);
+      await db.query(
+        `update requirements r set optional = $3 from sites s where r.site_id = s.id and s.workplace_id = $1 and lower(r.name) = lower($2)`,
+        [w.id, name, optional],
+      );
+      // Making something required can mean a Site Ready file no longer qualifies.
+      if (!optional) for (const f of files) await recheckSiteReady(db, f.id, 'requirement made required');
+      await audit(db, ctx, optional ? 'Made requirement optional' : 'Made requirement required', `${w.name}: ${name}`);
+      await publishChange(db, [ctx.org.id, ...files.map((f) => f.linked_org_id).filter((x): x is string => !!x)]);
+      return { ok: true, files: files.length };
     });
   });
 
@@ -284,7 +308,7 @@ export async function joinWorkplaceByCode(db: Db, ctx: OrgCtx, code: string): Pr
     [w.org_id, w.name, w.location, c.id, JSON.stringify(w.emergency ?? {}), w.id],
   ))!;
   for (const [i, r] of w.requirements.entries()) {
-    await db.query(`insert into requirements (site_id, category, name, source, why, position) values ($1, $2, $3, $4, $5, $6)`, [site.id, r.category, r.name, r.source, r.why, i]);
+    await db.query(`insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`, [site.id, r.category, r.name, r.source, r.why, i, !!r.optional]);
   }
   await audit(db, ctx, 'Joined site with site code', `${w.name} — ${w.requirements.length} requirements`, site.id);
   await notifyOrg(db, w.org_id, [...REVIEWERS], { kind: 'accepted', title: `${ctx.org.name} joined ${w.name}`, body: `${ctx.org.trade ? ctx.org.trade + ' · ' : ''}They can now see the site's requirements and start their safety file.`, link: { kind: 'site', siteId: site.id } });

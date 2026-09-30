@@ -176,7 +176,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
 
     // ---- requirements ----
     for (const r of await many(db, `select * from requirements where site_id = any($1::uuid[]) order by position, created_at`, [activeIds])) {
-      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name) });
+      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, optional: !!r.optional, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name) });
     }
 
     // ---- documents (site requirements) ----

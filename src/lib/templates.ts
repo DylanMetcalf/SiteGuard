@@ -14,6 +14,8 @@ export interface TemplateItem {
   name: string;
   source: Source;
   why: string;
+  /** Welcome in the file but not required; sites and contractors can change it per file. */
+  optional?: boolean;
 }
 
 export interface TemplatePack {
@@ -21,11 +23,19 @@ export interface TemplatePack {
   name: string;
   description: string;
   items: TemplateItem[];
+  /**
+   * Where the list applies and how far it has been checked. The lists are data, not code, so
+   * other jurisdictions are new packs rather than a rebuild. "Researched" means compiled from
+   * published legislation and guidance; a qualified SHE practitioner should confirm it for a site.
+   */
+  jurisdiction?: string;
+  reviewedOn?: string;
+  verification?: 'researched' | 'professionally_verified';
 }
 
 const item = (category: string, name: string, source: Source, why: string): TemplateItem => ({ category, name, source, why });
 
-export const TEMPLATE_PACKS: TemplatePack[] = [
+const RAW_PACKS: TemplatePack[] = [
   {
     id: 'general-mine',
     name: 'General safety file — mine (MHSA)',
@@ -171,17 +181,20 @@ export const TEMPLATE_PACKS: TemplatePack[] = [
   },
 ];
 
+/** Every pack so far is South African, researched from published legislation (Sep 2026) and not yet professionally verified. */
+export const TEMPLATE_PACKS: TemplatePack[] = RAW_PACKS.map((p) => ({ jurisdiction: 'ZA', reviewedOn: '2026-09-29', verification: 'researched', ...p }));
+
 /** Items from the chosen packs, in pack order, without duplicate names. */
-export function itemsFromPacks(packIds: string[], exclude: Iterable<string> = []): TemplateItem[] {
+export function itemsFromPacks(packIds: string[], exclude: Iterable<string> = []): (TemplateItem & { optional: boolean })[] {
   const seen = new Set([...exclude].map((n) => n.trim().toLowerCase()));
-  const out: TemplateItem[] = [];
+  const out: (TemplateItem & { optional: boolean })[] = [];
   for (const pack of TEMPLATE_PACKS) {
     if (!packIds.includes(pack.id)) continue;
     for (const it of pack.items) {
       const key = it.name.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push(it);
+      out.push({ ...it, optional: !!it.optional });
     }
   }
   return out;

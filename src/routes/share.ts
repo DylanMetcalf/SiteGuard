@@ -197,8 +197,15 @@ export default async function shareRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     if (!isUuid(id)) throw notFound();
     await loadSite(pool, ctx, id);
-    const { pdf, filename, revision, created } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`);
+    // Optional selection: which filed documents go into this copy (?only=reqId,reqId), and whether appointments and certificates do.
+    const q = req.query as { only?: string; appointments?: string; certificates?: string };
+    const only = typeof q.only === 'string' ? q.only.split(',').filter(Boolean).slice(0, 500) : undefined;
+    if (only && only.some((x) => !isUuid(x))) throw notFound();
+    const { pdf, filename, revision, created, partial } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`, {
+      only, appointments: q.appointments === '0' ? false : undefined, certificates: q.certificates === '0' ? false : undefined,
+    });
     if (created) await audit(pool, ctx, 'Compiled safety file', `Rev ${revision}`, id);
+    else if (partial) await audit(pool, ctx, 'Compiled safety file (selected documents)', `${only ? only.length : 'all'} document${only?.length === 1 ? '' : 's'} chosen`, id);
     reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, false));
     return reply.type('application/pdf').send(pdf);
   });
