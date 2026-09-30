@@ -34,6 +34,8 @@ haven't built.
 - Gate clearance is computed live in `lib/gate.ts` (never stored); the public `/gate/:token` page shows no ID numbers
   or certificates. Suspension, audits and validity rules live in `routes/oversight.ts`; a mine's validity rules only
   ever shorten an expiry (`lib/validity.ts`). Safety file revisions are recorded only when the contents change.
+- Contractor projects (`routes/projects.ts`) are ordinary files for a private client record (`organisations.managed_by_org`);
+  `loadSite` sets `site.project`. Never add memberships to a client record; archive projects, never delete them.
 - The Walkthrough (`public/js/tour.js`) only navigates: when a screen changes, check its step's `target` selector still exists.
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.

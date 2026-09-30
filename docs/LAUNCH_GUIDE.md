@@ -228,6 +228,26 @@ covers.
 - **Backups.** Render backs up the paid database and snapshots the disk daily. Once a month, try a
   restore of the database into a new one to prove it works.
 
+## Sharing SiteGuard with testers
+
+Send people your app's address (for example `https://siteguard.onrender.com`). They land on a page
+that explains SiteGuard, with three ways in:
+
+- **Create a free account**: they choose "We run a site or mine" or "We're a contractor", then
+  confirm their email address from the link SiteGuard sends. Email needs Step 2 (Resend) to be
+  set up; until then, confirmation links only appear in Render's log.
+- **Watch the 2-minute tour**: a private demo with sample data that plays the walkthrough by
+  itself. Nothing they do there touches real accounts, and it is deleted after three days.
+- **Sign in**, once they have an account.
+
+Tips for a test round:
+- Ask one tester to be a mine and one to be a contractor, so they can try the site code, reviews
+  and Site Ready together.
+- Contractors who work for clients outside SiteGuard can try **Sites → + Project**.
+- Testers send feedback from **More → Report a problem or suggest an idea**; it is emailed to the
+  `SUPPORT_EMAIL` address you set in Step 2.
+- Until you switch on payments, everything is free and no limits apply.
+
 ## Your 10-minute demo on site
 
 **Hands-free option:** open SiteGuard, then **Walkthrough** on the dashboard (or More →

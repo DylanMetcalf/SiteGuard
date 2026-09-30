@@ -188,6 +188,12 @@ export function maybeOfferTour(){
   let seen = false;
   try{ seen = localStorage.getItem('sg_tutorial_seen') === '1'; }catch{ seen = true; }
   if(seen) return;
+  // Let a welcome message ("check your email…") finish first, so it never covers the buttons.
+  if(document.querySelector('.toast')){ setTimeout(showOffer, 3400); return; }
+  showOffer();
+}
+function showOffer(){
+  if(!S.state || document.querySelector('.overlay.tutorial, .tour')) return;
   const o = document.createElement('div');
   o.className = 'overlay tutorial';
   o.innerHTML = '<div class="sheet tut-card" role="dialog" aria-modal="true" aria-labelledby="tutT"><div class="tut-icon">'+ICONS.sparkle+'</div>'

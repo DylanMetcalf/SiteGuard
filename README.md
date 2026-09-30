@@ -60,6 +60,24 @@ and the site's requirements; a new requirement reaches every contractor's file a
 asks whether you run a site or are a contractor. (Inviting one contractor by email for a single
 job still works.)
 
+**Landing page**: someone opening the link without an account sees what SiteGuard is, who it's
+for and how it works, with *Create a free account*, *Sign in*, and *Watch the 2-minute tour* (a
+private demo that opens straight into the auto-playing walkthrough).
+
+**Contractor projects**: a contractor can build a safety file for any client or site that isn't on
+SiteGuard (*Sites → + Project*). It picks the client, starts from a starter list (or copies another
+file's list), adds its own items, files documents from its library or Document Studio, and sends
+the client the bound PDF or a secure link. The client needs no account. Filed documents count
+straight away, and the PDF says the file was prepared by the contractor and not reviewed by the
+client. Free contractors get 2 active projects (when billing is on); Contractor Pro is unlimited.
+
+**Safety file check**: before the PDF downloads, SiteGuard shows what is required, what is in the
+file, what is missing or expired (by name), and which workers lack a valid medical. The PDF lists
+every gap rather than presenting the file as complete.
+
+**Timeline**: each file's *Site activity* ends with its dated history from both companies — who
+submitted, reviewed, approved, audited or changed what, and when.
+
 **Walkthrough**: *More → Walkthrough* (or the button on the dashboard) is a guided tour of every
 page for the mine or the contractor. It moves through the real screens, highlights each part and
 explains it in a sentence or two, with Back, Next and **Auto-play** for demos. Add `?tour=1` to the

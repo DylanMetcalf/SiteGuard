@@ -58,11 +58,12 @@ added, and what is deliberately parked (with the reason in `PARKING_LOT.md`).
 | 38 Multi-tenant SaaS, roles | ✅ | Mines and contractors are separate tenants; owner, admin, reviewer and staff roles; every route enforces them. |
 | 39 Either side can subscribe | ✅ | Plans in `lib/plans.ts`, Stripe billing; workflows don't hard-code prices. |
 | 40 One master profile, many site files | ✅ | Exactly how files work. |
-| 41–42 Standalone contractor mode (own projects) | ⏸ | Changes the tenancy model (files belong to a mine's site today). Needs the owner's approval as an architectural change. |
-| 43–46 Export engine, index, numbering, completeness | ✅ | Contents generated from the file; Studio numbering uses the company's own prefix; the cover states approved / awaiting / outstanding counts. |
+| 41–42 Standalone contractor mode (own projects) | 🆕 (update 3) | *My projects*: a contractor builds a safety file for any client that isn't on SiteGuard. It uses a starter list, a copy of another file's list or its own items, files documents from its library or Document Studio, and sends a PDF or a secure link. The client needs no account. |
+| 43–46 Export engine, index, numbering, completeness | ✅ / 🆕 | Contents generated from the file; Studio numbering uses the company's own prefix; the cover states approved / awaiting / outstanding counts. 🆕 A *safety file check* before every download shows required, in the file, missing and expired items, with names, and says the PDF lists every gap. |
 | 47, 87, 89 Change impact and rebuild | 🆕 | "Revisions and what changed" on every file, and a to-do item when a file has changed since its last revision. |
 | 48 "What needs my attention?" | ✅ | Dashboard, To-do list and agent findings. |
 | 49 Notification centre | ✅ | In-app inbox plus email; SMS/WhatsApp are parked. |
+| 75 Compliance timeline | 🆕 (update 3) | *Timeline* on each file's Site activity: the dated history from both companies. |
 | 50 Audit trail | ✅ | Append-only, filterable and exportable; 🆕 audits, findings, suspensions, validity rules and new safety file revisions are recorded. |
 | 51 Search | ✅ | A search box on every list, plus 🆕 the gate list. |
 | 52–55 Dashboards, mobile-first, visual design, field use | ✅ | Phone-first layout; 🆕 44-pixel Yes/No/N/A buttons on the audit checklist for gloved hands. |
@@ -90,6 +91,6 @@ pull requests is parked until there is usage data to prioritise from.
 
 Journeys B (site invites contractor), C (one contractor, many sites), D (expiry → renewal →
 affected files), E (new requirement → request → upload → review) and G (toolbox talk) run end to
-end today. Journey A needs standalone mode (parked), and Journey F (field induction on a shared
+end today. Journey A (a new contractor's own project) runs end to end since update 3, and Journey F (field induction on a shared
 device) is partly covered: inductions are recorded as certificates, and signatures happen through
 toolbox talks. See *What was verified, and how* in `ARCHITECTURE.md` for the tests behind each one.
