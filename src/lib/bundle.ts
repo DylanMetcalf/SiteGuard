@@ -16,6 +16,7 @@
  * safety-file link — and only the certificates of workers assigned to the site.
  */
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { createHash } from 'node:crypto';
 import { many, one, type Db } from '../db/pool.js';
 import { daysUntil, effectiveStatus, type DocStatus } from './readiness.js';
 import { storage } from './storage.js';
@@ -96,7 +97,7 @@ const certStatus = (expires: string | null): [string, string] => {
   return ['Valid', GREEN];
 };
 
-export async function buildSafetyFile(db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string }> {
+async function safetyFileItems(db: Db, siteId: string) {
   const site = (await one<any>(
     db,
     `select s.name, s.location, s.status, o.name as host_name, c.name as contractor_name, c.linked_org_id,
@@ -156,6 +157,57 @@ export async function buildSafetyFile(db: Db, siteId: string, generatedBy: strin
     }
   }
 
+  return { site, reqs, items, workers };
+}
+
+/** One line of a safety file revision: enough to say what changed between two revisions. */
+export interface FileLine { section: string; name: string; status: string; version: string | null; expiry: string | null; included: boolean }
+export interface FileChange { kind: 'added' | 'removed' | 'changed'; section: string; name: string; detail: string }
+
+const lineKey = (l: FileLine) => `${l.section}\u0000${l.name}`;
+const describe = (l: FileLine) => [l.status, l.version ? ver(l.version) : '', l.expiry ? `expires ${fmt(l.expiry)}` : ''].filter(Boolean).join(', ');
+
+/** What differs between a revision's contents and the file as it stands now. */
+export function diffContents(prev: FileLine[], cur: FileLine[]): FileChange[] {
+  const before = new Map(prev.map((l) => [lineKey(l), l]));
+  const now = new Map(cur.map((l) => [lineKey(l), l]));
+  const out: FileChange[] = [];
+  for (const [k, l] of now) {
+    const p = before.get(k);
+    if (!p) out.push({ kind: 'added', section: l.section, name: l.name, detail: describe(l) });
+    else if (p.status !== l.status || p.version !== l.version || p.expiry !== l.expiry || p.included !== l.included) {
+      out.push({ kind: 'changed', section: l.section, name: l.name, detail: `${describe(p)} → ${describe(l)}` });
+    }
+  }
+  for (const [k, l] of before) if (!now.has(k)) out.push({ kind: 'removed', section: l.section, name: l.name, detail: describe(l) });
+  return out;
+}
+
+const toLines = (items: BundleItem[]): FileLine[] =>
+  items.map((i) => ({ section: i.section, name: i.name, status: i.status[0], version: i.version ?? null, expiry: i.expiry ? fmt(i.expiry) : null, included: !!i.file }));
+
+/** The file's contents as they stand now, without rendering a PDF. */
+export async function currentContents(db: Db, siteId: string): Promise<FileLine[]> {
+  return toLines((await safetyFileItems(db, siteId)).items);
+}
+
+/** Saves a revision when the contents differ from the last one; returns the revision number in force. */
+async function recordRevision(db: Db, siteId: string, lines: FileLine[], generatedBy: string): Promise<{ number: number; created: boolean }> {
+  const digest = createHash('sha256').update(JSON.stringify(lines)).digest('hex');
+  const last = await one<{ number: number; digest: string }>(db, 'select number, digest from safety_file_versions where site_id = $1 order by number desc limit 1', [siteId]);
+  if (last && last.digest === digest) return { number: last.number, created: false };
+  const number = (last?.number ?? 0) + 1;
+  await db.query(
+    `insert into safety_file_versions (site_id, number, digest, contents, generated_by) values ($1, $2, $3, $4, $5) on conflict (site_id, number) do nothing`,
+    [siteId, number, digest, JSON.stringify(lines), generatedBy],
+  );
+  return { number, created: true };
+}
+
+export async function buildSafetyFile(db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean }> {
+  const { site, reqs, items, workers } = await safetyFileItems(db, siteId);
+  const revision = await recordRevision(db, siteId, toLines(items), generatedBy);
+
   const registers = await siteRegisters(db, siteId, workers);
   const { brand, logo } = await loadBranding(db, site.linked_org_id);
   const reqStatuses = reqs.map((r) => effectiveStatus(r.status ? { status: r.status, expiry_date: r.expiry_date } : null));
@@ -176,14 +228,15 @@ export async function buildSafetyFile(db: Db, siteId: string, generatedBy: strin
       ...(ready ? ([['Verification code', site.verification_id]] as [string, string][]) : []),
       ['Requirements', `${n('complete', 'expiring')} approved · ${n('awaiting_review')} awaiting review · ${n('missing', 'expired', 'correction_required')} outstanding`],
       ['Workforce', `${workers.length} worker${workers.length === 1 ? '' : 's'} assigned`],
+      ['Revision', `Rev ${revision.number}${revision.created ? '' : ' (unchanged since it was compiled)'}`],
       ['Compiled', `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC by ${generatedBy}`],
     ],
     items,
     registers,
     contentsNote: 'Only documents that have been submitted to the site are included. Missing, expired and returned documents are listed so the gaps are visible.',
-    stamp: `Safety file · ${site.name} · ${site.contractor_name}`,
+    stamp: `Safety file · ${site.name} · ${site.contractor_name} · Rev ${revision.number}`,
   });
-  return { pdf, filename: `Safety-file-${safeName(site.name)}.pdf` };
+  return { pdf, filename: `Safety-file-${safeName(site.name)}-rev${revision.number}.pdf`, revision: revision.number, created: revision.created };
 }
 
 /** A company's own selection of documents, merged into one PDF. */
@@ -219,6 +272,13 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
        from toolbox_talks t where t.site_id = $1 order by t.held_on`,
     [siteId],
   );
+  const audits = await many<any>(
+    db,
+    `select a.audited_on, a.auditor_name, a.score, a.summary,
+            (select string_agg(f.text || ' [' || f.status || ']', '; ' order by f.created_at) from audit_findings f where f.audit_id = a.id) as findings
+       from contractor_audits a where a.site_id = $1 order by a.audited_on`,
+    [siteId],
+  );
   const h = (s: string) => ({ text: s, bold: true, color: '#FFFFFF', fontSize: 8, fillColor: NAVY });
   const c = (s: unknown, extra: Record<string, unknown> = {}) => ({ text: t(s) || '—', fontSize: 8, ...extra });
   const table = (title: string, widths: (string | number)[], head: string[], rows: unknown[][], empty: string) => [
@@ -243,6 +303,9 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
     ...table('Toolbox talks', ['14%', '*', '20%', '34%'], ['Date', 'Topic', 'Presenter', 'Attendees (signed)'],
       talks.map((x) => [c(fmt(x.held_on)), c(x.topic), c(x.presenter_name), c(x.attendees)]),
       'No toolbox talks recorded.'),
+    ...table('Site audits', ['14%', '18%', '10%', '*'], ['Date', 'Auditor', 'Score', 'Findings (status)'],
+      audits.map((a) => [c(fmt(a.audited_on)), c(a.auditor_name), c(`${a.score}%`), c(a.findings || a.summary || 'No findings')]),
+      'No site audits recorded.'),
   ];
 }
 

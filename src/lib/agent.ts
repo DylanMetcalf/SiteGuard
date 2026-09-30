@@ -13,6 +13,7 @@ import { many, pool, withTx } from '../db/pool.js';
 import { computeReadiness } from './readiness.js';
 import { publishChange } from './realtime.js';
 import { appUrl, queueToOrg } from './email.js';
+import { currentContents, diffContents, type FileLine } from './bundle.js';
 
 export type Severity = 'high' | 'medium' | 'low';
 export interface FindingAction {
@@ -64,6 +65,31 @@ async function hostFindings(db: Db, orgId: string): Promise<Finding[]> {
       group by s.id, s.name`,
     [orgId],
   );
+  // Monthly audits (Construction Regulations 2014 expect the client to audit at least every 30 days).
+  const auditDue = await many<{ id: string; name: string; contractor: string; last: string | null; days: number }>(
+    db,
+    `select s.id, s.name, c.name as contractor, to_char(max(a.audited_on), 'YYYY-MM-DD') as last,
+            (current_date - coalesce(max(a.audited_on), s.created_at::date))::int as days
+       from sites s join contractors c on c.id = s.contractor_id left join contractor_audits a on a.site_id = s.id
+      where s.org_id = $1 and s.status in ('in_progress', 'site_ready')
+      group by s.id, s.name, c.name
+     having (current_date - coalesce(max(a.audited_on), s.created_at::date)) >= 30`,
+    [orgId],
+  );
+  for (const a of auditDue) {
+    out.push({ key: `audit-due:${a.id}`, siteId: a.id, severity: a.days >= 45 ? 'high' : 'medium', title: `${a.contractor} is due a site audit on ${a.name}`, detail: a.last ? `Last audited ${a.last} (${a.days} days ago). Audit contractors at least every 30 days.` : `Not audited yet, ${a.days} days after starting. Audit contractors at least every 30 days.`, action: { kind: 'site', siteId: a.id, tab: 'activity' } });
+  }
+  const overdueFindings = await many<{ site_id: string; name: string; contractor: string; n: number }>(
+    db,
+    `select s.id as site_id, s.name, c.name as contractor, count(*)::int as n
+       from audit_findings f join sites s on s.id = f.site_id join contractors c on c.id = s.contractor_id
+      where s.org_id = $1 and f.status <> 'closed' and f.due_on < current_date group by s.id, s.name, c.name`,
+    [orgId],
+  );
+  for (const f of overdueFindings) {
+    out.push({ key: `finding-overdue:${f.site_id}`, siteId: f.site_id, severity: 'high', title: `${plural(f.n, 'audit finding')} overdue for ${f.contractor}`, detail: `${f.name}: past the date it was due to be fixed.`, action: { kind: 'site', siteId: f.site_id, tab: 'activity' } });
+  }
+
   for (const w of waiting) {
     out.push({ key: `review:${w.site_id}`, siteId: w.site_id, severity: w.oldest >= 5 ? 'high' : 'medium', title: `${plural(w.n, 'document')} waiting for your review on ${w.name}`, detail: `The oldest has waited ${w.oldest} days. Contractors can't start until they're reviewed.`, action: { kind: 'site', siteId: w.site_id, tab: 'compliance' } });
   }
@@ -160,6 +186,38 @@ async function contractorFindings(db: Db, orgId: string): Promise<Finding[]> {
       where c.linked_org_id = $1 and s.status = 'invited'`,
     [orgId],
   );
+  const suspended = await many<{ host: string; reason: string; site_id: string | null }>(
+    db,
+    `select o.name as host, c.suspended_reason as reason, (select s.id from sites s where s.contractor_id = c.id and s.status <> 'declined' order by s.created_at limit 1) as site_id
+       from contractors c join organisations o on o.id = c.org_id where c.linked_org_id = $1 and c.suspended_at is not null`,
+    [orgId],
+  );
+  for (const s of suspended) {
+    if (!s.site_id) continue;
+    out.push({ key: `suspended:${s.site_id}`, siteId: s.site_id, severity: 'high', title: `Suspended by ${s.host}`, detail: `${s.reason || 'No reason given'}. Your people won't be cleared at their gates until it's lifted.`, action: { kind: 'site', siteId: s.site_id } });
+  }
+  const openFindings = await many<{ site_id: string; name: string; n: number; overdue: number }>(
+    db,
+    `select s.id as site_id, s.name, count(*)::int as n, count(*) filter (where f.due_on < current_date)::int as overdue
+       from audit_findings f join sites s on s.id = f.site_id join contractors c on c.id = s.contractor_id
+      where c.linked_org_id = $1 and f.status = 'open' and s.status <> 'declined' group by s.id, s.name`,
+    [orgId],
+  );
+  for (const f of openFindings) {
+    out.push({ key: `findings:${f.site_id}`, siteId: f.site_id, severity: f.overdue ? 'high' : 'medium', title: `${plural(f.n, 'audit finding')} to fix on ${f.name}`, detail: f.overdue ? `${f.overdue} past the due date. Respond once each is fixed.` : 'Fix each one, then tell the site what was done.', action: { kind: 'site', siteId: f.site_id, tab: 'activity' } });
+  }
+  const compiled = await many<{ site_id: string; name: string; number: number; contents: FileLine[] }>(
+    db,
+    `select distinct on (v.site_id) v.site_id, s.name, v.number, v.contents
+       from safety_file_versions v join sites s on s.id = v.site_id join contractors c on c.id = s.contractor_id
+      where c.linked_org_id = $1 and s.status <> 'declined' order by v.site_id, v.number desc`,
+    [orgId],
+  );
+  for (const v of compiled) {
+    const changes = diffContents(v.contents, await currentContents(db, v.site_id));
+    if (!changes.length) continue;
+    out.push({ key: `rebuild:${v.site_id}`, siteId: v.site_id, severity: 'low', title: `Safety file for ${v.name} has changed since Rev ${v.number}`, detail: `${plural(changes.length, 'change')}, e.g. ${changes[0].name}. Download it again to issue Rev ${v.number + 1}.`, action: { kind: 'site', siteId: v.site_id } });
+  }
   for (const s of invited) {
     out.push({ key: `invited:${s.id}`, siteId: s.id, severity: 'medium', title: `${s.host} invited you to ${s.name}`, detail: 'Accept the invitation to see what the site needs.', action: { kind: 'site', siteId: s.id } });
   }

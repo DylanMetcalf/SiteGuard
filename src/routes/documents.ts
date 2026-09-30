@@ -16,6 +16,7 @@ import { extractExpiryDate } from '../lib/ai.js';
 import { rl } from './auth.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 import { buildDocumentPack, statusLabel, type BundleItem } from '../lib/bundle.js';
+import { capExpiry, rulesForOrg, submissionCap } from '../lib/validity.js';
 import { canReadFile } from './files.js';
 import { contentDisposition } from '../lib/storage.js';
 
@@ -222,23 +223,33 @@ export default async function documentRoutes(app: FastifyInstance) {
       const eff = effectiveStatus(doc);
       if (doc.status === 'awaiting_review') throw conflict('Already submitted — waiting on review.');
       const version = bumpVersion(doc.version);
-      const expiry = body.expiryDate ?? null;
+      let expiry = body.expiryDate ?? null;
       // A common slip is typing last year; an already-expired document can never count.
       if (expiry && expiry < new Date().toISOString().slice(0, 10)) throw badRequest('That expiry date has already passed — check the date (especially the year) and try again.', 'expired_date');
       if (expiry && expiry > `${new Date().getFullYear() + 25}-12-31`) throw badRequest('That expiry date is too far in the future — check the year.', 'bad_date');
       // Documents that lapse must carry their date, or nobody gets warned before they do.
       if (!expiry && MUST_EXPIRE.test(s.name)) throw badRequest(`Add the expiry (valid-until) date printed on the ${s.name} — without it SiteGuard can't warn anyone before it lapses.`, 'expiry_required');
+      // The mine's validity rule: it accepts this kind of document for at most N months from today.
+      let ruleNote = '';
+      if (s.kind === 'site' && s.hostOrgId) {
+        const cap = submissionCap(await rulesForOrg(db, s.hostOrgId), s.name);
+        if (cap) {
+          const capped = capExpiry(expiry, cap.months);
+          if (capped !== expiry) ruleNote = `Accepted until ${capped} under the site's ${cap.months}-month rule for ${cap.label}.`;
+          expiry = capped;
+        }
+      }
       await db.query(
         `insert into document_versions (document_id, version, file_id, note, expiry_date, ai_drafted, submitted_by, submitted_by_name)
          values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [doc.id, version, doc.pending_file_id, body.note, expiry, body.aiDrafted, ctx.user.id, ctx.user.name],
+        [doc.id, version, doc.pending_file_id, [body.note, ruleNote].filter(Boolean).join(' '), expiry, body.aiDrafted, ctx.user.id, ctx.user.name],
       );
       // Company library documents have no reviewer — they are the contractor's own record.
       const status = s.kind === 'library' ? 'complete' : 'awaiting_review';
       await db.query(
         `update documents set status = $2, version = $3, current_file_id = pending_file_id, pending_file_id = null,
                 note = $4, expiry_date = $5, updated_at = now() where id = $1`,
-        [doc.id, status, version, body.note, expiry],
+        [doc.id, status, version, [body.note, ruleNote].filter(Boolean).join(' '), expiry],
       );
       if (s.requirementId) {
         // Any open request tied to this requirement is answered by the submission.
@@ -257,7 +268,7 @@ export default async function documentRoutes(app: FastifyInstance) {
         });
       }
       await publishChange(db, s.parties);
-      return { version, status };
+      return { version, status, expiryDate: expiry, ruleNote };
     });
   });
 

@@ -13,7 +13,8 @@
 import type { Block, DocContent, Section } from './model.js';
 import { HAZARD_CONTROLS, hazardsFor, matchProfiles, WORK_PROFILES } from '../knowledge.js';
 
-export type FieldType = 'text' | 'textarea' | 'lines' | 'date' | 'select';
+/** 'checks' is a tick-box list; the answer is the ticked options joined by '; '. */
+export type FieldType = 'text' | 'textarea' | 'lines' | 'date' | 'select' | 'checks';
 export interface Field {
   id: string;
   label: string;
@@ -78,6 +79,12 @@ export function joinSite(name: string, location?: string): string {
 const siteLabel = (i: BuildInput) => (i.site ? joinSite(i.site.name, i.site.location) : v(i, 'site', 'the site'));
 const clientLabel = (i: BuildInput) => i.site?.clientName || v(i, 'client', 'the client');
 const scopeText = (i: BuildInput) => v(i, 'scope', v(i, 'task', 'the work described in this document'));
+/** The scope plus any work activities ticked: what hazards, controls, PPE and permits are worked out from. */
+const workText = (i: BuildInput) => [scopeText(i), v(i, 'activities')].filter(Boolean).join('; ');
+const activityField: Field = {
+  id: 'activities', label: 'Work activities (tick all that apply)', type: 'checks', options: WORK_PROFILES.map((p) => p.label),
+  help: 'Each activity adds its hazards, controls, PPE and permits. SiteGuard also picks them up from the scope of work.',
+};
 
 const LEGAL_CORE = [
   'Occupational Health and Safety Act 85 of 1993 (OHS Act), including section 8 (general duties of employers) and section 37(2) (agreements with mandataries)',
@@ -275,14 +282,15 @@ const riskAssessment: Blueprint = {
   id: 'risk-assessment', code: 'RA', name: 'Site-specific Risk Assessment', category: 'Risk assessments',
   description: 'Hazard identification and risk assessment (HIRA) with a 5×5 risk matrix and controls for the job.',
   matches: /risk assessment|hira|baseline risk/i, reviewMonths: 12,
-  fields: [common.site, common.scope,
+  fields: [common.site, common.scope, activityField,
     { id: 'steps', label: 'Main steps of the job (optional)', type: 'lines', placeholder: 'One per line, e.g. Isolate conveyor; Erect scaffold; Remove idlers…' },
     { id: 'team', label: 'Risk assessment team', type: 'text', placeholder: 'e.g. J. Dlamini (supervisor), P. Naidoo (safety officer)' }],
   guidance: 'A HIRA: every hazard linked to the job steps, realistic inherent and residual ratings on the 5×5 matrix, specific controls following the hierarchy of controls. Include at least 8 hazards.',
   build(i) {
     const scope = scopeText(i);
+    const work = workText(i);
     const steps = lines(v(i, 'steps'));
-    const { profiles } = hazardsFor(scope);
+    const { profiles } = hazardsFor(work);
     return {
       title: 'Site-specific Risk Assessment',
       subtitle: `${scope} — ${siteLabel(i)}`,
@@ -292,8 +300,8 @@ const riskAssessment: Blueprint = {
         legalSection(['Construction Regulations, 2014, regulation 9 (risk assessment), where applicable']),
         sec('Method', para('Each hazard is rated for likelihood (1–5) and consequence (1–5) before controls (inherent risk) and after controls (residual risk). Controls follow the hierarchy: elimination, substitution, engineering, administrative controls, then PPE. No task may start while a residual risk is High.'), MATRIX),
         ...(steps.length ? [sec('Job steps', numbered(steps))] : []),
-        sec('Hazard identification and risk register', hazardTable(scope, 'Supervisor')),
-        sec('Personal protective equipment', bullets(ppeFor(scope))),
+        sec('Hazard identification and risk register', hazardTable(work, 'Supervisor')),
+        sec('Personal protective equipment', bullets(ppeFor(work))),
         sec('Communication', para('This risk assessment is explained to every worker at a toolbox talk before the job starts and whenever it changes. Workers sign the attendance register to confirm they understand it.')),
         ...recordsReview(i, ['Signed risk assessment', 'Toolbox talk attendance for this assessment'], 12),
         signOff(),
@@ -306,14 +314,15 @@ const methodStatement: Blueprint = {
   id: 'method-statement', code: 'MS', name: 'Method Statement / Safe Work Procedure', category: 'Procedures',
   description: 'Step-by-step description of how the job will be done safely, with plant, PPE and permits.',
   matches: /method statement|safe work procedure|swp/i, reviewMonths: 12,
-  fields: [common.site, common.scope,
+  fields: [common.site, common.scope, activityField,
     { id: 'steps', label: 'Sequence of work', type: 'lines', placeholder: 'One step per line. Leave blank for a standard sequence.' },
     { id: 'equipment', label: 'Plant, tools and equipment', type: 'lines', placeholder: 'One per line' },
     common.supervisor],
   guidance: 'A practical method statement a supervisor can brief from: detailed sequence of work with the control at each step, plant and PPE, permits, hold points and emergency arrangements.',
   build(i) {
     const scope = scopeText(i);
-    const { permits, profiles } = hazardsFor(scope);
+    const work = workText(i);
+    const { permits, profiles } = hazardsFor(work);
     const steps = lines(v(i, 'steps'));
     const seq = steps.length ? steps : [
       "Obtain the required permit(s) from the client's authorised person and sign on to the site register.",
@@ -334,10 +343,10 @@ const methodStatement: Blueprint = {
         legalSection(),
         responsibilities(i, [['Site supervisor', `${v(i, 'supervisor', 'Appointed in writing')}. Briefs the crew, controls the work and stops it if conditions change.`]]),
         sec('Plant, tools and equipment', bullets(lines(v(i, 'equipment')).length ? lines(v(i, 'equipment')) : ['List the plant, tools and equipment for this job here; each item is inspected before use.'])),
-        sec('Personal protective equipment', bullets(ppeFor(scope))),
+        sec('Personal protective equipment', bullets(ppeFor(work))),
         sec('Permits and hold points', permits.length ? bullets([...permits.map((p) => `${p} permit before starting`), 'Supervisor sign-off before energy is restored or equipment returned to service']) : bullets(['Confirm with the client whether a permit to work is required', 'Supervisor sign-off at completion'])),
         sec('Sequence of work', numbered(seq)),
-        sec('Key hazards and controls', hazardTable(scope, 'Supervisor')),
+        sec('Key hazards and controls', hazardTable(work, 'Supervisor')),
         sec('Emergency arrangements', para("Stop work, make the area safe and follow the client's emergency response plan."), ...emergencyBlocks(i)),
         ...recordsReview(i, ['Signed method statement', 'Permits', 'Toolbox talk attendance'], 12),
         signOff(),

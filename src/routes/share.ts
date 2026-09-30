@@ -17,10 +17,10 @@ import { planOf } from '../lib/plans.js';
 import { computeReadiness, effectiveStatus } from '../lib/readiness.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
-import { buildSafetyFile } from '../lib/bundle.js';
+import { buildSafetyFile, currentContents, diffContents, type FileLine } from '../lib/bundle.js';
 import { contentDisposition } from '../lib/storage.js';
 
-const esc = (s: unknown) =>
+export const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const fmtDate = (v: unknown) => (v ? new Date(v as string).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
@@ -31,7 +31,7 @@ const STATUS_COLOR: Record<string, string> = {
   complete: '#2C6B44', missing: '#A23A2D', expiring: '#8E6410', expired: '#A23A2D', awaiting_review: '#2A4E62', correction_required: '#A23A2D',
 };
 
-function page(title: string, body: string): string {
+export function page(title: string, body: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>${esc(title)} · SiteGuard</title>
 <link rel="icon" type="image/png" href="/icons/icon-32.png">
@@ -195,9 +195,28 @@ export default async function shareRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     if (!isUuid(id)) throw notFound();
     await loadSite(pool, ctx, id);
-    const { pdf, filename } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`);
+    const { pdf, filename, revision, created } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`);
+    if (created) await audit(pool, ctx, 'Compiled safety file', `Rev ${revision}`, id);
     reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, false));
     return reply.type('application/pdf').send(pdf);
+  });
+
+  /** Revisions of the safety file, and what has changed since the latest one (so it's clear when to rebuild). */
+  app.get('/api/sites/:id/safety-file/revisions', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    const { id } = req.params as { id: string };
+    if (!isUuid(id)) throw notFound();
+    await loadSite(pool, ctx, id);
+    const rows = await many<{ number: number; created_at: Date; generated_by: string; contents: FileLine[] }>(
+      pool, 'select number, created_at, generated_by, contents from safety_file_versions where site_id = $1 order by number desc limit 50', [id]);
+    const changes = rows.length ? diffContents(rows[0].contents, await currentContents(pool, id)) : [];
+    return {
+      revisions: rows.map((r, i) => ({
+        number: r.number, at: r.created_at, by: r.generated_by, documents: r.contents.filter((l) => l.included).length,
+        changes: rows[i + 1] ? diffContents(rows[i + 1].contents, r.contents).length : null,
+      })),
+      changesSinceLatest: changes,
+    };
   });
 
   app.get('/share/:token/safety-file.pdf', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
