@@ -214,6 +214,8 @@ export default async function orgRoutes(app: FastifyInstance) {
         inspectxBaseUrl: z.string().trim().max(300).refine((v) => v === '' || /^https:\/\//.test(v), 'must start with https://').optional(),
         reminderDigest: z.boolean().optional(),
         weeklySummary: z.boolean().optional(),
+        /** Days before an expiry when reminders go out, e.g. [60, 30, 14, 7, 1]. */
+        reminderDays: z.array(z.number().int().min(1).max(180)).min(1).max(6).transform((a) => [...new Set(a)].sort((x, y) => y - x)).optional(),
       })
       .parse(req.body);
     await withTx(async (db) => {

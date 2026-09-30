@@ -6,6 +6,7 @@
  */
 import { libraryTypeFor } from '../lib/readiness.js';
 import { rulesOf } from '../lib/validity.js';
+import { reminderDaysOf } from '../jobs/reminders.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
 import { features } from '../config.js';
@@ -71,7 +72,12 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     incidents: {},
     permits: {},
     diary: {},
-    settings: host ? { inspectxEnabled: false, inspectxBaseUrl: '', ...(ctx.org.settings as object) } : { inspectxEnabled: false, inspectxBaseUrl: '' },
+    settings: host
+      ? { inspectxEnabled: false, inspectxBaseUrl: '', ...(ctx.org.settings as object), reminderDays: reminderDaysOf(ctx.org.settings) }
+      : {
+          inspectxEnabled: false, inspectxBaseUrl: '', reminderDays: reminderDaysOf(ctx.org.settings),
+          reminderDigest: (ctx.org.settings as Record<string, unknown> | null)?.reminderDigest, weeklySummary: (ctx.org.settings as Record<string, unknown> | null)?.weeklySummary,
+        },
     shareLinks: [],
     workplaces: {},
   };

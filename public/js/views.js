@@ -1019,7 +1019,11 @@ function renderSettings(){
   html += '<div class="section-title">Notifications</div><div class="card">'
     +'<div class="toggle-row"><label for="digestToggle">Email reminder digests (expiring documents &amp; certificates, open incidents, overdue requests)</label><input type="checkbox" id="digestToggle" '+(s.reminderDigest===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-digest"')+'></div>'
     +'<div class="toggle-row"><label for="weeklyToggle">Monday compliance summary for admins (from the compliance agent)</label><input type="checkbox" id="weeklyToggle" '+(s.weeklySummary===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-weekly"')+'></div>'
-    +'<div class="site-card-sub" style="margin-top:6px;">Invitations, correction requests, requests for information, permit requests and serious incidents are always emailed.</div></div>';
+    +'<div class="field-label" style="margin-top:12px;">Remind us before a document or certificate expires</div>'
+    +'<div class="check-grid" id="reminderDays">'+[90,60,30,14,7,1].map(d=>'<label class="check-chip"><input type="checkbox" value="'+d+'"'+((s.reminderDays||[30,7]).includes(d)?' checked':'')+(ro?' disabled':'')+'> '+(d===1?'1 day':d+' days')+'</label>').join('')+'</div>'
+    +'<div class="site-card-sub" style="margin-top:6px;">One email at each point you tick, and one when it expires. Nothing is repeated, so the list stays short.</div>'
+    +(ro?'':'<button class="btn secondary small" style="margin-top:8px;" data-action="save-reminder-days">Save reminder days</button>')
+    +'<div class="site-card-sub" style="margin-top:10px;">Invitations, correction requests, requests for information, permit requests and serious incidents are always emailed.</div></div>';
   if(isHost()){
     html += '<div class="section-title">InspectX integration</div><div class="card"><div class="site-card-sub" style="margin-bottom:10px;">SiteGuard works fully without InspectX. Once enabled, inspections with an external reference link straight across.</div>'
       +'<div class="toggle-row"><label for="inspectxToggle">Enable InspectX links</label><input type="checkbox" id="inspectxToggle" '+(s.inspectxEnabled?'checked':'')+'></div>'
@@ -1264,6 +1268,11 @@ on('save-org', (el)=>{
   return act(()=>api.patch('/api/org', body), 'Company details saved', el);
 });
 on('toggle-digest', (el)=>act(()=>api.patch('/api/org/settings', { reminderDigest: el.checked }), el.checked?'Reminder digests on':'Reminder digests off'));
+on('save-reminder-days', (el)=>{
+  const days = [...document.querySelectorAll('#reminderDays input:checked')].map(x=>Number(x.value));
+  if(!days.length){ showToast('Tick at least one reminder'); return; }
+  return act(()=>api.patch('/api/org/settings', { reminderDays: days }), 'Reminder days saved', el);
+});
 on('toggle-weekly', (el)=>act(()=>api.patch('/api/org/settings', { weeklySummary: el.checked }), el.checked?'Weekly summary on':'Weekly summary off'));
 on('save-integration', (el)=>act(()=>api.patch('/api/org/settings', { inspectxEnabled: document.getElementById('inspectxToggle').checked, inspectxBaseUrl: document.getElementById('inspectxUrl').value.trim() }), 'Settings saved', el));
 on('resend-verification', (el)=>act(()=>api.post('/api/auth/resend-verification'), 'Confirmation email sent', el));
