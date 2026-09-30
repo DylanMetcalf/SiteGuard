@@ -133,7 +133,7 @@ export default async function shareRoutes(app: FastifyInstance) {
 
     const site = (await one<any>(
       pool,
-      `select s.*, c.name as contractor_name, o.name as host_name, a.verification_id, a.approved_on, a.approver_name, a.approver_role
+      `select s.*, c.name as contractor_name, o.name as host_name, (o.managed_by_org is not null) as project, a.verification_id, a.approved_on, a.approver_name, a.approver_role
          from sites s join contractors c on c.id = s.contractor_id join organisations o on o.id = s.org_id
          left join approvals a on a.site_id = s.id where s.id = $1`,
       [link.site_id],
@@ -141,11 +141,13 @@ export default async function shareRoutes(app: FastifyInstance) {
     const r = await computeReadiness(pool, site.id);
     const severe = await many(pool, `select type, occurred_on from incidents where site_id = $1 and status <> 'closed' and type in ('lost_time','fatality')`, [site.id]);
     let body = `<div class="card"><div class="sub">Shared by ${esc(link.org_name)}${link.label ? ` · ${esc(link.label)}` : ''} · link expires ${fmtDate(link.expires_at)}</div>
-      <h1>${esc(site.name)}</h1><div class="sub">${esc(site.location)} · Host: ${esc(site.host_name)} · Contractor: ${esc(site.contractor_name)}</div></div>
+      <h1>${esc(site.name)}</h1><div class="sub">${[site.location, `${site.project ? 'Client' : 'Host'}: ${site.host_name}`, `Contractor: ${site.contractor_name}`].filter(Boolean).map(esc).join(' · ')}</div></div>
       <div class="card" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
-        <div><div class="big">${site.status === 'site_ready' ? 100 : r.percent}%</div><div class="sub">Site readiness</div></div>
+        <div><div class="big">${site.status === 'site_ready' ? 100 : r.percent}%</div><div class="sub">${site.project ? 'File complete' : 'Site readiness'}</div></div>
         <div style="flex:1;min-width:200px">${
-          site.status === 'site_ready' && site.verification_id
+          site.project
+            ? `<div class="sub">${r.counts.complete} of ${r.total} documents in the file · ${r.counts.missing + r.counts.expired} outstanding</div><div class="sub" style="margin-top:6px">Prepared by ${esc(site.contractor_name)} for ${esc(site.host_name)}. The documents are the contractor's own; check them against your requirements.</div>`
+            : site.status === 'site_ready' && site.verification_id
             ? `<span class="stamp">SITE READY</span><div class="sub" style="margin-top:6px">Approved ${fmtDate(site.approved_on)} by ${esc(site.approver_name)}, ${esc(site.approver_role)} · Verification <a href="/verify/${esc(site.verification_id)}">${esc(site.verification_id)}</a></div>`
             : `<div class="sub">${r.counts.complete} of ${r.total} requirements complete · ${r.counts.awaiting_review} awaiting review · ${r.counts.missing} missing · ${r.counts.expired + r.counts.correction_required} need attention</div>`
         }${severe.length ? `<div class="stamp warn" style="margin-top:8px">${severe.length} open serious incident investigation${severe.length === 1 ? '' : 's'}</div>` : ''}</div></div>`;

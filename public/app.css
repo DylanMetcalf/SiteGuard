@@ -692,3 +692,7 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
   #printArea .gc-foot{font-size:8px; color:#777; margin-top:6px;}
 }
 .gate-reissue{display:block; margin-top:6px; font-size:12.5px;}
+/* ===== Contractor projects ===== */
+.project-bar{border-left:4px solid var(--sage); margin-top:12px;}
+.project-empty{border:1px dashed var(--sage-soft); background:var(--sage-bg);}
+.section-title.flexbetween .linkish{font-size:13px; text-transform:none; letter-spacing:0;}

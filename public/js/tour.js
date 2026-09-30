@@ -53,6 +53,7 @@ function contractorSteps(){
     { title: 'Welcome to SiteGuard', body: 'SiteGuard keeps your company\'s safety files for every site you work on. Your documents are stored once and reused wherever they are needed; each site sees only its own file. This walkthrough takes about two minutes.', go: go({ nav: 'dashboard', activeSiteId: null, moreView: null }) },
     { title: 'What you need to do', body: 'The dashboard puts your to-do list first: missing and expiring documents, corrections the site asked for, audit findings to fix, and requests with due dates.', target: '.hero, .dash-hero, .view-head' },
     { title: 'Join a site with its code', body: 'The site gives you a code. Type it under More → Join a site with a code, and your safety file for that site starts straight away with the site\'s requirements.', go: go({ nav: 'more', moreView: null }), target: '[data-action="join-site"], .view-head' },
+    { title: 'Your own projects', body: 'Working for a client who isn\'t on SiteGuard? Start a project: pick the documents they need (or copy another file\'s list), file them once from your library, and send a professional PDF or a secure link. The client doesn\'t need an account.', go: go({ nav: 'sites', activeSiteId: null, moreView: null }), target: '[data-action="new-project"], .view-head' },
   ];
   if(file){
     out.push(
