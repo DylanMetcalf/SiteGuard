@@ -5,6 +5,34 @@ Newest first.
 
 ---
 
+**DECISION** Gate clearance is computed on every request from the file, the company and the worker's certificates; it is never stored as a flag.
+**REASON** A stored "cleared" goes stale the day a medical expires or a contractor is suspended. Security at the gate must see today's answer, with the reason when it's no.
+**DATE** 2026-09-30
+
+**DECISION** The public gate page shows name, occupation, employee number, company, site and the reasons; never ID numbers, medical details or documents.
+**REASON** POPIA data minimisation: security needs a yes/no and a name to match the person, not their records. The token is unguessable and per worker per site.
+**DATE** 2026-09-30
+
+**DECISION** A contractor is suspended per mine (across all that mine's sites), not per site.
+**REASON** Suspensions follow a serious incident or investigation of the company; a mine wants them off every site at once. Per-site removal already exists for the everyday case.
+**DATE** 2026-09-30
+
+**DECISION** Validity rules take the earlier of the rule and the document's own date, and are counted from the issue date for medicals and inductions and from submission for COID and insurance.
+**REASON** A rule should only ever make acceptance stricter, never extend a document past its printed expiry. Letters and policies often have no reliable issue date in the system.
+**DATE** 2026-09-30
+
+**DECISION** A safety file revision is recorded when its contents change, not on every download.
+**REASON** Revision numbers must mean something to an auditor ("Rev 3 is what we were given"). Downloading twice shouldn't bump the number.
+**DATE** 2026-09-30
+
+**DECISION** The in-app Walkthrough replaces the three-card first-run tutorial.
+**REASON** Showing the real screens teaches faster than describing them, and the same tour doubles as a hands-free demo (`?tour=1&autoplay=1`).
+**DATE** 2026-09-30
+
+**DECISION** Standalone contractor projects (a contractor building a safety file for a site that isn't on SiteGuard) are parked.
+**REASON** It changes the tenancy model: today every file belongs to a mine's site. It needs the owner's approval as an architectural change; the owner's spec (item 41) asks for it. See PARKING_LOT.
+**DATE** 2026-09-30
+
 **DECISION** Site Ready is withdrawn automatically when a file stops qualifying, rather than shown as "approved" until someone notices.
 **REASON** An independent audit found that an expired COID letter or a reported fatality left the public verification page saying "Site Ready". A live status protects the mine, the contractor and whoever checks the verification code.
 **DATE** 2026-09-29

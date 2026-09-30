@@ -5,6 +5,7 @@
  * client never receives data it isn't allowed to see.
  */
 import { libraryTypeFor } from '../lib/readiness.js';
+import { rulesOf } from '../lib/validity.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
 import { features } from '../config.js';
@@ -110,7 +111,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
       state.contractors[c.id] = {
         id: c.id, name: c.name, reg: own(c.lo_reg, c.reg_number), coid: own(c.lo_coid, c.coid_number), trade: own(c.lo_trade, c.trade),
         contact: own(c.lo_contact, c.contact_name), contactEmail: own(c.lo_email, c.contact_email), address: c.linked_org_id ? c.lo_address || '' : '',
-        linked: !!c.linked_org_id, linkedOrgName: c.linked_org_name, reliability, onTimeRate: onTime, firstTimeRightRate: ftr,
+        linked: !!c.linked_org_id, suspended: c.suspended_at ? { at: d(c.suspended_at), reason: c.suspended_reason, by: c.suspended_by_name } : null, linkedOrgName: c.linked_org_name, reliability, onTimeRate: onTime, firstTimeRightRate: ftr,
       };
     }
   } else {
@@ -123,6 +124,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
   // ---- sites ----
   for (const s of sites) {
     state.sites[s.id] = {
+      suspended: null,
       id: s.id, name: s.name, location: s.location,
       // On the contractor side every site belongs to "me".
       contractorId: host ? s.contractor_id : ctx.org.id,
@@ -154,6 +156,20 @@ export async function buildState(db: Db, ctx: OrgCtx) {
   }
 
   if (activeIds.length) {
+    // ---- suspension (shown to both sides on each file) ----
+    for (const r of await many(db, `select s.id, c.suspended_at, c.suspended_reason, c.suspended_by_name from sites s join contractors c on c.id = s.contractor_id where s.id = any($1::uuid[]) and c.suspended_at is not null`, [activeIds])) {
+      state.sites[r.id].suspended = { at: d(r.suspended_at), reason: r.suspended_reason, by: r.suspended_by_name };
+    }
+    // ---- monthly contractor audits and their findings ----
+    state.audits = {};
+    for (const a of await many(db, `select id, site_id, to_char(audited_on, 'YYYY-MM-DD') as audited_on, auditor_name, items, score, summary from contractor_audits where site_id = any($1::uuid[]) order by audited_on desc, created_at desc`, [activeIds])) {
+      (state.audits[a.site_id] ??= []).push({ id: a.id, auditedOn: a.audited_on, auditor: a.auditor_name, items: a.items, score: a.score, summary: a.summary, findings: [] });
+    }
+    for (const f of await many(db, `select id, audit_id, site_id, text, to_char(due_on, 'YYYY-MM-DD') as due_on, status, response, responded_by, closed_by_name, closed_at from audit_findings where site_id = any($1::uuid[]) order by created_at`, [activeIds])) {
+      const a = (state.audits[f.site_id] || []).find((x: { id: string }) => x.id === f.audit_id);
+      if (a) a.findings.push({ id: f.id, text: f.text, dueOn: f.due_on, status: f.status, response: f.response, respondedBy: f.responded_by, closedBy: f.closed_by_name, closedAt: d(f.closed_at) });
+    }
+
     // ---- requirements ----
     for (const r of await many(db, `select * from requirements where site_id = any($1::uuid[]) order by position, created_at`, [activeIds])) {
       state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name) });
@@ -361,7 +377,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         reg: c.org.reg_number, coid: c.org.coid_number, vat: c.org.vat_number, address: c.org.address, trade: c.org.trade,
         role: c.role, roleLabel: roleLabel(c.org.kind, c.role), uiRole: uiRole(c),
         plan: plan.id, planName: plan.name, subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
-        currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
+        currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, validityRules: rulesOf(c.org.settings), cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
         siteLimit: plan.siteLimit,
         branding: brandingOf(c),
       },

@@ -56,7 +56,7 @@ describe('bound safety file', () => {
   it('merges every submitted document behind a cover and contents, for both sides', async () => {
     const c = await contractor.req('GET', `/api/sites/${siteId}/safety-file.pdf`);
     assert.equal(c.status, 200);
-    assert.match(String(c.raw.headers['content-disposition']), /Safety-file-Shaft-4-Substation\.pdf/);
+    assert.match(String(c.raw.headers['content-disposition']), /Safety-file-Shaft-4-Substation-rev1\.pdf/);
     const n = await pages(c.raw.rawPayload);
     // cover + contents (≥2) + registers (1) + damaged-PDF notice (1) + photo page (1) + Studio document (≥3)
     assert.ok(n >= 8, `expected at least 8 pages, got ${n}`);

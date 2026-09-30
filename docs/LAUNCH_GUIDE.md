@@ -230,6 +230,11 @@ covers.
 
 ## Your 10-minute demo on site
 
+**Hands-free option:** open SiteGuard, then **Walkthrough** on the dashboard (or More →
+Walkthrough) and tap **Auto-play**. It moves through every page by itself, about 7 seconds per
+step, and you can talk over it. Back and Next take over at any point. Sending someone a link that
+ends in `?tour=1` starts the walkthrough as soon as they sign in.
+
 Use a phone or tablet. Open your site and tap **Explore the demo**: a private sandbox with a sample
 mine and three contractors, deleted automatically after three days.
 
@@ -258,6 +263,18 @@ mine and three contractors, deleted automatically after three days.
 6. **Close (2 min).** "Contractors use it free. You pay per user after a 14-day trial. Can we set up
    your first site together now?" Create a real account on the spot and use **Ask SiteGuard** to
    start their first site.
+
+### Show the mine's oversight tools (2 minutes, add to either demo)
+
+1. On the mine's site page open **Gate**: who may enter today, and the reason for anyone who
+   can't. Open a contractor's file → **People** → **Print gate cards (QR)** and scan one with a
+   phone: the gate check page opens without a login.
+2. **Site activity → Audit this contractor**: tap Yes / No through the checklist, type a note on
+   one "No", save. Switch to the contractor: the finding is on their to-do list; they say what was
+   fixed; back as the mine, **Close** it.
+3. **More → Organisation settings → Validity rules**: set medicals to 12 months from issue.
+4. **Contractors → a company → Suspend on all my sites** (then lift it): Site Ready, permits and
+   the gate all stop at once.
 
 ### The same demo from a clean start (best for a mine's SHE manager)
 

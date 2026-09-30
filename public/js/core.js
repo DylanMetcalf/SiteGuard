@@ -265,6 +265,7 @@ export function contractorOf(site){ return S.state.contractors[site.contractorId
 
 /* ============ UI PRIMITIVES ============ */
 let toastTimer = null;
+window.addEventListener('sg-rule-note', (e)=>{ setTimeout(()=>showToast(String(e.detail)), 1200); });
 export function showToast(msg){
   document.querySelectorAll('.toast').forEach(t=>t.remove());
   const el = document.createElement('div');

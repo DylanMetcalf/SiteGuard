@@ -16,7 +16,9 @@
  * safety-file link — and only the certificates of workers assigned to the site.
  */
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { many, one, type Db } from '../db/pool.js';
+import { createHash } from 'node:crypto';
+import { many, one, withTx, type Db } from '../db/pool.js';
+import { certExpiry, rulesOf } from './validity.js';
 import { daysUntil, effectiveStatus, type DocStatus } from './readiness.js';
 import { storage } from './storage.js';
 import { pdfFromDefinition, tint } from './studio/render-pdf.js';
@@ -96,10 +98,10 @@ const certStatus = (expires: string | null): [string, string] => {
   return ['Valid', GREEN];
 };
 
-export async function buildSafetyFile(db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string }> {
+async function safetyFileItems(db: Db, siteId: string) {
   const site = (await one<any>(
     db,
-    `select s.name, s.location, s.status, o.name as host_name, c.name as contractor_name, c.linked_org_id,
+    `select s.name, s.location, s.status, o.name as host_name, o.settings as host_settings, c.name as contractor_name, c.linked_org_id,
             a.verification_id, a.approved_on, a.approver_name
        from sites s join organisations o on o.id = s.org_id join contractors c on c.id = s.contractor_id
        left join approvals a on a.site_id = s.id
@@ -140,21 +142,94 @@ export async function buildSafetyFile(db: Db, siteId: string, generatedBy: strin
   const workers = await many<any>(
     db,
     `select w.full_name, w.occupation,
-            coalesce((select json_agg(json_build_object('kind', c.kind, 'name', c.name, 'issuer', c.issuer, 'expires', c.expires_on,
+            coalesce((select json_agg(json_build_object('kind', c.kind, 'name', c.name, 'issuer', c.issuer, 'expires', c.expires_on, 'issued', c.issued_on,
                         'storage_key', f.storage_key, 'content_type', f.content_type, 'filename', f.filename) order by c.kind, c.name)
                         from worker_certificates c left join files f on f.id = c.file_id where c.worker_id = w.id), '[]') as certs
        from site_workers sw join workers w on w.id = sw.worker_id where sw.site_id = $1 and w.active order by w.full_name`,
     [siteId],
   );
+  // The mine's validity rules (e.g. medicals 12 months from issue) apply here as they do at the gate.
+  const rules = rulesOf(site.host_settings);
   for (const w of workers) {
     for (const c of w.certs) {
+      const eff = certExpiry(rules, { kind: c.kind, issued_on: c.issued, expires_on: c.expires });
       items.push({
         section: 'Workforce certificates', name: `${w.full_name} — ${c.name}`, sub: c.issuer || w.occupation || undefined,
-        status: certStatus(c.expires), expiry: c.expires,
+        status: eff.missingIssue ? ['No issue date', AMBER] : certStatus(eff.until), expiry: eff.until,
         file: c.storage_key ? { storage_key: c.storage_key, content_type: c.content_type, filename: c.filename } : null,
       });
     }
   }
+
+  return { site, reqs, items, workers };
+}
+
+/** One line of a safety file revision: enough to say what changed between two revisions. */
+export interface FileLine { section: string; name: string; status: string; version: string | null; expiry: string | null; included: boolean }
+export interface FileChange { kind: 'added' | 'removed' | 'changed'; section: string; name: string; detail: string }
+
+const lineKey = (l: FileLine) => `${l.section}\u0000${l.name}`;
+const describe = (l: FileLine) => [l.status, l.version ? ver(l.version) : '', l.expiry ? `expires ${fmt(l.expiry)}` : ''].filter(Boolean).join(', ');
+
+/** What differs between a revision's contents and the file as it stands now. */
+export function diffContents(prev: FileLine[], cur: FileLine[]): FileChange[] {
+  const before = new Map(prev.map((l) => [lineKey(l), l]));
+  const now = new Map(cur.map((l) => [lineKey(l), l]));
+  const out: FileChange[] = [];
+  for (const [k, l] of now) {
+    const p = before.get(k);
+    if (!p) out.push({ kind: 'added', section: l.section, name: l.name, detail: describe(l) });
+    else if (p.status !== l.status || p.version !== l.version || p.expiry !== l.expiry || p.included !== l.included) {
+      out.push({ kind: 'changed', section: l.section, name: l.name, detail: `${describe(p)} → ${describe(l)}` });
+    }
+  }
+  for (const [k, l] of before) if (!now.has(k)) out.push({ kind: 'removed', section: l.section, name: l.name, detail: describe(l) });
+  return out;
+}
+
+/** Two items with the same name in a section (e.g. two medicals for one worker) get "(2)", "(3)" so each keeps its own line. */
+const toLines = (items: BundleItem[]): FileLine[] => {
+  const seen = new Map<string, number>();
+  return items.map((i) => {
+    const k = `${i.section}\u0000${i.name}`;
+    const n = (seen.get(k) ?? 0) + 1;
+    seen.set(k, n);
+    return { section: i.section, name: n > 1 ? `${i.name} (${n})` : i.name, status: i.status[0], version: i.version ?? null, expiry: i.expiry ? fmt(i.expiry) : null, included: !!i.file };
+  });
+};
+
+/** The file's contents as they stand now, without rendering a PDF. */
+export async function currentContents(db: Db, siteId: string): Promise<FileLine[]> {
+  return toLines((await safetyFileItems(db, siteId)).items);
+}
+
+/** Saves a revision when the contents differ from the last one; returns the revision number in force. */
+async function recordRevision(db: Db, siteId: string, lines: FileLine[], generatedBy: string): Promise<{ number: number; created: boolean }> {
+  const digest = createHash('sha256').update(JSON.stringify(lines)).digest('hex');
+  const last = await one<{ number: number; digest: string }>(db, 'select number, digest from safety_file_versions where site_id = $1 order by number desc limit 1', [siteId]);
+  if (last && last.digest === digest) return { number: last.number, created: false };
+  const number = (last?.number ?? 0) + 1;
+  await db.query(
+    `insert into safety_file_versions (site_id, number, digest, contents, generated_by) values ($1, $2, $3, $4, $5)`,
+    [siteId, number, digest, JSON.stringify(lines), generatedBy],
+  );
+  return { number, created: true };
+}
+
+/**
+ * Compiles the safety file. Runs in one transaction holding a per-site lock, so two people
+ * compiling at once get consecutive revisions, and a PDF that fails to render records nothing.
+ */
+export async function buildSafetyFile(_db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean }> {
+  return withTx(async (db) => {
+    await db.query('select pg_advisory_xact_lock(hashtext($1))', ['safety-file:' + siteId]);
+    return compileSafetyFile(db, siteId, generatedBy);
+  });
+}
+
+async function compileSafetyFile(db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean }> {
+  const { site, reqs, items, workers } = await safetyFileItems(db, siteId);
+  const revision = await recordRevision(db, siteId, toLines(items), generatedBy);
 
   const registers = await siteRegisters(db, siteId, workers);
   const { brand, logo } = await loadBranding(db, site.linked_org_id);
@@ -176,14 +251,15 @@ export async function buildSafetyFile(db: Db, siteId: string, generatedBy: strin
       ...(ready ? ([['Verification code', site.verification_id]] as [string, string][]) : []),
       ['Requirements', `${n('complete', 'expiring')} approved · ${n('awaiting_review')} awaiting review · ${n('missing', 'expired', 'correction_required')} outstanding`],
       ['Workforce', `${workers.length} worker${workers.length === 1 ? '' : 's'} assigned`],
+      ['Revision', `Rev ${revision.number}${revision.created ? '' : ' (unchanged since it was compiled)'}`],
       ['Compiled', `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC by ${generatedBy}`],
     ],
     items,
     registers,
     contentsNote: 'Only documents that have been submitted to the site are included. Missing, expired and returned documents are listed so the gaps are visible.',
-    stamp: `Safety file · ${site.name} · ${site.contractor_name}`,
+    stamp: `Safety file · ${site.name} · ${site.contractor_name} · Rev ${revision.number}`,
   });
-  return { pdf, filename: `Safety-file-${safeName(site.name)}.pdf` };
+  return { pdf, filename: `Safety-file-${safeName(site.name)}-rev${revision.number}.pdf`, revision: revision.number, created: revision.created };
 }
 
 /** A company's own selection of documents, merged into one PDF. */
@@ -219,6 +295,13 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
        from toolbox_talks t where t.site_id = $1 order by t.held_on`,
     [siteId],
   );
+  const audits = await many<any>(
+    db,
+    `select a.audited_on, a.auditor_name, a.score, a.summary,
+            (select string_agg(f.text || ' [' || f.status || ']', '; ' order by f.created_at) from audit_findings f where f.audit_id = a.id) as findings
+       from contractor_audits a where a.site_id = $1 order by a.audited_on`,
+    [siteId],
+  );
   const h = (s: string) => ({ text: s, bold: true, color: '#FFFFFF', fontSize: 8, fillColor: NAVY });
   const c = (s: unknown, extra: Record<string, unknown> = {}) => ({ text: t(s) || '—', fontSize: 8, ...extra });
   const table = (title: string, widths: (string | number)[], head: string[], rows: unknown[][], empty: string) => [
@@ -243,6 +326,9 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
     ...table('Toolbox talks', ['14%', '*', '20%', '34%'], ['Date', 'Topic', 'Presenter', 'Attendees (signed)'],
       talks.map((x) => [c(fmt(x.held_on)), c(x.topic), c(x.presenter_name), c(x.attendees)]),
       'No toolbox talks recorded.'),
+    ...table('Site audits', ['14%', '18%', '10%', '*'], ['Date', 'Auditor', 'Score', 'Findings (status)'],
+      audits.map((a) => [c(fmt(a.audited_on)), c(a.auditor_name), c(`${a.score}%`), c(a.findings || a.summary || 'No findings')]),
+      'No site audits recorded.'),
   ];
 }
 

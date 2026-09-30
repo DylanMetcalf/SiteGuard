@@ -397,6 +397,7 @@ export default async function siteRoutes(app: FastifyInstance) {
       if (await openSevereIncidents(db, site.id)) {
         throw conflict("Can't approve — an open lost time injury or fatality investigation needs closing first.");
       }
+      if ((await one<{ suspended_at: Date | null }>(db, 'select suspended_at from contractors where id = $1 for share', [site.contractor_id]))?.suspended_at) throw conflict('This contractor is suspended. Lift the suspension before approving the site.');
       const r = await computeReadiness(db, site.id);
       if (r.submission !== 'ready_to_approve') {
         throw conflict('Every requirement must be complete (and none expiring) before the site can be marked Site Ready.');

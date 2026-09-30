@@ -19,6 +19,8 @@ async function lapseReason(db: Db, siteId: string): Promise<string | null> {
   if (r.counts.correction_required) parts.push(`${r.counts.correction_required} sent back for correction`);
   if (r.counts.missing) parts.push(`${r.counts.missing} requirement${r.counts.missing === 1 ? '' : 's'} not met`);
   if (await openSevereIncidents(db, siteId)) parts.push('an open lost-time injury or fatality');
+  const sus = await one<{ suspended_reason: string }>(db, 'select c.suspended_reason from sites s join contractors c on c.id = s.contractor_id where s.id = $1 and c.suspended_at is not null', [siteId]);
+  if (sus) parts.push(`the contractor is suspended${sus.suspended_reason ? ` (${sus.suspended_reason})` : ''}`);
   return parts.length ? parts.join(', ') : null;
 }
 

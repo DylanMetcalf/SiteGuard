@@ -177,6 +177,10 @@ export async function generateDocument(ctx: OrgCtx, req: GenerateRequest, log: F
       if (val && !f.options!.includes(val)) throw badRequest(`Choose a valid ${f.label.toLowerCase()}.`);
     }
   }
+  for (const f of bp.fields.filter((x) => x.type === 'checks')) {
+    const ticked = (req.values[f.id] ?? '').split(';').map((x) => x.trim()).filter(Boolean);
+    if (ticked.some((x) => !f.options!.includes(x))) throw badRequest(`Choose from the listed ${f.label.toLowerCase().replace(/\s*\(.*\)/, '')}.`);
+  }
 
   let site: BuildInput['site'];
   let siteId: string | null = null;

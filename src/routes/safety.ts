@@ -118,6 +118,7 @@ export default async function safetyRoutes(app: FastifyInstance) {
       // Contractors request; site reviewers issue directly.
       const issuing = side === 'host';
       if (issuing && !body.validTo) throw badRequest('Set when the permit expires ("valid to") before issuing it.', 'valid_to_required');
+      if (await one(db, 'select 1 from contractors where id = $1 and suspended_at is not null', [site.contractor_id])) throw conflict('This contractor is suspended by the site, so permits can\'t be requested or issued.');
       if (issuing) requireReviewer(ctx);
       const p = (await one<{ id: string }>(
         db,
@@ -158,6 +159,7 @@ export default async function safetyRoutes(app: FastifyInstance) {
       const from = body.validFrom ? new Date(body.validFrom) : row.valid_from;
       const to = body.validTo ? new Date(body.validTo) : row.valid_to;
       if (!to) throw badRequest('Set when the permit expires ("valid to") before issuing it.');
+      if (await one(db, 'select 1 from permits p join sites s on s.id = p.site_id join contractors c on c.id = s.contractor_id where p.id = $1 and c.suspended_at is not null', [id])) throw conflict('This contractor is suspended, so no permits can be issued to it.');
       if (from && new Date(to) <= new Date(from)) throw badRequest('"Valid to" must be after "valid from".');
       await db.query(`update permits set status = 'active', issued_by_name = $2, valid_from = $3, valid_to = $4 where id = $1`, [id, ctx.user.name, from, to]);
       await audit(db, ctx, 'Issued permit', `${PERMIT_LABELS[row.type]} — ${row.location}`, row.site_id);

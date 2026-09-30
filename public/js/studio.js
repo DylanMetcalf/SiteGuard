@@ -136,6 +136,10 @@ function fieldHtml(f, value){
   const ph = f.placeholder ? ' placeholder="'+escapeHtml(f.placeholder)+'"' : '';
   let input;
   if(f.type==='textarea' || f.type==='lines') input = '<textarea id="'+id+'" rows="'+(f.type==='lines'?4:3)+'"'+ph+'>'+v+'</textarea>';
+  else if(f.type==='checks'){
+    const on = String(value||'').split(';').map(x=>x.trim());
+    input = '<div id="'+id+'" class="check-grid" role="group" aria-label="'+escapeHtml(f.label)+'">'+f.options.map(o=>'<label class="check-chip"><input type="checkbox" value="'+escapeHtml(o)+'"'+(on.includes(o)?' checked':'')+'> '+escapeHtml(o)+'</label>').join('')+'</div>';
+  }
   else if(f.type==='select') input = '<select id="'+id+'" class="field">'+f.options.map(o=>'<option'+(o===value?' selected':'')+'>'+escapeHtml(o)+'</option>').join('')+'</select>';
   else input = '<input type="'+(f.type==='date'?'date':'text')+'" id="'+id+'" value="'+v+'"'+ph+'>';
   return label + input + (f.help ? '<div class="site-card-sub" style="margin-top:4px;">'+escapeHtml(f.help)+'</div>' : '');
@@ -191,7 +195,7 @@ on('studio-generate', async (el)=>{
   for(const fld of bp.fields){
     const node = document.getElementById('sf_'+fld.id);
     if(!node) continue;
-    values[fld.id] = node.value.trim();
+    values[fld.id] = fld.type==='checks' ? [...node.querySelectorAll('input:checked')].map(x=>x.value).join('; ') : node.value.trim();
     if(fld.required && !values[fld.id]){ el.disabled = false; node.focus(); showToast(fld.label+' is required'); return; }
   }
   const siteSel = document.getElementById('sf_siteId');
