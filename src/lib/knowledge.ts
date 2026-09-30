@@ -7,6 +7,93 @@
  * A practical starting point, not legal advice.
  */
 
+/**
+ * Tools and equipment a contractor can tick in a risk assessment or method statement. Each adds
+ * its own hazards (with the control for each), PPE and pre-use inspection. Standard practice, not
+ * legal advice: the drafts they feed are for the contractor's competent person to check and sign.
+ */
+export interface Tool {
+  label: string;
+  category: 'Power tools' | 'Hot work' | 'Access equipment' | 'Electrical equipment' | 'Lifting equipment' | 'Plant and vehicles' | 'Other equipment';
+  hazards: [hazard: string, control: string][];
+  ppe: string[];
+  inspection: string;
+}
+
+export const TOOLS: Tool[] = [
+  { label: 'Angle grinder', category: 'Power tools', ppe: ['Face shield over safety glasses', 'Hearing protection'],
+    inspection: 'Guard fitted, disc rated for the speed and undamaged, dead-man switch working, cord and plug intact',
+    hazards: [['Disc shattering and flying fragments', 'Correct disc for the material and speed; guard always fitted; stand to the side on start-up; never use a damaged disc.'],
+      ['Sparks igniting nearby material', 'Hot work permit where required; remove or cover combustibles; fire extinguisher within reach; fire watch after work.']] },
+  { label: 'Electric drill / impact driver', category: 'Power tools', ppe: ['Safety glasses'],
+    inspection: 'Chuck and bits secure, casing undamaged, cord or battery pack intact, tagged as tested',
+    hazards: [['Drill bit binding and wrist injury', 'Clamp the work piece; use the side handle; correct bit and speed; release the trigger if the bit binds.'],
+      ['Drilling into hidden services', 'Scan for cables and pipes before drilling; check drawings; isolate services where they may be present.']] },
+  { label: 'Circular saw', category: 'Power tools', ppe: ['Safety glasses', 'Hearing protection', 'Dust mask'],
+    inspection: 'Retracting guard moves freely, blade sharp and correct for the material, riving knife fitted',
+    hazards: [['Kickback and contact with the blade', 'Retracting guard working; riving knife fitted; support the work piece; keep hands clear of the cutting line.']] },
+  { label: 'Jackhammer / breaker', category: 'Power tools', ppe: ['Hearing protection', 'Safety glasses', 'Dust mask', 'Anti-vibration gloves'],
+    inspection: 'Tool bit secure, hoses or cord undamaged, handles and vibration dampers intact',
+    hazards: [['Hand-arm vibration', 'Limit trigger time and rotate operators; anti-vibration tools and gloves; report tingling or numbness.'],
+      ['Breaking into buried services', 'Service scan and drawings checked before breaking; locate by hand digging near known services.']] },
+  { label: 'Arc welding machine', category: 'Hot work', ppe: ['Welding helmet with correct shade', 'Leather gauntlets and apron', 'Flame-retardant overalls'],
+    inspection: 'Leads and earth clamp undamaged, connections tight, machine earthed, tagged as tested',
+    hazards: [['Arc eye and UV burns', 'Welding screens around the work; correct helmet shade; warn people nearby before striking an arc.'],
+      ['Welding fumes', 'Local extraction or good ventilation; respirator where fumes cannot be removed; never weld on coated or galvanised metal without extraction.']] },
+  { label: 'Oxy-acetylene cutting set', category: 'Hot work', ppe: ['Cutting goggles or face shield', 'Leather gauntlets', 'Flame-retardant overalls'],
+    inspection: 'Flashback arrestors fitted at both ends, hoses and regulators undamaged, leak test done, cylinders chained upright',
+    hazards: [['Flashback and cylinder fire', 'Flashback arrestors at regulator and torch; leak test before use; cylinders upright and secured; valves closed when not in use.'],
+      ['Burns and fire from cutting slag', 'Hot work permit; combustibles removed or covered; fire extinguisher at hand; fire watch after cutting.']] },
+  { label: 'Ladder', category: 'Access equipment', ppe: [],
+    inspection: 'Stiles and rungs undamaged, feet intact, locking bars working on step ladders, tagged as inspected',
+    hazards: [['Falling from the ladder', 'Short-duration work only; three points of contact; set at 1:4 and secured at the top; never over-reach or stand on the top two rungs.']] },
+  { label: 'Scaffold / mobile scaffold tower', category: 'Access equipment', ppe: ['Full-body harness where edge protection is incomplete'],
+    inspection: 'Erected by a competent person, scaffold tag green, guardrails and toe boards complete, castors locked',
+    hazards: [['Falls from the scaffold', 'Erected and inspected by a competent scaffolder; guardrails and toe boards fitted; do not use a scaffold without a green tag.'],
+      ['Scaffold collapse or overturning', 'Level base and sole boards; ties or outriggers as designed; no loading beyond its rating; wheels locked before climbing.']] },
+  { label: 'Mobile elevating work platform (MEWP)', category: 'Access equipment', ppe: ['Full-body harness clipped to the basket anchor'],
+    inspection: 'Daily pre-use check done, emergency lowering tested, outriggers and tyres sound, operator authorised',
+    hazards: [['Overturning or being thrown from the basket', 'Authorised operator only; firm level ground; outriggers deployed; harness clipped to the basket anchor.'],
+      ['Crushing against overhead structures', 'Plan the route; spotter where clearance is tight; slow movement near structures.']] },
+  { label: 'Portable generator', category: 'Electrical equipment', ppe: ['Hearing protection'],
+    inspection: 'Earth leakage protection working, frame earthed, fuel cap tight, no leaks, tagged as tested',
+    hazards: [['Electric shock from generator supply', 'Earth leakage protection tested; frame earthed; no makeshift connections; cables protected from damage.'],
+      ['Exhaust fumes and fuel fires', 'Run outdoors with good ventilation; refuel only when cool and switched off; fire extinguisher nearby.']] },
+  { label: 'Extension leads and distribution boxes', category: 'Electrical equipment', ppe: [],
+    inspection: 'Plugs and sockets intact, no joins or taped cable, earth leakage unit tested, tagged as tested',
+    hazards: [['Electric shock from damaged leads', 'Inspect before use; no joins or taped repairs; earth leakage protection; keep leads out of water and off walkways.']] },
+  { label: 'Chain block / lever hoist', category: 'Lifting equipment', ppe: ['Gloves'],
+    inspection: 'Load test certificate current, hooks and safety catches intact, chain not stretched or damaged',
+    hazards: [['Load falling from failed lifting gear', 'Current load test certificate; rated for the load; anchored to a rated point; nobody under the load.']] },
+  { label: 'Slings, shackles and lifting accessories', category: 'Lifting equipment', ppe: ['Gloves'],
+    inspection: 'Colour-coded as inspected this period, working load limit marked, no cuts, kinks or deformation',
+    hazards: [['Sling or shackle failure', 'Inspected and colour-coded; working load limit marked and not exceeded; correct angle and protection on sharp edges.']] },
+  { label: 'Mobile crane', category: 'Lifting equipment', ppe: [],
+    inspection: 'Load test certificate current, operator licensed, pre-use checks done, rigger appointed',
+    hazards: [['Crane overturning', 'Lift plan with ground bearing check; outriggers fully extended on mats; load chart followed; wind limits observed.'],
+      ['Contact with overhead power lines', 'Safe clearances marked; spotter; isolate lines where clearance cannot be kept.']] },
+  { label: 'Forklift', category: 'Plant and vehicles', ppe: [],
+    inspection: 'Daily pre-use check done, brakes, horn, lights and reverse alarm working, operator licensed',
+    hazards: [['Pedestrians struck by the forklift', 'Licensed operator; separate pedestrian routes; reverse alarm and lights; speed limits in the work area.'],
+      ['Load falling or forklift tipping', 'Within rated capacity; load secured and tilted back; forks low when travelling; no people on the forks.']] },
+  { label: 'TLB / excavator', category: 'Plant and vehicles', ppe: [],
+    inspection: 'Pre-use check done, operator licensed, buckets and quick hitch locked, reverse alarm working',
+    hazards: [['People struck by the machine or bucket', 'Exclusion zone around the slew radius; banksman; operator has sight of the area; reverse alarm working.'],
+      ['Striking buried services', 'Services located and marked before digging; hand digging near known services.']] },
+  { label: 'Light delivery vehicle (LDV)', category: 'Plant and vehicles', ppe: [],
+    inspection: 'Roadworthy, site access permit displayed, flag and beacon fitted where the site requires them',
+    hazards: [['Vehicle collisions on site', 'Site speed limits; driver authorised for the site; flag and beacon as required; park in designated areas.']] },
+  { label: 'Air compressor and pneumatic tools', category: 'Other equipment', ppe: ['Safety glasses', 'Hearing protection'],
+    inspection: 'Pressure vessel certificate current, safety valve working, hoses and whip checks fitted',
+    hazards: [['Hose whip and compressed-air injury', 'Whip checks on every coupling; release pressure before disconnecting; never point air at a person.']] },
+  { label: 'High-pressure water jetter', category: 'Other equipment', ppe: ['Face shield', 'Waterproof clothing', 'Safety boots'],
+    inspection: 'Trigger dead-man working, hoses rated and undamaged, lance guard fitted',
+    hazards: [['High-pressure injection injury', 'Trained operator; dead-man trigger; exclusion zone; never point the lance at anyone; release pressure before changing nozzles.']] },
+  { label: 'Hand tools', category: 'Other equipment', ppe: ['Gloves suited to the task'],
+    inspection: 'Handles secure, no mushroomed heads or cracked shafts, insulated tools intact for electrical work',
+    hazards: [['Cuts and impact injuries from hand tools', 'Right tool for the job and in good condition; carry and store safely; tool lanyards when working at height.']] },
+];
+
 export interface WorkProfile {
   id: string;
   label: string;

@@ -64,7 +64,7 @@ function contractorSteps(){
   }
   out.push(
     { title: 'Your document library', body: 'Every document you hold, grouped by status, with expiry dates. Replace one here and SiteGuard shows every site file it affects.', go: go({ nav: 'passport', activeSiteId: null }), target: '[data-action="nav"][data-nav="passport"]' },
-    { title: 'Document Studio', body: 'Don\'t have a document? Create it: risk assessments, method statements (tick the work activities and the hazards, controls and PPE are filled in), policies, appointment letters and more, branded as yours. Drafts are for you to check and sign — they are not a certification.', go: go({ nav: 'more', moreView: 'studio' }), target: '.view-head' },
+    { title: 'Document Studio', body: 'Don\'t have a document? Create it: risk assessments, method statements (tick the work activities and the tools used, and the hazards, controls, PPE and pre-use checks are filled in), policies, appointment letters and more, branded as yours. Drafts are for you to check and sign — they are not a certification.', go: go({ nav: 'more', moreView: 'studio' }), target: '.view-head' },
     { title: 'Log anything, anywhere', body: 'The + button is always there: upload a document, record a toolbox talk with signatures on one device, report an incident or log the diary.', go: go({ nav: 'dashboard', moreView: null }), target: '.fab' },
   );
   return out;

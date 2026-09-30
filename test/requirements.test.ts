@@ -95,3 +95,21 @@ describe('choosing documents for the safety file PDF', () => {
     assert.ok(a.rows.length >= 1);
   });
 });
+
+describe('tools and equipment in risk assessments and method statements', () => {
+  it('adds each ticked tool\'s hazards, checks and PPE, and refuses unknown tools', async () => {
+    const { blueprintById } = await import('../src/lib/studio/blueprints.js');
+    for (const id of ['risk-assessment', 'method-statement']) {
+      const bp = blueprintById(id)!;
+      const out = JSON.stringify(bp.build({ values: { scope: 'Replace roof sheeting', tools: 'Angle grinder; Ladder' }, company: { name: 'Mu' }, preparer: { name: 'T' } }));
+      assert.match(out, /Disc shattering/, id);
+      assert.match(out, /Falling from the ladder/, id);
+      assert.match(out, /Guard fitted, disc rated/, id);
+      assert.match(out, /Face shield over safety glasses/, id);
+    }
+    const bad = await con.post('/api/studio/documents', { blueprintId: 'risk-assessment', values: { scope: 'Roof', tools: 'Lightsaber' } });
+    assert.equal(bad.status, 400);
+    const ok = await con.post('/api/studio/documents', { blueprintId: 'risk-assessment', values: { scope: 'Roof', tools: 'Angle grinder; Scaffold / mobile scaffold tower' } });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  });
+});
