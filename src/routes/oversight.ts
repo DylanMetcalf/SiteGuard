@@ -16,6 +16,7 @@ import { publishChange } from '../lib/realtime.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 import { recheckSiteReady } from '../lib/siteready.js';
 import { RULE_KEYS, saToday } from '../lib/validity.js';
+import { auditFor } from './org.js';
 
 /** The standard monthly audit checklist; the auditor can add items of their own. */
 export const AUDIT_ITEMS = [
@@ -168,15 +169,10 @@ export default async function oversightRoutes(app: FastifyInstance) {
   /** Everything recorded against one file, by either company, newest first: the evidence trail. */
   app.get('/api/sites/:id/timeline', async (req) => {
     const ctx = requireOrg(req.ctx);
-    const { site, parties } = await loadSite(pool, ctx, (req.params as { id: string }).id);
-    const rows = await many<{ created_at: Date; actor_name: string; actor_role: string; action: string; detail: string; org_name: string }>(
-      pool,
-      `select e.created_at, e.actor_name, e.actor_role, e.action, e.detail, o.name as org_name
-         from audit_events e join organisations o on o.id = e.org_id
-        where e.site_id = $1 and e.org_id = any($2::uuid[]) order by e.created_at desc limit 200`,
-      [site.id, parties],
-    );
-    return { events: rows.map((r) => ({ at: r.created_at, actor: r.actor_name, role: r.actor_role, org: r.org_name, action: r.action, detail: r.detail })) };
+    const { site } = await loadSite(pool, ctx, (req.params as { id: string }).id);
+    // Same visibility as the audit trail: a contractor sees the mine's events only from when it joined.
+    const rows = await auditFor(pool, ctx, { siteId: site.id, limit: 200 });
+    return { events: rows.map((r: any) => ({ at: r.ts, actor: r.actor, role: r.role, action: r.action, detail: r.detail })) };
   });
 
   // ---- Validity rules ------------------------------------------------------------------------

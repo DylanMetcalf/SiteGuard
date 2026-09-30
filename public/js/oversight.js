@@ -53,7 +53,7 @@ export function timelineSection(siteId){
     const head = d !== day ? '<div class="tl-day">'+d+'</div>' : '';
     day = d;
     return head + '<div class="tl-row"><span class="tl-dot" aria-hidden="true"></span><div><div class="tl-action">'+esc(ev.action)+(ev.detail?' <span class="tl-detail">— '+esc(ev.detail)+'</span>':'')+'</div>'
-      +'<div class="site-card-sub">'+esc(ev.actor)+' · '+esc(ev.org)+' · '+new Date(ev.at).toLocaleTimeString('en-ZA', { hour:'2-digit', minute:'2-digit' })+'</div></div></div>';
+      +'<div class="site-card-sub">'+esc(ev.actor)+(ev.role?' · '+esc(ev.role):'')+' · '+new Date(ev.at).toLocaleTimeString('en-ZA', { hour:'2-digit', minute:'2-digit' })+'</div></div></div>';
   }).join('') + '</div>';
 }
 on('timeline-open', (el)=>{ S.timelineOpen = el.dataset.site; S.keepScroll = true; render(); S.keepScroll = false; });

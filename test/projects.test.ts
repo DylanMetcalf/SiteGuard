@@ -107,3 +107,28 @@ describe('contractor projects', () => {
     assert.ok(a.rows.some((r) => r.action === 'Archived project'));
   });
 });
+
+describe('project details from the security review', () => {
+  let p2: string;
+  it('lets the contractor close out an incident on its own project', async () => {
+    p2 = (await con.post('/api/projects', { clientName: 'Gamma Retail', name: 'Store refit' })).body.id;
+    const inc = await con.post(`/api/sites/${p2}/incidents`, { type: 'first_aid', description: 'Cut finger on sheet metal' });
+    assert.equal(inc.status, 200, JSON.stringify(inc.body));
+    assert.equal((await other.patch(`/api/incidents/${inc.body.id}`, { rootCause: 'x', correctiveActions: 'y', close: true })).status, 404);
+    const close = await con.patch(`/api/incidents/${inc.body.id}`, { rootCause: 'No cut-resistant gloves', correctiveActions: 'Gloves issued; toolbox talk held', close: true });
+    assert.equal(close.status, 200, JSON.stringify(close.body));
+  });
+
+  it('corrects the spelling of a client name in place', async () => {
+    assert.equal((await con.patch(`/api/projects/${p2}`, { clientName: 'GAMMA Retail' })).status, 200);
+    assert.equal((await con.state()).state.sites[p2].hostName, 'GAMMA Retail');
+  });
+
+  it('revokes links to the client when a project is archived', async () => {
+    const link = await con.post('/api/share-links', { siteId: p2, kind: 'safety_file', days: 7 });
+    const url = `/share/${link.body.url.split('/share/')[1]}`;
+    assert.equal((await new Agent(app).req('GET', url)).status, 200);
+    await con.post(`/api/projects/${p2}/archive`);
+    assert.notEqual((await new Agent(app).req('GET', url)).status, 200);
+  });
+});

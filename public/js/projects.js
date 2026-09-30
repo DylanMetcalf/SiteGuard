@@ -8,7 +8,7 @@
 import { api } from './api.js';
 import {
   S, ICONS, actions, on, act, render, showToast, openSheet, closeSheet, sheetHead, escapeHtml, val,
-  isContractor, isOrgAdmin, readOnly, computeReadiness, SOURCE_LABEL,
+  org, isContractor, isOrgAdmin, readOnly, computeReadiness, SOURCE_LABEL,
 } from './core.js';
 import { loadPacks, packPicker, PACK_NOTE } from './sheets.js';
 
@@ -29,7 +29,7 @@ export function projectBar(siteId){
     +'<span class="badge '+(ready?'complete':'grey')+'">'+(ready?ICONS.check+'Ready to send':outstanding+' to go')+'</span></div>'
     +'<div class="site-card-sub" style="margin-top:8px;">You manage this file yourself. Documents you file count straight away. When it\'s ready, send the client the PDF or a secure link. The client doesn\'t need a SiteGuard account.</div>'
     +'<div class="row-actions">'
-    +'<button class="btn primary small" data-action="new-share-link" data-site="'+siteId+'">Send to client</button>'
+    +'<button class="btn primary small" data-action="project-send" data-site="'+siteId+'">Send to client</button>'
     +'<button class="btn secondary small" data-action="export-bundle" data-site="'+siteId+'">Download PDF</button>'
     +(canManage()?'<button class="btn secondary small" data-action="project-reqs" data-site="'+siteId+'">Requirements</button><button class="btn secondary small" data-action="project-edit" data-site="'+siteId+'">Edit</button>':'')
     +'</div></div>';
@@ -44,6 +44,23 @@ export function projectsSection(match){
     +(canManage()?'<button class="btn primary small" style="margin-top:10px;" data-action="new-project">Start a project</button>':'')+'</div>';
   return html;
 }
+
+/* ---------- send to the client ---------- */
+on('project-send', (el)=>{
+  const siteId = el.dataset.site;
+  // Secure links are a Contractor Pro feature once billing is on; the PDF always works.
+  if(S.boot.features.billing && org().plan === 'contractor_free'){
+    openSheet(sheetHead('Send to '+S.state.sites[siteId].hostName, S.state.sites[siteId].name)
+      +'<div class="card"><div class="site-card-title" style="font-size:14px;">Email the PDF</div><div class="site-card-sub" style="margin:4px 0 10px;">Download the bound safety file and attach it to an email to your client.</div>'
+      +'<button class="btn primary block" data-action="export-bundle" data-site="'+siteId+'">Check and download the PDF</button></div>'
+      +'<div class="card"><div class="site-card-title" style="font-size:14px;">Send a secure link</div><div class="site-card-sub" style="margin:4px 0 10px;">An expiring link the client opens without an account, always showing the latest file. You see when it was opened and can revoke it. Included in Contractor Pro.</div>'
+      +'<button class="btn secondary block" data-action="project-upgrade">See Contractor Pro</button></div>');
+    return;
+  }
+  actions['new-share-link']({ dataset: { site: siteId } });
+});
+
+on('project-upgrade', ()=>{ closeSheet(); actions['goto-more']({ dataset: { view: 'billing' } }); });
 
 /* ---------- start a project ---------- */
 on('new-project', async ()=>{

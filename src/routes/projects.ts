@@ -113,9 +113,13 @@ export default async function projectRoutes(app: FastifyInstance) {
       .object({ name: text(300).min(1).optional(), location: text(300).optional(), clientName: text(200).min(1).optional(), clientContact: text(300).optional(), emergency: emergencySchema.optional() })
       .parse(req.body);
     return withTx(async (db) => {
+      await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
       const { site } = await loadProject(db, ctx, (req.params as { id: string }).id);
       let orgId = site.org_id;
-      if (body.clientName && body.clientName.toLowerCase() !== site.host_name.toLowerCase()) {
+      if (body.clientName && body.clientName !== site.host_name && body.clientName.toLowerCase() === site.host_name.toLowerCase()) {
+        // Only the spelling changed: correct the client record itself (it's this contractor's own).
+        await db.query('update organisations set name = $2 where id = $1 and managed_by_org = $3', [site.org_id, body.clientName, ctx.org.id]);
+      } else if (body.clientName && body.clientName.toLowerCase() !== site.host_name.toLowerCase()) {
         // Move the project to another client record; the contractor entry moves with it.
         orgId = await clientRecord(db, ctx, body.clientName);
       }
@@ -135,8 +139,8 @@ export default async function projectRoutes(app: FastifyInstance) {
 
   app.post('/api/projects/:id/requirements', async (req) => {
     const ctx = requireOrg(req.ctx);
+    requireContractorAdmin(ctx);
     requireWritable(ctx);
-    if (!isContractor(ctx)) throw forbidden();
     const body = z.object({ packIds: packIdsSchema.default([]), requirements: z.array(requirementSchema).max(200).default([]) }).parse(req.body);
     return withTx(async (db) => {
       const { site } = await loadProject(db, ctx, (req.params as { id: string }).id);
@@ -164,8 +168,8 @@ export default async function projectRoutes(app: FastifyInstance) {
 
   app.post('/api/projects/:id/requirements/:reqId/remove', async (req) => {
     const ctx = requireOrg(req.ctx);
+    requireContractorAdmin(ctx);
     requireWritable(ctx);
-    if (!isContractor(ctx)) throw forbidden();
     const { id, reqId } = req.params as { id: string; reqId: string };
     if (!isUuid(reqId)) throw notFound();
     return withTx(async (db) => {
@@ -192,6 +196,8 @@ export default async function projectRoutes(app: FastifyInstance) {
     return withTx(async (db) => {
       const { site } = await loadProject(db, ctx, (req.params as { id: string }).id);
       await db.query(`update sites set status = 'declined' where id = $1`, [site.id]);
+      // Links sent to the client stop working when the project is archived.
+      await db.query('update share_links set revoked_at = now() where site_id = $1 and revoked_at is null', [site.id]);
       await audit(db, ctx, 'Archived project', `${site.name} for ${site.host_name}`, site.id);
       await publishChange(db, [ctx.org.id]);
       return { ok: true };
