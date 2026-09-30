@@ -164,6 +164,21 @@ export default async function oversightRoutes(app: FastifyInstance) {
     });
   });
 
+  // ---- Timeline -----------------------------------------------------------------------------
+  /** Everything recorded against one file, by either company, newest first: the evidence trail. */
+  app.get('/api/sites/:id/timeline', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    const { site, parties } = await loadSite(pool, ctx, (req.params as { id: string }).id);
+    const rows = await many<{ created_at: Date; actor_name: string; actor_role: string; action: string; detail: string; org_name: string }>(
+      pool,
+      `select e.created_at, e.actor_name, e.actor_role, e.action, e.detail, o.name as org_name
+         from audit_events e join organisations o on o.id = e.org_id
+        where e.site_id = $1 and e.org_id = any($2::uuid[]) order by e.created_at desc limit 200`,
+      [site.id, parties],
+    );
+    return { events: rows.map((r) => ({ at: r.created_at, actor: r.actor_name, role: r.actor_role, org: r.org_name, action: r.action, detail: r.detail })) };
+  });
+
   // ---- Validity rules ------------------------------------------------------------------------
   app.put('/api/org/validity-rules', async (req) => {
     const ctx = requireOrg(req.ctx);

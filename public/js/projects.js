@@ -30,7 +30,7 @@ export function projectBar(siteId){
     +'<div class="site-card-sub" style="margin-top:8px;">You manage this file yourself. Documents you file count straight away. When it\'s ready, send the client the PDF or a secure link. The client doesn\'t need a SiteGuard account.</div>'
     +'<div class="row-actions">'
     +'<button class="btn primary small" data-action="new-share-link" data-site="'+siteId+'">Send to client</button>'
-    +'<a class="btn secondary small" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download>Download PDF</a>'
+    +'<button class="btn secondary small" data-action="export-bundle" data-site="'+siteId+'">Download PDF</button>'
     +(canManage()?'<button class="btn secondary small" data-action="project-reqs" data-site="'+siteId+'">Requirements</button><button class="btn secondary small" data-action="project-edit" data-site="'+siteId+'">Edit</button>':'')
     +'</div></div>';
 }

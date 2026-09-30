@@ -5,6 +5,7 @@
  * demo_group, so sandboxes are isolated from each other and from real tenants,
  * and are deleted automatically after a few days.
  */
+import { itemsFromPacks } from '../lib/templates.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { Db } from '../db/pool.js';
 import { one } from '../db/pool.js';
@@ -294,7 +295,24 @@ export async function seedDemo(db: Db): Promise<{ group: string; entryUserId: st
     await db.query(`insert into toolbox_attendance (talk_id, worker_id, attendee_name, signature) values ($1, $2, $3, $4)`, [talk, w, workers[i][0], sig]);
   }
 
+  // ABC Electrical's own project for a client that isn't on SiteGuard (a private client record).
+  const kestrel = (await one<{ id: string }>(
+    db,
+    `insert into organisations (name, kind, plan, subscription_status, seat_limit, managed_by_org, is_demo, demo_group) values ('Kestrel Property Group', 'host', 'host_starter', 'free', 1, $1, true, $2) returning id`,
+    [abcId, group],
+  ))!.id;
+  const abcAtKestrel = (await one<{ id: string }>(db, `insert into contractors (org_id, name, trade, linked_org_id) values ($1, 'ABC Electrical Pty Ltd', 'Electrical', $2) returning id`, [kestrel, abcId]))!.id;
+  const solar = (await one<{ id: string }>(
+    db,
+    `insert into sites (org_id, name, location, contractor_id, status, emergency, client_contact, created_by, created_at) values ($1, $2, $3, $4, 'in_progress', $5, $6, $7, $8) returning id`,
+    [kestrel, 'Northgate Centre — Rooftop Solar PV', 'Northgate Centre, Randburg', abcAtKestrel, JSON.stringify({ musterPoint: 'Parking level P1, north ramp', contact: 'Centre security — 011 555 0140', hospital: 'Life Wilgeheuwel Hospital' }), 'Lerato Mahlangu, Facilities Manager', sipho, ts(-6)],
+  ))!.id;
+  for (const [i, r] of itemsFromPacks(['general-construction', 'electrical']).entries()) {
+    await db.query(`insert into requirements (site_id, category, name, source, why, position) values ($1, $2, $3, $4, $5, $6)`, [solar, r.category, r.name, r.source, r.why, i]);
+  }
+
   const auditRows: [string, string | null, string, string, string, string, number][] = [
+    [abcId, solar, 'Sipho Ndlovu', 'Contractor Admin', 'Created project', 'Northgate Centre — Rooftop Solar PV for Kestrel Property Group', -6],
     [hostId, alpha, 'Thabo Mokoena', 'Group Compliance Manager', 'Created site', 'Leeuwpan Colliery — Shaft 3 Conveyor Rewire', -43],
     [hostId, alpha, 'Thabo Mokoena', 'Group Compliance Manager', 'Invited contractor', 'ABC Electrical Pty Ltd to Leeuwpan Shaft 3', -43],
     [abcId, alpha, 'Sipho Ndlovu', 'Contractor Admin', 'Submitted document', '5 company documents for Leeuwpan Shaft 3', -41],

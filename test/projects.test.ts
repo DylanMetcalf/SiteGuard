@@ -91,6 +91,14 @@ describe('contractor projects', () => {
     assert.match(page.raw.body, /Warehouse roof phase 1/);
   });
 
+  it('shows the file\'s timeline to its owner only', async () => {
+    const t = await con.get(`/api/sites/${pid}/timeline`);
+    assert.equal(t.status, 200);
+    assert.ok(t.body.events.some((e: { action: string }) => e.action === 'Created project'));
+    assert.equal((await other.get(`/api/sites/${pid}/timeline`)).status, 404);
+    assert.equal((await mine.get(`/api/sites/${pid}/timeline`)).status, 404);
+  });
+
   it('archives a project out of the lists but keeps its history', async () => {
     assert.equal((await con.post(`/api/projects/${pid}/archive`)).status, 200);
     assert.equal((await con.state()).state.sites[pid], undefined);

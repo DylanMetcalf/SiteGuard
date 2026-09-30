@@ -15,7 +15,7 @@ import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
 import { renderWorkplace, workplaceCards } from './workplaces.js';
 import { isProject, projectBar, projectsSection } from './projects.js';
-import { suspendedBanner, suspendControls, gateSection, auditsSection, validityCard, revisionsLink } from './oversight.js';
+import { suspendedBanner, suspendControls, gateSection, auditsSection, validityCard, revisionsLink, timelineSection } from './oversight.js';
 
 /* ============ SHELL ============ */
 export function topbar(){
@@ -443,7 +443,7 @@ function renderSiteDetail(siteId){
     if(isContractor()) html += guideCard(siteId);
   }
   const filed = (S.state.requirements[siteId]||[]).filter(r=>['complete','expiring','awaiting_review'].includes(effectiveStatus(S.state.documents[r.id]))).length;
-  if(filed && !isProject(site)) html += '<a class="bundle-link" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>';
+  if(filed && !isProject(site)) html += '<a class="bundle-link" role="button" tabindex="0" style="cursor:pointer;" data-action="export-bundle" data-site="'+siteId+'"><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>';
   if(filed) html += revisionsLink(siteId);
 
   const grouped = {};
@@ -509,7 +509,7 @@ function renderSiteActivity(siteId){
   html += '<div class="section-title">Inspections &amp; corrective actions</div>';
   const list = S.state.inspections[siteId]||[];
   if(canReview() && !ro) html += '<button class="btn primary block" data-action="new-inspection" data-site="'+siteId+'" style="margin-bottom:14px;">Log inspection</button>';
-  if(!list.length) return html + '<div class="empty"><h3>No inspections logged yet</h3><p>Scheduled inspections and spot checks will appear here.</p></div>';
+  if(!list.length) return html + (project ? '' : '<div class="empty"><h3>No inspections logged yet</h3><p>Scheduled inspections and spot checks will appear here.</p></div>') + timelineSection(siteId);
   list.forEach(insp=>{
     const openDefects = insp.defects.filter(d=>d.status!=='verified').length;
     html += '<div class="card checkpoint inspection-card"><div class="flexbetween"><div><div class="site-card-title">'+insp.title+'</div>'
@@ -520,7 +520,7 @@ function renderSiteActivity(siteId){
     if(canReview() && !ro) html += '<button class="btn secondary small" style="margin-top:10px;" data-action="new-defect" data-id="'+insp.id+'" data-site="'+siteId+'">+ Log defect</button>';
     html += '</div>';
   });
-  return html;
+  return html + timelineSection(siteId);
 }
 function renderDiaryRow(entry){
   return '<div class="diary-row"><div class="diary-head"><span>'+timeAgo(entry.date)+' · '+entry.crew+' on site</span>'+(entry.incident? '<span class="diary-incident">⚠ Incident</span>' : '')+'</div>'
@@ -1147,10 +1147,29 @@ on('export-site', (el)=>{
     +'<button class="qa-item" data-action="export-register" data-site="'+id+'"><div class="qa-icon">'+ICONS.audit+'</div><div style="flex:1;"><div class="qa-title">One-page status report (print)</div><div class="qa-sub">Requirement statuses, registers and recent audit history, to print or save as PDF</div></div>'+ICONS.chevron+'</button>');
 });
 on('export-register', (el)=>{ closeSheet(); exportSafetyFile(el.dataset.site); });
+/** Before compiling: what's in the file, what isn't, and what will be flagged in it (spec: never disguise an incomplete file). */
 on('export-bundle', (el)=>{
-  closeSheet();
-  showToast('Preparing the safety file — the download starts in a moment');
-  window.location.href = '/api/sites/'+encodeURIComponent(el.dataset.site)+'/safety-file.pdf';
+  const siteId = el.dataset.site, site = S.state.sites[siteId];
+  const { items, total, counts } = computeReadiness(siteId);
+  const list = (st)=>items.filter(i=>i.status===st).map(i=>i.req.name);
+  const missing = list('missing'), expired = list('expired'), back = list('correction_required');
+  const workers = ((S.state.siteWorkers||{})[siteId]||[]).map(id=>S.state.workers[id]).filter(Boolean);
+  const noMedical = workers.filter(w=>!w.certificates.some(c=>c.kind==='medical_fitness' && certStatus(c)!=='expired'));
+  const inFile = (counts.complete||0)+(counts.expiring||0)+(counts.awaiting_review||0);
+  const row = (n, label, cls)=>'<div class="sfr-stat '+cls+'"><b>'+n+'</b><span>'+label+'</span></div>';
+  const names = (arr)=>arr.length ? '<ul class="plain-list">'+arr.slice(0,8).map(n=>'<li>'+n+'</li>').join('')+(arr.length>8?'<li>and '+(arr.length-8)+' more</li>':'')+'</ul>' : '';
+  const gaps = missing.length + expired.length + back.length;
+  openSheet(sheetHead('Safety file check', site.name)
+    +'<div class="sfr-grid">'+row(total,'Required','')+row(inFile,'In the file','ok')+row(missing.length,'Missing',missing.length?'bad':'')+row(expired.length+back.length,'Expired or sent back',expired.length+back.length?'bad':'')+'</div>'
+    +(counts.awaiting_review && !site.project ? '<div class="notice">'+counts.awaiting_review+' document'+(counts.awaiting_review===1?' is':'s are')+' included but still waiting for the site\'s review.</div>' : '')
+    +(counts.expiring ? '<div class="notice">'+counts.expiring+' document'+(counts.expiring===1?' expires':'s expire')+' within 30 days.</div>' : '')
+    +(missing.length ? '<div class="section-title">Missing</div>'+names(missing) : '')
+    +(expired.length+back.length ? '<div class="section-title">Expired or sent back</div>'+names(expired.concat(back)) : '')
+    +(noMedical.length ? '<div class="section-title">Workers without a valid medical</div>'+names(noMedical.map(w=>w.name)) : '')
+    +(gaps ? '<div class="notice alert-red" style="margin-top:12px;">The PDF lists every gap on its contents page, so the reader sees exactly what\'s outstanding. It is not presented as complete.</div>'
+      : '<div class="notice alert-green" style="margin-top:12px;">Everything required is in the file.</div>')
+    +'<a class="btn primary block" style="margin-top:12px;" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download>'+(gaps?'Download with the gaps listed':'Download the safety file')+'</a>'
+    +(gaps && isContractor() ? '<button class="btn secondary block" style="margin-top:8px;" data-action="guide-open" data-site="'+siteId+'">Fill the gaps first</button>' : ''));
 });
 on('approve-site', (el)=>act(()=>api.post('/api/sites/'+el.dataset.site+'/approve'), 'Site marked Site Ready', el));
 on('invitation-decide', async (el)=>{
