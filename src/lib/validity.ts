@@ -5,6 +5,7 @@
  * a contractor types. Stored on the mine's organisation settings.
  */
 import { one, type Db } from '../db/pool.js';
+import { libraryTypeFor } from './readiness.js';
 
 export interface ValidityRules {
   /** Certificates of fitness: valid this many months from their issue date. */
@@ -35,18 +36,25 @@ export async function rulesForOrg(db: Db, orgId: string): Promise<ValidityRules>
   return rulesOf(o?.settings);
 }
 
-const addMonths = (iso: string, m: number) => {
-  const d = new Date(iso + 'T00:00:00Z');
-  d.setUTCMonth(d.getUTCMonth() + m);
-  return d.toISOString().slice(0, 10);
+/** Adds calendar months, keeping to the end of shorter months (31 Aug + 6 months = 28/29 Feb). */
+export const addMonths = (iso: string, m: number) => {
+  const [y, mo, day] = iso.split('-').map(Number);
+  const target = new Date(Date.UTC(y, mo - 1 + m, 1));
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(day, last));
+  return target.toISOString().slice(0, 10);
 };
-const today = () => new Date().toISOString().slice(0, 10);
+/** Today's date in South Africa (UTC+2, no daylight saving): what "expired" means at the gate. */
+export const saToday = () => new Date(Date.now() + 2 * 3600e3).toISOString().slice(0, 10);
+const today = saToday;
 
 /** The rule (months, counted from submission) that applies to a requirement's name, if any. */
 export function submissionCap(rules: ValidityRules, requirementName: string): { months: number; label: string } | null {
-  if (rules.goodStanding && /good\s*standing|\bcoid\b/i.test(requirementName)) return { months: rules.goodStanding, label: 'Letter of Good Standing' };
-  if (rules.insurance && /liability\s+insurance|public\s+liability/i.test(requirementName)) return { months: rules.insurance, label: 'public liability insurance' };
-  if (rules.medical && /medical|fitness/i.test(requirementName)) return { months: rules.medical, label: 'medical certificates' };
+  // Same matching as company documents, so a "Medical emergency plan" or a policy is never capped.
+  // Medicals and inductions are counted from their issue date on the worker's certificate instead.
+  const type = libraryTypeFor(requirementName);
+  if (type === 'good-standing' && rules.goodStanding) return { months: rules.goodStanding, label: 'Letter of Good Standing' };
+  if (type === 'insurance' && rules.insurance) return { months: rules.insurance, label: 'public liability insurance' };
   return null;
 }
 

@@ -17,7 +17,8 @@
  */
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { createHash } from 'node:crypto';
-import { many, one, type Db } from '../db/pool.js';
+import { many, one, withTx, type Db } from '../db/pool.js';
+import { certExpiry, rulesOf } from './validity.js';
 import { daysUntil, effectiveStatus, type DocStatus } from './readiness.js';
 import { storage } from './storage.js';
 import { pdfFromDefinition, tint } from './studio/render-pdf.js';
@@ -100,7 +101,7 @@ const certStatus = (expires: string | null): [string, string] => {
 async function safetyFileItems(db: Db, siteId: string) {
   const site = (await one<any>(
     db,
-    `select s.name, s.location, s.status, o.name as host_name, c.name as contractor_name, c.linked_org_id,
+    `select s.name, s.location, s.status, o.name as host_name, o.settings as host_settings, c.name as contractor_name, c.linked_org_id,
             a.verification_id, a.approved_on, a.approver_name
        from sites s join organisations o on o.id = s.org_id join contractors c on c.id = s.contractor_id
        left join approvals a on a.site_id = s.id
@@ -141,17 +142,20 @@ async function safetyFileItems(db: Db, siteId: string) {
   const workers = await many<any>(
     db,
     `select w.full_name, w.occupation,
-            coalesce((select json_agg(json_build_object('kind', c.kind, 'name', c.name, 'issuer', c.issuer, 'expires', c.expires_on,
+            coalesce((select json_agg(json_build_object('kind', c.kind, 'name', c.name, 'issuer', c.issuer, 'expires', c.expires_on, 'issued', c.issued_on,
                         'storage_key', f.storage_key, 'content_type', f.content_type, 'filename', f.filename) order by c.kind, c.name)
                         from worker_certificates c left join files f on f.id = c.file_id where c.worker_id = w.id), '[]') as certs
        from site_workers sw join workers w on w.id = sw.worker_id where sw.site_id = $1 and w.active order by w.full_name`,
     [siteId],
   );
+  // The mine's validity rules (e.g. medicals 12 months from issue) apply here as they do at the gate.
+  const rules = rulesOf(site.host_settings);
   for (const w of workers) {
     for (const c of w.certs) {
+      const eff = certExpiry(rules, { kind: c.kind, issued_on: c.issued, expires_on: c.expires });
       items.push({
         section: 'Workforce certificates', name: `${w.full_name} — ${c.name}`, sub: c.issuer || w.occupation || undefined,
-        status: certStatus(c.expires), expiry: c.expires,
+        status: eff.missingIssue ? ['No issue date', AMBER] : certStatus(eff.until), expiry: eff.until,
         file: c.storage_key ? { storage_key: c.storage_key, content_type: c.content_type, filename: c.filename } : null,
       });
     }
@@ -183,8 +187,16 @@ export function diffContents(prev: FileLine[], cur: FileLine[]): FileChange[] {
   return out;
 }
 
-const toLines = (items: BundleItem[]): FileLine[] =>
-  items.map((i) => ({ section: i.section, name: i.name, status: i.status[0], version: i.version ?? null, expiry: i.expiry ? fmt(i.expiry) : null, included: !!i.file }));
+/** Two items with the same name in a section (e.g. two medicals for one worker) get "(2)", "(3)" so each keeps its own line. */
+const toLines = (items: BundleItem[]): FileLine[] => {
+  const seen = new Map<string, number>();
+  return items.map((i) => {
+    const k = `${i.section}\u0000${i.name}`;
+    const n = (seen.get(k) ?? 0) + 1;
+    seen.set(k, n);
+    return { section: i.section, name: n > 1 ? `${i.name} (${n})` : i.name, status: i.status[0], version: i.version ?? null, expiry: i.expiry ? fmt(i.expiry) : null, included: !!i.file };
+  });
+};
 
 /** The file's contents as they stand now, without rendering a PDF. */
 export async function currentContents(db: Db, siteId: string): Promise<FileLine[]> {
@@ -198,13 +210,24 @@ async function recordRevision(db: Db, siteId: string, lines: FileLine[], generat
   if (last && last.digest === digest) return { number: last.number, created: false };
   const number = (last?.number ?? 0) + 1;
   await db.query(
-    `insert into safety_file_versions (site_id, number, digest, contents, generated_by) values ($1, $2, $3, $4, $5) on conflict (site_id, number) do nothing`,
+    `insert into safety_file_versions (site_id, number, digest, contents, generated_by) values ($1, $2, $3, $4, $5)`,
     [siteId, number, digest, JSON.stringify(lines), generatedBy],
   );
   return { number, created: true };
 }
 
-export async function buildSafetyFile(db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean }> {
+/**
+ * Compiles the safety file. Runs in one transaction holding a per-site lock, so two people
+ * compiling at once get consecutive revisions, and a PDF that fails to render records nothing.
+ */
+export async function buildSafetyFile(_db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean }> {
+  return withTx(async (db) => {
+    await db.query('select pg_advisory_xact_lock(hashtext($1))', ['safety-file:' + siteId]);
+    return compileSafetyFile(db, siteId, generatedBy);
+  });
+}
+
+async function compileSafetyFile(db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean }> {
   const { site, reqs, items, workers } = await safetyFileItems(db, siteId);
   const revision = await recordRevision(db, siteId, toLines(items), generatedBy);
 

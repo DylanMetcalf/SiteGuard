@@ -50,7 +50,7 @@ describe('gate clearance', () => {
     assert.equal(g.cleared, false);
     assert.ok(g.reasons.some((r: string) => /isn't approved yet/.test(r)));
     assert.ok(g.reasons.some((r: string) => /No certificate of fitness/.test(r)));
-    assert.ok(g.reasons.includes('Not inducted'));
+    assert.ok(g.reasons.includes('No site induction on record'));
     assert.match(g.token, /^[A-Za-z0-9_-]{24}$/);
     token = g.token;
   });
@@ -85,6 +85,14 @@ describe('gate clearance', () => {
     const wg = await mine.get(`/api/workplaces/${wid}/gate`);
     assert.equal(wg.status, 200);
     assert.equal(wg.body.workers.length, 1);
+  });
+
+  it('replaces a lost gate card; the old QR stops working', async () => {
+    assert.equal((await otherMine.post(`/api/sites/${fileId}/gate/${workerId}/reissue`)).status, 404);
+    assert.equal((await con.post(`/api/sites/${fileId}/gate/${workerId}/reissue`)).status, 200);
+    assert.equal((await new Agent(app).req('GET', `/gate/${token}`)).status, 404);
+    token = (await gateOf()).token;
+    assert.equal((await new Agent(app).req('GET', `/gate/${token}`)).status, 200);
   });
 
   it('keeps gate lists inside the tenant', async () => {
@@ -153,6 +161,8 @@ describe('suspension', () => {
   });
 
   it('withdraws Site Ready, blocks the gate, permits and approval, and tells the contractor', async () => {
+    const permit = await con.post(`/api/sites/${fileId}/permits`, { type: 'hot_work', location: 'Headframe' });
+    assert.equal(permit.status, 200, JSON.stringify(permit.body));
     const r = await mine.post(`/api/contractors/${contractorId}/suspend`, { reason: 'Fatality investigation at Shaft 4' });
     assert.equal(r.status, 200, JSON.stringify(r.body));
     const ms = await mine.state();
@@ -161,7 +171,12 @@ describe('suspension', () => {
     const g = await gateOf();
     assert.equal(g.cleared, false);
     assert.ok(g.reasons.some((x: string) => /Company suspended by the site: Fatality/.test(x)));
-    assert.match((await new Agent(app).req('GET', `/gate/${token}`)).raw.body, /NOT CLEARED/);
+    const publicPage = (await new Agent(app).req('GET', `/gate/${token}`)).raw.body;
+    assert.match(publicPage, /NOT CLEARED/);
+    assert.match(publicPage, /may not work on this site/);
+    assert.doesNotMatch(publicPage, /Fatality|medical expired|Medical expired/i, 'no reasons or health details on the public page');
+    const p = ((await con.state()).state.permits[fileId] as { id: string; status: string; closeNotes?: string }[]).find((x) => x.id === permit.body.id)!;
+    assert.equal(p.status, 'closed', 'live and pending permits close on suspension');
     assert.equal((await mine.post(`/api/sites/${fileId}/approve`)).status, 409);
     assert.equal((await con.post(`/api/sites/${fileId}/permits`, { type: 'hot_work', location: 'Workshop' })).status, 409);
     const cs = await con.state();
@@ -230,5 +245,19 @@ describe('work activities in risk assessments', () => {
     assert.equal(bad.status, 400);
     const ok = await con.post('/api/studio/documents', { blueprintId: 'method-statement', values: { scope: 'Painting', activities: 'Working at heights; Hot work' } });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  });
+});
+
+describe('validity rule details', () => {
+  it('adds months without overflowing short months, and caps only the right documents', async () => {
+    const { addMonths, submissionCap } = await import('../src/lib/validity.js');
+    assert.equal(addMonths('2026-08-31', 6), '2027-02-28');
+    assert.equal(addMonths('2028-01-31', 1), '2028-02-29');
+    assert.equal(addMonths('2026-03-15', 12), '2027-03-15');
+    const rules = { goodStanding: 3, insurance: 12, medical: 12 };
+    assert.equal(submissionCap(rules, 'Letter of Good Standing (COID)')?.months, 3);
+    assert.equal(submissionCap(rules, 'Public liability insurance certificate')?.months, 12);
+    assert.equal(submissionCap(rules, 'Medical emergency plan'), null);
+    assert.equal(submissionCap(rules, 'Fitness-for-duty procedure'), null);
   });
 });

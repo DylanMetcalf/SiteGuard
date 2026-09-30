@@ -69,11 +69,12 @@ async function hostFindings(db: Db, orgId: string): Promise<Finding[]> {
   const auditDue = await many<{ id: string; name: string; contractor: string; last: string | null; days: number }>(
     db,
     `select s.id, s.name, c.name as contractor, to_char(max(a.audited_on), 'YYYY-MM-DD') as last,
-            (current_date - coalesce(max(a.audited_on), s.created_at::date))::int as days
+            (current_date - coalesce(max(a.audited_on), greatest(s.created_at::date, (select applied_at::date from schema_migrations where name = '011_gate_audits_suspension.sql'))))::int as days
        from sites s join contractors c on c.id = s.contractor_id left join contractor_audits a on a.site_id = s.id
       where s.org_id = $1 and s.status in ('in_progress', 'site_ready')
+      -- Counted from when audits arrived in SiteGuard, so existing sites aren't all flagged on day one.
       group by s.id, s.name, c.name
-     having (current_date - coalesce(max(a.audited_on), s.created_at::date)) >= 30`,
+     having (current_date - coalesce(max(a.audited_on), greatest(s.created_at::date, (select applied_at::date from schema_migrations where name = '011_gate_audits_suspension.sql')))) >= 30`,
     [orgId],
   );
   for (const a of auditDue) {

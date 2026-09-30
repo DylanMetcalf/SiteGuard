@@ -4,13 +4,15 @@
  *  - the contractor's safety file for the site is approved (Site Ready);
  *  - the contractor company isn't suspended by the mine;
  *  - the worker is still employed and has a valid certificate of fitness;
- *  - the worker has a valid site induction.
+ *  - the worker has a site induction on record that hasn't lapsed. Inductions are
+ *    recorded by the contractor as certificates (not per mine yet), so the mine's
+ *    induction rule — e.g. 12 months from the induction date — is what gives them teeth.
  * Validity uses the mine's own rules where it set them (lib/validity.ts).
  * Every assigned worker gets an unguessable token for the QR on their gate card.
  */
 import { randomBytes } from 'node:crypto';
 import { many, type Db } from '../db/pool.js';
-import { certExpiry, rulesOf } from './validity.js';
+import { certExpiry, rulesOf, saToday } from './validity.js';
 
 export interface GateRow {
   siteId: string;
@@ -28,7 +30,6 @@ export interface GateRow {
   token: string;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
 
 /** Gate status for every worker assigned to the given contractor files (sites rows). */
 export async function gateRows(db: Db, siteIds: string[]): Promise<GateRow[]> {
@@ -50,7 +51,7 @@ export async function gateRows(db: Db, siteIds: string[]): Promise<GateRow[]> {
       order by c.name, w.full_name`,
     [siteIds],
   );
-  const now = today();
+  const now = saToday();
   return rows.map((r) => {
     const rules = rulesOf(r.host_settings);
     const reasons: string[] = [];
@@ -74,7 +75,7 @@ export async function gateRows(db: Db, siteIds: string[]): Promise<GateRow[]> {
     else if (med.until === undefined) reasons.push(med.missingIssue ? 'Medical has no issue date, which this site needs' : 'No valid medical');
     else if (med.until !== null && med.until < now) reasons.push(`Medical expired on ${med.until}`);
     const ind = best('induction');
-    if (!ind.any) reasons.push('Not inducted');
+    if (!ind.any) reasons.push('No site induction on record');
     else if (ind.until === undefined) reasons.push(ind.missingIssue ? 'Induction has no issue date, which this site needs' : 'No valid induction');
     else if (ind.until !== null && ind.until < now) reasons.push(`Induction expired on ${ind.until}`);
     const dates = [med.until, ind.until].filter((d): d is string => typeof d === 'string');

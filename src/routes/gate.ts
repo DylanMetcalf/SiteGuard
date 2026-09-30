@@ -6,12 +6,30 @@
  */
 import type { FastifyInstance } from 'fastify';
 import QRCode from 'qrcode';
-import { many, one, pool } from '../db/pool.js';
-import { isUuid, loadSite, requireOrg } from '../lib/authz.js';
+import { randomBytes } from 'node:crypto';
+import { many, one, pool, withTx } from '../db/pool.js';
+import { isUuid, loadSite, requireOrg, requireReviewer, requireWritable } from '../lib/authz.js';
+import { audit } from '../lib/audit.js';
+import { publishChange } from '../lib/realtime.js';
 import { notFound } from '../lib/errors.js';
 import { gateRows } from '../lib/gate.js';
 import { appUrl } from '../lib/email.js';
 import { esc, page } from './share.js';
+
+/**
+ * The public page says why in general terms only: anyone holding the card can open it,
+ * so no health details (which certificate, when it expired) and no suspension reasons.
+ */
+function publicReasons(reasons: string[]): string[] {
+  const out = new Set<string>();
+  for (const r of reasons) {
+    if (/suspended/i.test(r)) out.add('The company may not work on this site at the moment');
+    else if (/safety file/i.test(r)) out.add('The company\'s safety file for this site isn\'t approved yet');
+    else if (/no longer working/i.test(r)) out.add('Not listed as working for the company');
+    else out.add('The worker\'s medical or induction isn\'t in order for this site');
+  }
+  return [...out];
+}
 
 export default async function gateRoutes(app: FastifyInstance) {
   /** One contractor file: its crew's clearance (either side of the site). */
@@ -44,6 +62,28 @@ export default async function gateRoutes(app: FastifyInstance) {
     return reply.type('image/svg+xml').send(svg);
   });
 
+  /** Replaces a worker's gate card (lost or copied card): the old QR stops working at once. */
+  app.post('/api/sites/:id/gate/:workerId/reissue', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const { id, workerId } = req.params as { id: string; workerId: string };
+    if (!isUuid(workerId)) throw notFound();
+    return withTx(async (db) => {
+      const { site, side, parties } = await loadSite(db, ctx, id);
+      // Contractor staff manage their own workers; on the mine's side, reviewers and admins.
+      if (side === 'host') requireReviewer(ctx);
+      const w = await one<{ full_name: string }>(
+        db,
+        `update site_workers sw set gate_token = $3 from workers w where w.id = sw.worker_id and sw.site_id = $1 and sw.worker_id = $2 returning w.full_name`,
+        [site.id, workerId, randomBytes(18).toString('base64url')],
+      );
+      if (!w) throw notFound();
+      await audit(db, ctx, 'Replaced gate card', w.full_name, site.id);
+      await publishChange(db, parties);
+      return { ok: true };
+    });
+  });
+
   /** What the guard sees after scanning a gate card. */
   app.get('/gate/:token', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { token } = req.params as { token: string };
@@ -56,11 +96,11 @@ export default async function gateRoutes(app: FastifyInstance) {
     const checked = new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', dateStyle: 'medium', timeStyle: 'short' });
     const body = `<div class="card" style="text-align:center;border:3px solid ${row.cleared ? 'var(--green)' : 'var(--red)'}">
         <div class="big" style="color:${row.cleared ? 'var(--green)' : 'var(--red)'};margin:8px 0">${row.cleared ? 'CLEARED' : 'NOT CLEARED'}</div>
-        <h1>${esc(row.name)}</h1><div class="sub">${esc(row.occupation || 'Worker')}${row.employeeNo ? ` · ${esc(row.employeeNo)}` : ''}</div>
+        <h1>${esc(row.name)}</h1><div class="sub">${esc(row.occupation || 'Worker')}</div>
         <div style="margin-top:10px">${esc(row.company)}</div><div class="sub">${esc(row.siteName)}</div></div>
       ${row.cleared
         ? `<div class="card"><div class="sub">Cleared for this site${row.until ? ` until ${esc(row.until)}` : ''}: medical, induction and the contractor's safety file are in order.</div></div>`
-        : `<div class="card"><strong>Why not</strong><ul>${row.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul><div class="sub">Refer the worker to their supervisor or the site's safety office.</div></div>`}
+        : `<div class="card"><strong>Why not</strong><ul>${publicReasons(row.reasons).map((r) => `<li>${esc(r)}</li>`).join('')}</ul><div class="sub">Refer the worker to their supervisor or the site's safety office. The details are in SiteGuard.</div></div>`}
       <div class="sub" style="text-align:center">Checked ${esc(checked)}</div>`;
     return reply.type('text/html').send(page('Gate check', body));
   });

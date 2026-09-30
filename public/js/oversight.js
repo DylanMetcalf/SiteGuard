@@ -79,13 +79,15 @@ on('contractor-unsuspend', async (el)=>{
 });
 
 /* ================= Gate clearance ================= */
-function gateRow(w, showCompany){
+function gateRow(w, showCompany, siteId){
   const reasons = w.cleared ? '' : '<ul class="gate-reasons">'+w.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>';
   return '<div class="gate-row '+(w.cleared?'ok':'no')+'"><span class="gate-dot" aria-hidden="true"></span><div class="reqrow-main">'
     +'<div class="reqrow-name">'+esc(w.name)+'</div>'
     +'<div class="reqrow-meta"><span class="badge '+(w.cleared?'complete':'correction_required')+'">'+(w.cleared?ICONS.check+'Cleared':'Not cleared')+'</span>'
     +'<span class="srctag">'+[w.occupation, showCompany ? w.company : '', w.employeeNo ? 'No. '+w.employeeNo : ''].filter(Boolean).map(esc).join(' · ')+'</span>'
-    +(w.cleared && w.until ? '<span class="srctag">until '+fmtDate(w.until)+'</span>' : '')+'</div>'+reasons+'</div></div>';
+    +(w.cleared && w.until ? '<span class="srctag">until '+fmtDate(w.until)+'</span>' : '')+'</div>'+reasons
+    +(siteId && !readOnly() && (isContractor() || canReview()) ? '<button class="linkish gate-reissue" data-action="gate-reissue" data-site="'+siteId+'" data-worker="'+esc(w.workerId)+'" data-name="'+esc(w.name)+'">Replace card</button>' : '')
+    +'</div></div>';
 }
 function gateSummary(list){
   const ok = list.filter(w=>w.cleared).length;
@@ -100,7 +102,7 @@ export function gateSection(siteId){
   if(!e.data) return html + loading;
   const list = e.data.workers;
   if(!list.length) return html + '<div class="card"><div class="site-card-sub">Nobody is assigned to this site yet. Each person assigned here gets a gate status: cleared only when the safety file is Site Ready and their medical and induction are valid'+(isHost()?' under your validity rules':'')+'.</div></div>';
-  return html + gateSummary(list) + '<div class="card">'+list.map(w=>gateRow(w, false)).join('')+'</div>'
+  return html + gateSummary(list) + '<div class="card">'+list.map(w=>gateRow(w, false, siteId)).join('')+'</div>'
     + '<button class="btn secondary block" data-action="print-gate-cards" data-site="'+siteId+'">Print gate cards (QR)</button>'
     + '<div class="site-card-sub" style="margin-top:6px;">Security scans a card to see today\'s status on their phone — no login and no ID numbers are shown.</div>';
 }
@@ -120,6 +122,10 @@ export function workplaceGateHtml(wid){
     + (list.length ? '<div class="card">'+list.map(w=>gateRow(w, true)).join('')+'</div>' : '<div class="list-empty">No one matches.</div>')
     + '<button class="btn secondary block" data-action="print-gate-list" data-wp="'+wid+'">Print today\'s gate list</button>';
 }
+on('gate-reissue', (el)=>{
+  if(!confirm('Replace '+el.dataset.name+'\'s gate card? The old card stops working straight away; print the new one.')) return;
+  act(()=>api.post('/api/sites/'+encodeURIComponent(el.dataset.site)+'/gate/'+encodeURIComponent(el.dataset.worker)+'/reissue'), 'Card replaced — print the new one', el);
+});
 on('gate-filter', (el)=>{ S.gateFilter = el.dataset.f; S.keepScroll = true; render(); S.keepScroll = false; });
 
 on('print-gate-cards', async (el)=>{
@@ -255,7 +261,7 @@ export function validityCard(){
   const ro = readOnly() || !isOrgAdmin();
   const opts = (k)=>'<option value="">Use the date on the document</option>'+[3,6,12,24,36].map(m=>'<option value="'+m+'"'+(r[k]===m?' selected':'')+'>'+m+' months</option>').join('');
   return '<div class="section-title">Validity rules</div><div class="card">'
-    +'<div class="site-card-sub" style="margin-bottom:6px;">How long your sites accept these documents. Contractors see the rule when they submit; gate clearance and Site Ready use it. The earlier of the rule and the date on the document applies.</div>'
+    +'<div class="site-card-sub" style="margin-bottom:6px;">How long your sites accept these documents. Contractors see the rule when they submit; gate clearance and Site Ready use it. The earlier of the rule and the date on the document applies. Medical and induction rules take effect at the gate straight away; COID and insurance rules apply to documents submitted from now on.</div>'
     + RULES.map(([k,l,h])=>'<label class="field-label" for="vr_'+k+'">'+l+'</label><select id="vr_'+k+'" class="field"'+(ro?' disabled':'')+'>'+opts(k)+'</select><div class="site-card-sub">Counted '+h+'.</div>').join('')
     +(ro?'':'<button class="btn primary block" style="margin-top:12px;" data-action="save-validity">Save validity rules</button>')+'</div>';
 }

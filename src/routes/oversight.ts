@@ -15,7 +15,7 @@ import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 import { recheckSiteReady } from '../lib/siteready.js';
-import { RULE_KEYS } from '../lib/validity.js';
+import { RULE_KEYS, saToday } from '../lib/validity.js';
 
 /** The standard monthly audit checklist; the auditor can add items of their own. */
 export const AUDIT_ITEMS = [
@@ -36,7 +36,7 @@ export const AUDIT_ITEMS = [
 
 const text = (max: number) => z.string().trim().max(max);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const addDays = (n: number) => new Date(Date.now() + n * 86400e3).toISOString().slice(0, 10);
+const addDays = (n: number) => new Date(Date.parse(saToday() + 'T00:00:00Z') + n * 86400e3).toISOString().slice(0, 10);
 
 export default async function oversightRoutes(app: FastifyInstance) {
   // ---- Suspension -------------------------------------------------------------------------
@@ -57,6 +57,14 @@ export default async function oversightRoutes(app: FastifyInstance) {
         if (c.suspended_at) throw conflict('Already suspended.');
         await db.query(`update contractors set suspended_at = now(), suspended_reason = $2, suspended_by_name = $3 where id = $1`, [c.id, reason, ctx.user.name]);
         await audit(db, ctx, 'Suspended contractor', `${c.name} on all sites — ${reason}`);
+        // Work stops: live and pending permits are closed, with the reason on each.
+        const closed = await many<{ id: string; site_id: string; type: string; location: string }>(
+          db,
+          `update permits set status = 'closed', closed_by_name = $2, closed_at = now(), close_notes = $3
+            where site_id = any($1::uuid[]) and status in ('pending', 'active') returning id, site_id, type, location`,
+          [sites.map((s) => s.id), ctx.user.name, `Closed: contractor suspended — ${reason}`],
+        );
+        for (const p of closed) await audit(db, ctx, 'Closed permit', `${p.type.replace(/_/g, ' ')} at ${p.location} — contractor suspended`, p.site_id);
         for (const s of sites) await recheckSiteReady(db, s.id, 'contractor suspended');
         if (c.linked_org_id) await notifyOrg(db, c.linked_org_id, null, { kind: 'correction', title: `Suspended by ${ctx.org.name}`, body: `On all ${ctx.org.name} sites: ${reason}. Your people won't be cleared at the gate until the suspension is lifted.` });
       } else {
@@ -92,8 +100,8 @@ export default async function oversightRoutes(app: FastifyInstance) {
     const scored = body.items.filter((i) => i.result !== 'na');
     if (!scored.length) throw badRequest('Mark at least one item yes or no.');
     const score = Math.round((100 * scored.filter((i) => i.result === 'yes').length) / scored.length);
-    const on = body.auditedOn ?? new Date().toISOString().slice(0, 10);
-    if (on > new Date().toISOString().slice(0, 10)) throw badRequest('The audit date can\'t be in the future.');
+    const on = body.auditedOn ?? saToday();
+    if (on > saToday()) throw badRequest('The audit date can\'t be in the future.');
     return withTx(async (db) => {
       const { site, side, parties } = await loadSite(db, ctx, (req.params as { id: string }).id);
       if (side !== 'host') throw forbidden('Only the site audits its contractors.');
