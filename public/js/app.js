@@ -11,6 +11,7 @@ import { refreshGuide } from './guide.js';
 import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
 import './inbox.js';
 import './builder.js';
+import { maybeOfferTour } from './tour.js';
 
 const app = document.getElementById('app');
 
@@ -82,7 +83,7 @@ function render(){
   if(arriving) window.scrollTo(0, 0); else if(S.keepScroll || typing) window.scrollTo(0, y);
   if(typing){ const n = document.querySelector('[data-search="'+typing.key+'"]'); if(n){ n.focus(); try{ n.setSelectionRange(typing.pos, typing.pos); }catch{ /* search inputs in some browsers */ } } }
   startLive();
-  maybeShowTutorial();
+  maybeOfferTour();
 }
 setRender(render);
 
@@ -147,39 +148,6 @@ function startLive(){
 function stopLive(){ if(es){ es.close(); es = null; } S.live = false; }
 function updateLiveDot(){ const d = document.querySelector('.live-dot'); if(d) d.classList.toggle('off', !S.live); }
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && S.boot && S.boot.org){ S.keepScroll = true; reload().catch(()=>{}).finally(()=>{ S.keepScroll=false; }); } });
-
-/* ============ first-run tutorial (from the MVP) ============ */
-const TUTORIAL_STEPS = [
-  {title:'Your sites, at a glance', text:'Pick the site you\'re working on and SiteGuard shows you exactly what\'s outstanding — no digging through folders or spreadsheets.'},
-  {title:'One tap to log anything', text:'The + button is always there — upload a document, log today\'s site diary, report an incident or record a toolbox talk, from wherever you are.'},
-  {title:'Your whole team, live', text:'Colleagues and contractors see the same record as you, on any device. Expiring certificates, corrections and open incidents are flagged — and emailed — automatically.'},
-];
-let tutorialStep = 0, tutorialChecked = false;
-function maybeShowTutorial(){
-  if(tutorialChecked) return;
-  tutorialChecked = true;
-  let seen = false;
-  try{ seen = localStorage.getItem('sg_tutorial_seen')==='1'; }catch{ seen = true; }
-  if(!seen) showTutorialStep();
-}
-function showTutorialStep(){
-  document.querySelectorAll('.overlay.tutorial').forEach(o=>o.remove());
-  const step = TUTORIAL_STEPS[tutorialStep];
-  const isLast = tutorialStep===TUTORIAL_STEPS.length-1;
-  const overlay = document.createElement('div');
-  overlay.className='overlay tutorial';
-  overlay.innerHTML = '<div class="sheet tut-card" role="dialog" aria-modal="true"><div class="tut-icon">'+ICONS.sparkle+'</div><h2>'+step.title+'</h2><p>'+step.text+'</p>'
-    +'<div class="tut-dots">'+TUTORIAL_STEPS.map((s,i)=>'<span class="'+(i===tutorialStep?'active':'')+'"></span>').join('')+'</div>'
-    +'<button class="btn primary block" id="tutNext">'+(isLast?'Get started':'Next')+'</button>'
-    +(isLast?'':'<button class="btn secondary block" style="margin-top:8px;" id="tutSkip">Skip</button>')+'</div>';
-  document.body.appendChild(overlay);
-  overlay.querySelector('#tutNext').onclick = ()=>{ if(isLast) finishTutorial(); else { tutorialStep++; showTutorialStep(); } };
-  const skip = overlay.querySelector('#tutSkip'); if(skip) skip.onclick = finishTutorial;
-}
-function finishTutorial(){
-  try{ localStorage.setItem('sg_tutorial_seen','1'); }catch{ /* private mode */ }
-  document.querySelectorAll('.overlay.tutorial').forEach(o=>o.remove());
-}
 
 /* ============ boot ============ */
 (async function boot(){

@@ -14,6 +14,7 @@ import { renderStudio } from './studio.js';
 import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
 import { renderWorkplace, workplaceCards } from './workplaces.js';
+import { suspendedBanner, suspendControls, gateSection, auditsSection, validityCard, revisionsLink } from './oversight.js';
 
 /* ============ SHELL ============ */
 export function topbar(){
@@ -178,7 +179,7 @@ function renderDashboard(){
   const stat = (n, label) => '<div class="hero-stat"><b>'+n+'</b><span>'+label+'</span></div>';
   const head = '<div class="dash-hero"><div class="flexbetween" style="align-items:flex-start;"><div><p class="hero-eyebrow">'+org().name+'</p><h1>'+greeting()+'</h1>'
     +'<p class="greeting">'+(urgent ? urgent+' urgent item'+(urgent===1?'':'s')+' need'+(urgent===1?'s':'')+' you today.' : findings.length ? findings.length+' item'+(findings.length===1?'':'s')+' to look at — nothing urgent.' : 'Everything is in order across your sites.')+'</p></div>'
-    +'<button class="btn secondary small" data-action="customise-dashboard">Customise</button></div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn secondary small" data-action="start-tour">Walkthrough</button><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div></div>'
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
   const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
@@ -382,7 +383,7 @@ function renderSiteDetail(siteId){
     +'<div class="view-head"><h1>'+site.name+'</h1><p>'+[site.location, isContractor()?site.hostName:contractor.name].filter(Boolean).join(' · ')+'</p></div>'
     +'<div class="subtabs" role="tablist">'
       +['compliance','activity','people'].map(t=>'<button role="tab" data-action="site-tab" data-tab="'+t+'" class="'+(S.siteTab===t?'active':'')+'" aria-selected="'+(S.siteTab===t)+'">'+({compliance:'Compliance',activity:'Site activity',people:'People'})[t]+'</button>').join('')
-    +'</div>';
+    +'</div>' + suspendedBanner(siteId);
 
   if(S.siteTab==='activity') return html + renderSiteActivity(siteId);
   if(S.siteTab==='people') return html + renderSitePeople(siteId);
@@ -433,7 +434,7 @@ function renderSiteDetail(siteId){
     if(isContractor()) html += guideCard(siteId);
   }
   const filed = (S.state.requirements[siteId]||[]).filter(r=>['complete','expiring','awaiting_review'].includes(effectiveStatus(S.state.documents[r.id]))).length;
-  if(filed) html += '<a class="bundle-link" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>';
+  if(filed) html += '<a class="bundle-link" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>' + revisionsLink(siteId);
 
   const grouped = {};
   items.forEach(it=>{ (grouped[it.req.category] = grouped[it.req.category]||[]).push(it); });
@@ -475,7 +476,7 @@ export function renderIncidentRow(inc, siteId, showSite){
 function renderSiteActivity(siteId){
   const ro = readOnly();
   const permits = S.state.permits[siteId] || [];
-  let html = '<div class="section-title">Permit to work register</div>';
+  let html = auditsSection(siteId) + '<div class="section-title">Permit to work register</div>';
   if(!ro && (isContractor() || canReview())) html += '<button class="btn primary block" data-action="new-permit" data-site="'+siteId+'" style="margin-bottom:10px;">'+(isContractor()?'Request a permit':'Issue a permit')+'</button>';
   html += permits.length ? '<div class="card">' + permits.map(p=>renderPermitRow(p, siteId)).join('') + '</div>'
     : '<div class="card"><div class="site-card-sub">No permits raised for this site. High-risk work — hot work, heights, confined space, excavation, lifting, electrical isolation — should have one before it starts.</div></div>';
@@ -545,6 +546,7 @@ function renderSitePeople(siteId){
   } else {
     html += '<div class="card">' + workers.map(w=>workerRow(w, siteId)).join('') + '</div>';
   }
+  if(workers.length) html += gateSection(siteId);
 
   const talks = (S.state.toolboxTalks||{})[siteId] || [];
   html += '<div class="section-title">Toolbox talks</div>';
@@ -741,7 +743,8 @@ on('open-contractor', (el)=>{
       : '<div class="list-empty">No sites yet.</div>')
     +(c.linked
       ? '<div class="notice" style="margin-top:12px;">'+c.name+' manages its own company details in SiteGuard, so they can\'t be changed here. That keeps the record accurate and shows who is responsible for it.</div>'
-      : (isOrgAdmin() && !readOnly() ? '<button class="btn secondary block" style="margin-top:12px;" data-action="edit-contractor" data-id="'+c.id+'">Correct invitation details</button><div class="site-card-sub" style="margin-top:6px;">You can correct the name or email you invited them with until they join. After that, they keep their own details up to date.</div>' : '')));
+      : (isOrgAdmin() && !readOnly() ? '<button class="btn secondary block" style="margin-top:12px;" data-action="edit-contractor" data-id="'+c.id+'">Correct invitation details</button><div class="site-card-sub" style="margin-top:6px;">You can correct the name or email you invited them with until they join. After that, they keep their own details up to date.</div>' : ''))
+    + suspendControls(c));
 });
 on('contractor-site', (el)=>{ closeSheet(); S.nav='sites'; S.activeSiteId = el.dataset.site; S.siteTab='compliance'; render(); window.scrollTo(0,0); });
 
@@ -749,7 +752,9 @@ on('contractor-site', (el)=>{ closeSheet(); S.nav='sites'; S.activeSiteId = el.d
 function renderMore(){
   if(S.moreView) return '<div style="margin-bottom:14px;"><button class="btn secondary small" data-action="goto-more" data-view="">← More</button></div>' + (MORE_VIEWS[S.moreView] ? MORE_VIEWS[S.moreView]() : '');
   const item = (view, icon, title, sub) => '<button class="menu-row" data-action="goto-more" data-view="'+view+'"><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
-  let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div><div class="card">';
+  let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div>'
+    +'<button class="tour-cta" data-action="start-tour"><span class="tour-cta-ic">'+ICONS.sparkle+'</span><span><strong>Walkthrough</strong><span class="site-card-sub">A guided tour of every page, with auto-play for demos</span></span>'+ICONS.chevron+'</button>'
+    +'<div class="card">';
   html += item('studio', ICONS.passport, 'Document Studio', 'Branded safety documents as PDF and Word');
   if(isContractor() && isOrgAdmin()) html += '<button class="menu-row" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Join a site with a code</div><div class="qa-sub">Type the code the site gave you</div></div>'+ICONS.chevron+'</button>';
   const nf = (S.boot.agent||{findings:[]}).findings.length;
@@ -995,6 +1000,7 @@ function renderSettings(){
     +(isContractor()?'<label class="field-label" for="orgTrade">Trade</label><input type="text" id="orgTrade" value="'+o.trade+'">':'')
     +(ro?'':'<button class="btn primary block" style="margin-top:12px;" data-action="save-org">Save company details</button>')+'</div>';
   html += brandingCard(ro);
+  html += validityCard();
   html += '<div class="section-title">Notifications</div><div class="card">'
     +'<div class="toggle-row"><label for="digestToggle">Email reminder digests (expiring documents &amp; certificates, open incidents, overdue requests)</label><input type="checkbox" id="digestToggle" '+(s.reminderDigest===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-digest"')+'></div>'
     +'<div class="toggle-row"><label for="weeklyToggle">Monday compliance summary for admins (from the compliance agent)</label><input type="checkbox" id="weeklyToggle" '+(s.weeklySummary===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-weekly"')+'></div>'

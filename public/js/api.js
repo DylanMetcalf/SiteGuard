@@ -36,7 +36,10 @@ export async function request(method, url, body) {
   } catch {
     throw new ApiError(0, 'network', "Can't reach SiteGuard — check your connection and try again.");
   }
-  return handle(res);
+  const out = await handle(res);
+  // A site's validity rule shortened an expiry date: tell the person (core.js shows it).
+  if (out && typeof out.ruleNote === 'string' && out.ruleNote) window.dispatchEvent(new CustomEvent('sg-rule-note', { detail: out.ruleNote }));
+  return out;
 }
 
 export const api = {

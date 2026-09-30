@@ -7,9 +7,10 @@
 import { api } from './api.js';
 import {
   S, ICONS, SOURCE_LABEL, on, act, render, showToast, openSheet, closeSheet, sheetHead, escapeHtml, unescapeHtml, val,
-  isOrgAdmin, readOnly, computeReadiness, effectiveStatus, badge, initials, searchBox, matchSearch, searching,
+  isOrgAdmin, canReview, readOnly, computeReadiness, effectiveStatus, badge, initials, searchBox, matchSearch, searching,
 } from './core.js';
 import { loadPacks, packPicker, checkedPacks, PACK_NOTE, openNewSite } from './sheets.js';
+import { workplaceGateHtml } from './oversight.js';
 
 const W = () => S.state.workplaces || {};
 /** Each contractor's file for this site (one per contractor). */
@@ -50,7 +51,8 @@ export function renderWorkplace(wid){
   const tab = S.wpTab || 'contractors';
   const admin = isOrgAdmin() && !readOnly();
   let html = '<div style="margin-bottom:14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><button class="btn secondary small" data-action="back-sites">← Sites</button>'
-    +(admin?'<button class="btn secondary small" data-action="wp-edit" data-id="'+wid+'">Edit site</button>':'')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'+(canReview() && !readOnly() && st.files.length?'<button class="btn secondary small" data-action="wp-request-all" data-id="'+wid+'">Request from contractors</button>':'')
+    +(admin?'<button class="btn secondary small" data-action="wp-edit" data-id="'+wid+'">Edit site</button>':'')+'</div></div>'
     +'<div class="view-head"><h1>'+w.name+'</h1><p>'+[w.location, st.files.length+' contractor'+(st.files.length===1?'':'s')].filter(Boolean).join(' · ')+'</p></div>';
   if(w.code && st.files.length && !S.wpCodeOpen) html += '<div class="card wp-code-line"><span class="hero-eyebrow" style="color:var(--grey);margin:0;">Site code</span><span class="mono wp-code-sm">'+w.code+'</span>'
       +(w.joinOpen?'':'<span class="badge missing">Closed</span>')+'<button class="btn secondary small" data-action="wp-share" data-id="'+wid+'">Share</button><button class="linkish" data-action="wp-code-more">More</button></div>';
@@ -64,9 +66,10 @@ export function renderWorkplace(wid){
     +'<div class="attn-card '+(st.review?'amber':'blue')+'" data-action="wp-tab" data-tab="queue" style="cursor:pointer;"><div class="attn-num">'+st.review+'</div><div class="attn-label">Waiting for your review</div></div>'
     +'<div class="attn-card red" data-action="wp-tab" data-tab="contractors" style="cursor:pointer;"><div class="attn-num">'+st.outstanding+'</div><div class="attn-label">Documents outstanding</div></div>'
     +'<div class="attn-card green" style="background:var(--green-bg);"><div class="attn-num" style="color:var(--green);">'+st.ready+'</div><div class="attn-label">Site Ready</div></div></div>';
-  html += '<div class="subtabs" role="tablist">'+[['contractors','Contractors'],['queue','Review queue'+(st.review?' ('+st.review+')':'')],['requirements','Requirements ('+w.requirements.length+')']]
+  html += '<div class="subtabs" role="tablist">'+[['contractors','Contractors'],['queue','Review queue'+(st.review?' ('+st.review+')':'')],['gate','Gate'],['requirements','Requirements ('+w.requirements.length+')']]
     .map(([t,l])=>'<button role="tab" data-action="wp-tab" data-tab="'+t+'" class="'+(tab===t?'active':'')+'" aria-selected="'+(tab===t)+'">'+l+'</button>').join('')+'</div>';
   if(tab==='queue') return html + queueHtml(st.files);
+  if(tab==='gate') return html + workplaceGateHtml(wid);
   if(tab==='requirements') return html + requirementsHtml(w, admin);
   const removed = removedOf(wid);
   return html + contractorsHtml(w, st.files)

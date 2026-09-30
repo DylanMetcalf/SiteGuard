@@ -178,3 +178,57 @@ describe('suspension', () => {
     assert.equal((await mine.post(`/api/contractors/${contractorId}/unsuspend`)).status, 409);
   });
 });
+
+describe('one request to every contractor on a site', () => {
+  it('sends a request per contractor file, linked to the matching requirement', async () => {
+    const other = (await otherCon.post('/api/sites/join', { code: (await mine.state()).state.workplaces[wid].code })).body.siteId;
+    assert.equal((await con.post(`/api/workplaces/${wid}/requests`, { type: 'document', title: 'x' })).status, 403);
+    assert.equal((await otherMine.post(`/api/workplaces/${wid}/requests`, { type: 'document', title: 'x' })).status, 404);
+    const r = await mine.post(`/api/workplaces/${wid}/requests`, { type: 'document', title: 'Updated Letter of Good Standing', dueDate: iso(30), requirementName: 'letter of good standing (coid)' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.sent, 2);
+    const mine2 = Object.values((await con.state()).state.requests) as { siteId: string; title: string; linkedReqId?: string }[];
+    assert.ok(mine2.some((q) => q.siteId === fileId && q.title === 'Updated Letter of Good Standing'));
+    assert.ok(!mine2.some((q) => q.siteId === other), 'each contractor sees only its own request');
+    const only = await mine.post(`/api/workplaces/${wid}/requests`, { type: 'document', title: 'Only Lambda', siteIds: [other] });
+    assert.equal(only.body.sent, 1);
+  });
+});
+
+describe('safety file revisions', () => {
+  it('records a revision only when the contents change, and says what changed', async () => {
+    const first = await con.req('GET', `/api/sites/${fileId}/safety-file.pdf`);
+    assert.equal(first.status, 200);
+    assert.match(String(first.raw.headers['content-disposition']), /rev1\.pdf/);
+    await con.req('GET', `/api/sites/${fileId}/safety-file.pdf`);
+    let r = await con.get(`/api/sites/${fileId}/safety-file/revisions`);
+    assert.equal(r.body.revisions.length, 1, 'downloading again with nothing changed keeps Rev 1');
+    assert.deepEqual(r.body.changesSinceLatest, []);
+    assert.equal((await mine.post(`/api/sites/${fileId}/requirements`, { category: 'Site-Specific', name: 'Blasting exclusion zone acknowledgement', source: 'site', why: '' })).status, 200);
+    r = await con.get(`/api/sites/${fileId}/safety-file/revisions`);
+    assert.ok(r.body.changesSinceLatest.some((c: { kind: string; name: string }) => c.kind === 'added' && /Blasting/.test(c.name)));
+    const findings = (await con.post('/api/agent/run')).body.findings as { title: string }[];
+    assert.ok(findings.some((f) => /Safety file for Shaft 4 has changed since Rev 1/.test(f.title)));
+    const second = await mine.req('GET', `/api/sites/${fileId}/safety-file.pdf`);
+    assert.match(String(second.raw.headers['content-disposition']), /rev2\.pdf/);
+    r = await con.get(`/api/sites/${fileId}/safety-file/revisions`);
+    assert.equal(r.body.revisions[0].number, 2);
+    assert.equal((await otherCon.get(`/api/sites/${fileId}/safety-file/revisions`)).status, 404);
+  });
+});
+
+describe('work activities in risk assessments', () => {
+  it('uses the ticked activities for hazards and rejects unknown ones', async () => {
+    const { blueprintById } = await import('../src/lib/studio/blueprints.js');
+    const bp = blueprintById('risk-assessment')!;
+    const text = (v: Record<string, string>) => JSON.stringify(bp.build({ values: v, company: { name: 'Kappa' }, preparer: { name: 'T' } }));
+    const plain = text({ scope: 'Painting the office' });
+    const ticked = text({ scope: 'Painting the office', activities: 'Confined space entry' });
+    assert.ok(ticked.length > plain.length);
+    assert.match(ticked, /Confined space entry/);
+    const bad = await con.post('/api/studio/documents', { blueprintId: 'risk-assessment', values: { scope: 'Painting', activities: 'Juggling' } });
+    assert.equal(bad.status, 400);
+    const ok = await con.post('/api/studio/documents', { blueprintId: 'method-statement', values: { scope: 'Painting', activities: 'Working at heights; Hot work' } });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  });
+});
