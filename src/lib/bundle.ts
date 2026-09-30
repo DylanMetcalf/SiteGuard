@@ -101,7 +101,7 @@ const certStatus = (expires: string | null): [string, string] => {
 async function safetyFileItems(db: Db, siteId: string) {
   const site = (await one<any>(
     db,
-    `select s.name, s.location, s.status, o.name as host_name, o.settings as host_settings, c.name as contractor_name, c.linked_org_id,
+    `select s.name, s.location, s.status, s.client_contact, (o.managed_by_org is not null) as project, o.name as host_name, o.settings as host_settings, c.name as contractor_name, c.linked_org_id,
             a.verification_id, a.approved_on, a.approver_name
        from sites s join organisations o on o.id = s.org_id join contractors c on c.id = s.contractor_id
        left join approvals a on a.site_id = s.id
@@ -246,10 +246,13 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string): P
     logo,
     coverRows: [
       ['Contractor', site.contractor_name],
-      ['Client (host)', site.host_name],
-      ['Site status', ready ? `Site ready — approved ${fmt(site.approved_on)} by ${site.approver_name}` : 'Not yet approved'],
+      ...(site.project
+        ? ([['Client', [site.host_name, site.client_contact].filter(Boolean).join(' — ')], ['Status', 'Prepared by the contractor for the client; not reviewed by the client in SiteGuard']] as [string, string][])
+        : ([['Client (host)', site.host_name], ['Site status', ready ? `Site ready — approved ${fmt(site.approved_on)} by ${site.approver_name}` : 'Not yet approved']] as [string, string][])),
       ...(ready ? ([['Verification code', site.verification_id]] as [string, string][]) : []),
-      ['Requirements', `${n('complete', 'expiring')} approved · ${n('awaiting_review')} awaiting review · ${n('missing', 'expired', 'correction_required')} outstanding`],
+      ['Requirements', site.project
+        ? `${n('complete', 'expiring')} of ${reqStatuses.length} in the file · ${n('missing', 'expired')} outstanding`
+        : `${n('complete', 'expiring')} approved · ${n('awaiting_review')} awaiting review · ${n('missing', 'expired', 'correction_required')} outstanding`],
       ['Workforce', `${workers.length} worker${workers.length === 1 ? '' : 's'} assigned`],
       ['Revision', `Rev ${revision.number}${revision.created ? '' : ' (unchanged since it was compiled)'}`],
       ['Compiled', `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC by ${generatedBy}`],

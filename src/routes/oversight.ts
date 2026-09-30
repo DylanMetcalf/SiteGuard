@@ -16,6 +16,7 @@ import { publishChange } from '../lib/realtime.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 import { recheckSiteReady } from '../lib/siteready.js';
 import { RULE_KEYS, saToday } from '../lib/validity.js';
+import { auditFor } from './org.js';
 
 /** The standard monthly audit checklist; the auditor can add items of their own. */
 export const AUDIT_ITEMS = [
@@ -162,6 +163,16 @@ export default async function oversightRoutes(app: FastifyInstance) {
       await publishChange(db, parties);
       return { ok: true };
     });
+  });
+
+  // ---- Timeline -----------------------------------------------------------------------------
+  /** Everything recorded against one file, by either company, newest first: the evidence trail. */
+  app.get('/api/sites/:id/timeline', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    const { site } = await loadSite(pool, ctx, (req.params as { id: string }).id);
+    // Same visibility as the audit trail: a contractor sees the mine's events only from when it joined.
+    const rows = await auditFor(pool, ctx, { siteId: site.id, limit: 200 });
+    return { events: rows.map((r: any) => ({ at: r.ts, actor: r.actor, role: r.role, action: r.action, detail: r.detail })) };
   });
 
   // ---- Validity rules ------------------------------------------------------------------------

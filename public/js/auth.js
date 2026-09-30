@@ -2,11 +2,13 @@
 
 import { api } from './api.js';
 import { S, on, reload, render, showToast, escapeHtml, val } from './core.js';
+import { renderLanding } from './landing.js';
 
 const brand = '<div class="auth-hero"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div></div></div>'
   +'<p class="auth-tagline">Safety files, contractor compliance and site safety — in one place.</p>'
   +'<div class="auth-points"><span>Starter packs for SA mines</span><span>Live contractor readiness</span><span>Branded documents in minutes</span></div></div>';
-const wrap = (inner) => '<div class="auth-shell">'+brand+'<div class="onboard-wrap">'+inner+'</div></div>';
+const home = () => (S.boot && S.boot.authenticated) || S.authView === 'invite' || S.authView === 'site-invite' || S.authView === 'reset' ? '' : '<button class="linkish auth-home" data-action="auth-go" data-view="landing">← About SiteGuard</button>';
+const wrap = (inner) => '<div class="auth-shell">'+brand+'<div class="onboard-wrap">'+home()+inner+'</div></div>';
 const errorBox = () => S.authContext.error ? '<div class="form-error" role="alert">'+escapeHtml(S.authContext.error)+'</div>' : '';
 const okBox = () => S.authContext.ok ? '<div class="form-ok" role="status">'+escapeHtml(S.authContext.ok)+'</div>' : '';
 
@@ -66,9 +68,10 @@ export async function handleDeepLink(){
 }
 
 export function renderAuth(){
-  const v = S.authView || 'signin';
+  const v = S.authView || 'landing';
   const signedIn = S.boot && S.boot.authenticated;
   const features = (S.boot && S.boot.features) || {};
+  if(v === 'landing') return renderLanding(features);
 
   if(v === 'invite'){
     const inv = S.authContext.invite;
@@ -149,7 +152,7 @@ export function renderAuth(){
       +'<div class="field-label" style="margin-top:0;">Who are you signing up for?</div>'
       +'<div class="role-cards" role="radiogroup">'
         +roleCard('host', 'We run a site or mine', 'Create your sites, set what every contractor\'s safety file must contain, share a site code and vet what comes in.')
-        +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, and build each safety file in minutes — free.')
+        +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, or build a safety file for any client yourself. Free.')
       +'</div>'
       +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name" placeholder="e.g. Thandi Nkosi">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email">'
@@ -207,7 +210,7 @@ export function renderNoOrg(){
 }
 
 /* ============ actions ============ */
-on('auth-go', (el)=>go(el.dataset.view));
+on('auth-go', (el)=>{ go(el.dataset.view, el.dataset.kind ? { kind: el.dataset.kind } : undefined); window.scrollTo(0, 0); });
 on('auth-show-signin', (el)=>{ S.authContext.showSignin = el.dataset.show === '1'; S.authContext.error = ''; render(); });
 on('auth-done', ()=>finish());
 
@@ -322,6 +325,15 @@ on('clean-demo-go', async (el)=>{
 });
 on('start-demo', async (el)=>{
   el.disabled = true; el.textContent = 'Setting up your sandbox…';
-  try{ await api.post('/api/demo'); await finish(); showToast('Demo sandbox ready — this is sample data, not a real account'); }
+  try{
+    await api.post('/api/demo');
+    if(el.dataset.tour === '1'){
+      // Straight into the hands-free walkthrough (tour.js reads and clears these).
+      S.authView = null; S.authContext = {};
+      history.replaceState(null, '', '/?tour=1&autoplay=1');
+      await reload();
+    } else await finish();
+    showToast('Demo sandbox ready — this is sample data, not a real account');
+  }
   catch(e){ showToast(e.message); el.disabled = false; el.textContent = 'Explore the demo'; }
 });

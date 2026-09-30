@@ -14,7 +14,8 @@ import { renderStudio } from './studio.js';
 import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
 import { renderWorkplace, workplaceCards } from './workplaces.js';
-import { suspendedBanner, suspendControls, gateSection, auditsSection, validityCard, revisionsLink } from './oversight.js';
+import { isProject, projectBar, projectsSection } from './projects.js';
+import { suspendedBanner, suspendControls, gateSection, auditsSection, validityCard, revisionsLink, timelineSection } from './oversight.js';
 
 /* ============ SHELL ============ */
 export function topbar(){
@@ -186,7 +187,8 @@ function renderDashboard(){
   let start = gettingStarted();
   // A new contractor's first step is usually a code the site gave them: put it first.
   if(ctx && !ctx.mySites.length && !ctx.invited.length && isOrgAdmin() && !readOnly())
-    start = '<button class="qa-item join-first" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Got a code from a site?</div><div class="qa-sub">Join the site with it — takes 10 seconds</div></div>'+ICONS.chevron+'</button>' + start;
+    start = '<button class="qa-item join-first" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Got a code from a site?</div><div class="qa-sub">Join the site with it — takes 10 seconds</div></div>'+ICONS.chevron+'</button>'
+      + '<button class="qa-item join-first" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">Working for a client who isn\'t on SiteGuard?</div><div class="qa-sub">Start a project and build their safety file yourself</div></div>'+ICONS.chevron+'</button>' + start;
   if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
   return head + start + parts.join('');
 }
@@ -312,7 +314,9 @@ export function portfolioRow(site){
   const contractor = contractorOf(site);
   const pct = site.status==='site_ready' ? 100 : percent;
   const who = isContractor() ? site.hostName : contractor.name;
-  const sub = site.status==='site_ready' ? 'Site Ready · '+who
+  const out = isProject(site) ? (computeReadiness(site.id).counts.missing||0)+(computeReadiness(site.id).counts.expired||0) : 0;
+  const sub = isProject(site) ? 'For '+who+' · '+(computeReadiness(site.id).total ? (out ? out+' to go' : 'Ready to send') : 'No requirements yet')
+    : site.status==='site_ready' ? 'Site Ready · '+who
     : site.status==='invited' ? who+' · Invitation pending'
     : site.status==='declined' ? who+' · Invitation declined'
     : who+' · '+statusLabelForSubmission(siteSubmissionStatus(site.id));
@@ -327,11 +331,14 @@ export function portfolioRow(site){
 /* ============ SITES ============ */
 function renderSitesList(){
   // On the mine side, each contractor's file on a shared site lives inside that site's page.
-  const sites = Object.values(S.state.sites).filter(s=>!(isHost() && s.workplaceId && (S.state.workplaces||{})[s.workplaceId]));
+  const sites = Object.values(S.state.sites).filter(s=>!(isHost() && s.workplaceId && (S.state.workplaces||{})[s.workplaceId]) && !isProject(s));
+  const projectList = isContractor() ? Object.values(S.state.sites).filter(isProject) : [];
+  const projectMatch = (s)=>matchSearch('sites', s.name, s.location, s.hostName);
+  const projectsHtml = isContractor() ? projectsSection(projectMatch) + projectList.filter(projectMatch).map(portfolioRow).join('') : '';
   const nWp = Object.keys(S.state.workplaces||{}).length;
   let html = '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')
-    +(isContractor() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="join-site">+ Join a site</button>':'')+'</div>'
-    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : sites.length+' site'+(sites.length===1?'':'s'))+'</p></div>';
+    +(isContractor() && isOrgAdmin() && !readOnly()?'<div style="display:flex;gap:6px;"><button class="btn secondary small" data-action="new-project">+ Project</button><button class="btn primary small" data-action="join-site">+ Join a site</button></div>':'')+'</div>'
+    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : sites.length+' site'+(sites.length===1?'':'s')+' on SiteGuard · '+projectList.length+' project'+(projectList.length===1?'':'s'))+'</p></div>';
   if(isHost() && nWp){
     html += ((nWp + sites.length) > 3 || searching('sites') ? searchBox('sites', 'Search sites, locations or contractors') : '')
       + '<div class="section-title">Sites contractors join with a code</div>' + (workplaceCards() || '<div class="list-empty">No site matches.</div>');
@@ -339,7 +346,8 @@ function renderSitesList(){
     html += '<div class="section-title">Single-contractor jobs</div>';
     return html + sites.filter(s=>matchSearch('sites', s.name, s.location, (contractorOf(s)||{}).name)).map(portfolioRow).join('');
   }
-  if(!sites.length) return html + '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>';
+  if(!sites.length && projectList.length) return html + '<div class="section-title">Sites on SiteGuard</div><div class="card"><div class="site-card-sub">When a site on SiteGuard gives you a code or invites you, its file appears here.</div>'+(isOrgAdmin()&&!readOnly()?'<button class="btn secondary small" style="margin-top:8px;" data-action="join-site">Join a site with a code</button>':'')+'</div>' + projectsHtml;
+  if(!sites.length) return html + (isContractor() ? '<div class="section-title">Sites on SiteGuard</div>' : '') + '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()&&!readOnly()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>' + projectsHtml;
   const kind = (s)=>s.status==='site_ready'?'ready':s.status==='invited'?'invited':s.status==='declined'?'declined':'progress';
   const attention = (s)=>{ if(s.status!=='in_progress') return false; const st = siteSubmissionStatus(s.id); return st==='changes_required' || (isHost() ? st==='under_review' || st==='ready_to_approve' : st!=='under_review'); };
   const base = sites.filter(s=>matchSearch('sites', s.name, s.location, s.hostName, (contractorOf(s)||{}).name));
@@ -349,7 +357,7 @@ function renderSitesList(){
   html += (sites.length > 3 || searching('sites') ? searchBox('sites', isHost()?'Search sites, locations or contractors':'Search sites, locations or mines') : '')
     + '<div class="filter-chips">'+chips.map(([k,l])=>'<button class="site-picker-chip'+(f===k?' active':'')+'" data-action="sites-filter" data-filter="'+k+'">'+l+'<b>'+base.filter(tests[k]).length+'</b></button>').join('')+'</div>';
   const shown = base.filter(tests[f]);
-  return html + (shown.length ? shown.map(portfolioRow).join('') : '<div class="list-empty">'+(searching('sites') ? 'No site matches “'+escapeHtml(S.search.sites)+'”.' : 'No sites in this view.')+'</div>');
+  return html + (isContractor() ? '<div class="section-title">Sites on SiteGuard</div>' : '') + (shown.length ? shown.map(portfolioRow).join('') : '<div class="list-empty">'+(searching('sites') ? 'No site matches “'+escapeHtml(S.search.sites)+'”.' : 'No sites in this view.')+'</div>') + projectsHtml;
 }
 on('passport-filter', (el)=>{ S.passportFilter = el.dataset.filter; S.keepScroll = true; render(); S.keepScroll = false; });
 on('sites-filter', (el)=>{ S.sitesFilter = el.dataset.filter; S.keepScroll = true; render(); S.keepScroll = false; });
@@ -378,9 +386,9 @@ function renderSiteDetail(siteId){
     +'<button class="btn danger small icon" data-action="open-emergency" data-site="'+siteId+'" title="Emergency info" aria-label="Emergency info">'+ICONS.emergency+'</button>'
     +(isHost() && isOrgAdmin() && !readOnly() && !site.workplaceId ? '<button class="btn secondary small" data-action="edit-site" data-site="'+siteId+'">Edit</button>' : '')
     +(isHost() && isOrgAdmin() && !readOnly() && site.workplaceId && site.status!=='declined' ? '<button class="btn secondary small" data-action="wp-remove-contractor" data-site="'+siteId+'">Remove</button>' : '')
-    +(canShare && site.status!=='declined' ? '<button class="btn secondary small" data-action="new-share-link" data-site="'+siteId+'">Share</button>' : '')
+    +(canShare && site.status!=='declined' && !isProject(site) ? '<button class="btn secondary small" data-action="new-share-link" data-site="'+siteId+'">Share</button>' : '')
     +'<button class="btn secondary small" data-action="export-site" data-site="'+siteId+'">Export</button></div></div>'
-    +'<div class="view-head"><h1>'+site.name+'</h1><p>'+[site.location, isContractor()?site.hostName:contractor.name].filter(Boolean).join(' · ')+'</p></div>'
+    +'<div class="view-head"><h1>'+site.name+'</h1><p>'+[site.location, isContractor()?(isProject(site)?'Project for '+site.hostName:site.hostName):contractor.name].filter(Boolean).join(' · ')+'</p></div>'
     +'<div class="subtabs" role="tablist">'
       +['compliance','activity','people'].map(t=>'<button role="tab" data-action="site-tab" data-tab="'+t+'" class="'+(S.siteTab===t?'active':'')+'" aria-selected="'+(S.siteTab===t)+'">'+({compliance:'Compliance',activity:'Site activity',people:'People'})[t]+'</button>').join('')
     +'</div>' + suspendedBanner(siteId);
@@ -395,6 +403,7 @@ function renderSiteDetail(siteId){
   const canApprove = canReview() && !readOnly() && submission==='ready_to_approve' && site.status==='in_progress' && !safetyBlocksApproval;
   const approval = S.state.approvals[siteId];
 
+  if(isProject(site)) html += projectBar(siteId);
   if(site.status==='invited' && isHost()){
     html += '<div class="card checkpoint" style="margin-top:12px;"><div class="flexbetween"><div>'
       +'<div class="site-card-title" style="font-size:14px;">Awaiting contractor response</div>'
@@ -420,21 +429,22 @@ function renderSiteDetail(siteId){
       +'<div class="site-card-sub">Approved by '+approval.approver+', '+approval.role+' · '+timeAgo(approval.date)+' · '+approval.version+'</div>'
       +'<div class="row-actions"><a class="btn secondary small" href="/verify/'+approval.verificationId+'" target="_blank" rel="noopener">View verification</a></div></div>';
   } else if(submission==='no_requirements'){
-    html += '<div class="empty"><h3>No requirements set for this site</h3><p>'+(isContractor()?'The site hasn\'t defined what\'s required yet — check back soon.':'Add the documents this site needs from '+contractor.name+'.')+'</p>'
+    html += '<div class="empty"><h3>No requirements set for this '+(isProject(site)?'project':'site')+'</h3><p>'+(isProject(site)?'Add the documents this client needs under Requirements above.':isContractor()?'The site hasn\'t defined what\'s required yet — check back soon.':'Add the documents this site needs from '+contractor.name+'.')+'</p>'
       +(isHost() && isOrgAdmin() && !readOnly() ? '<div class="row-actions" style="justify-content:center;"><button class="btn primary" data-action="apply-packs" data-site="'+siteId+'">Use a starter pack</button><button class="btn secondary" data-action="add-requirement" data-site="'+siteId+'">Add one by one</button></div>' : '')+'</div>';
   } else {
     html += '<div class="card checkpoint readiness-hero">'+gauge(percent, 78)
-      +'<div><div class="site-card-title">Site Readiness</div><div class="site-card-sub">'+(counts.complete||0)+' of '+total+' requirements complete</div>'
+      +'<div><div class="site-card-title">'+(isProject(site)?'File complete':'Site Readiness')+'</div><div class="site-card-sub">'+(counts.complete||0)+' of '+total+' '+(isProject(site)?'documents filed':'requirements complete')+'</div>'
       +'<button class="why-link linkish" data-action="open-why" data-site="'+siteId+'">Why '+percent+'%?</button></div></div>';
     if(submission==='changes_required') html += '<div class="notice" style="background:var(--red-bg);color:var(--red);">'+((counts.correction_required||0)+(counts.expired||0))+' item(s) need corrections or renewal before this site can be approved.</div>';
     else if(submission==='under_review') html += '<div class="notice">'+counts.awaiting_review+' item(s) awaiting reviewer sign-off.</div>';
     else if(submission==='ready_to_approve' && safetyBlocksApproval) html += '<div class="notice" style="background:var(--red-bg);color:var(--red);">All requirements complete, but this site can\'t be marked Ready while a lost time injury or fatality investigation is still open.</div>';
-    else if(submission==='ready_to_approve' && !canReview()) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">All requirements complete — waiting on final site approval.</div>';
+    else if(submission==='ready_to_approve' && !canReview() && !isProject(site)) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">All requirements complete — waiting on final site approval.</div>';
     if(canApprove) html += '<button class="btn primary block" data-action="approve-site" data-site="'+siteId+'" style="margin-bottom:14px;">Approve — Mark Site Ready</button>';
     if(isContractor()) html += guideCard(siteId);
   }
   const filed = (S.state.requirements[siteId]||[]).filter(r=>['complete','expiring','awaiting_review'].includes(effectiveStatus(S.state.documents[r.id]))).length;
-  if(filed) html += '<a class="bundle-link" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>' + revisionsLink(siteId);
+  if(filed && !isProject(site)) html += '<a class="bundle-link" role="button" tabindex="0" style="cursor:pointer;" data-action="export-bundle" data-site="'+siteId+'"><span class="bundle-ic">'+ICONS.passport+'</span><span class="bundle-txt"><strong>Download the safety file</strong><span class="site-card-sub">One PDF: cover, contents and all '+filed+' submitted document'+(filed===1?'':'s')+'</span></span>'+ICONS.chevron+'</a>';
+  if(filed) html += revisionsLink(siteId);
 
   const grouped = {};
   items.forEach(it=>{ (grouped[it.req.category] = grouped[it.req.category]||[]).push(it); });
@@ -476,10 +486,14 @@ export function renderIncidentRow(inc, siteId, showSite){
 function renderSiteActivity(siteId){
   const ro = readOnly();
   const permits = S.state.permits[siteId] || [];
-  let html = auditsSection(siteId) + '<div class="section-title">Permit to work register</div>';
-  if(!ro && (isContractor() || canReview())) html += '<button class="btn primary block" data-action="new-permit" data-site="'+siteId+'" style="margin-bottom:10px;">'+(isContractor()?'Request a permit':'Issue a permit')+'</button>';
-  html += permits.length ? '<div class="card">' + permits.map(p=>renderPermitRow(p, siteId)).join('') + '</div>'
-    : '<div class="card"><div class="site-card-sub">No permits raised for this site. High-risk work — hot work, heights, confined space, excavation, lifting, electrical isolation — should have one before it starts.</div></div>';
+  const project = isProject(S.state.sites[siteId]);
+  let html = project ? '<div class="notice" style="margin-top:4px;">Permits to work on this project are issued by the client\'s authorised person under their own system. Record incidents and your daily diary here so they print in the safety file.</div>'
+    : auditsSection(siteId) + '<div class="section-title">Permit to work register</div>';
+  if(!project){
+    if(!ro && (isContractor() || canReview())) html += '<button class="btn primary block" data-action="new-permit" data-site="'+siteId+'" style="margin-bottom:10px;">'+(isContractor()?'Request a permit':'Issue a permit')+'</button>';
+    html += permits.length ? '<div class="card">' + permits.map(p=>renderPermitRow(p, siteId)).join('') + '</div>'
+      : '<div class="card"><div class="site-card-sub">No permits raised for this site. High-risk work — hot work, heights, confined space, excavation, lifting, electrical isolation — should have one before it starts.</div></div>';
+  }
 
   const incidents = S.state.incidents[siteId] || [];
   html += '<div class="section-title">Incident register</div>';
@@ -495,7 +509,7 @@ function renderSiteActivity(siteId){
   html += '<div class="section-title">Inspections &amp; corrective actions</div>';
   const list = S.state.inspections[siteId]||[];
   if(canReview() && !ro) html += '<button class="btn primary block" data-action="new-inspection" data-site="'+siteId+'" style="margin-bottom:14px;">Log inspection</button>';
-  if(!list.length) return html + '<div class="empty"><h3>No inspections logged yet</h3><p>Scheduled inspections and spot checks will appear here.</p></div>';
+  if(!list.length) return html + (project ? '' : '<div class="empty"><h3>No inspections logged yet</h3><p>Scheduled inspections and spot checks will appear here.</p></div>') + timelineSection(siteId);
   list.forEach(insp=>{
     const openDefects = insp.defects.filter(d=>d.status!=='verified').length;
     html += '<div class="card checkpoint inspection-card"><div class="flexbetween"><div><div class="site-card-title">'+insp.title+'</div>'
@@ -506,7 +520,7 @@ function renderSiteActivity(siteId){
     if(canReview() && !ro) html += '<button class="btn secondary small" style="margin-top:10px;" data-action="new-defect" data-id="'+insp.id+'" data-site="'+siteId+'">+ Log defect</button>';
     html += '</div>';
   });
-  return html;
+  return html + timelineSection(siteId);
 }
 function renderDiaryRow(entry){
   return '<div class="diary-row"><div class="diary-head"><span>'+timeAgo(entry.date)+' · '+entry.crew+' on site</span>'+(entry.incident? '<span class="diary-incident">⚠ Incident</span>' : '')+'</div>'
@@ -546,7 +560,7 @@ function renderSitePeople(siteId){
   } else {
     html += '<div class="card">' + workers.map(w=>workerRow(w, siteId)).join('') + '</div>';
   }
-  if(workers.length) html += gateSection(siteId);
+  if(workers.length && !isProject(S.state.sites[siteId])) html += gateSection(siteId);
 
   const talks = (S.state.toolboxTalks||{})[siteId] || [];
   html += '<div class="section-title">Toolbox talks</div>';
@@ -756,6 +770,7 @@ function renderMore(){
     +'<button class="tour-cta" data-action="start-tour"><span class="tour-cta-ic">'+ICONS.sparkle+'</span><span><strong>Walkthrough</strong><span class="site-card-sub">A guided tour of every page, with auto-play for demos</span></span>'+ICONS.chevron+'</button>'
     +'<div class="card">';
   html += item('studio', ICONS.passport, 'Document Studio', 'Branded safety documents as PDF and Word');
+  if(isContractor() && isOrgAdmin() && !readOnly()) html += '<button class="menu-row" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">New project</div><div class="qa-sub">A safety file for a client who isn\'t on SiteGuard</div></div>'+ICONS.chevron+'</button>';
   if(isContractor() && isOrgAdmin()) html += '<button class="menu-row" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Join a site with a code</div><div class="qa-sub">Type the code the site gave you</div></div>'+ICONS.chevron+'</button>';
   const nf = (S.boot.agent||{findings:[]}).findings.length;
   html += item('agent', ICONS.verify, 'Compliance agent', nf ? nf+' item'+(nf===1?'':'s')+' need attention' : 'Continuous checks across every site');
@@ -1132,10 +1147,29 @@ on('export-site', (el)=>{
     +'<button class="qa-item" data-action="export-register" data-site="'+id+'"><div class="qa-icon">'+ICONS.audit+'</div><div style="flex:1;"><div class="qa-title">One-page status report (print)</div><div class="qa-sub">Requirement statuses, registers and recent audit history, to print or save as PDF</div></div>'+ICONS.chevron+'</button>');
 });
 on('export-register', (el)=>{ closeSheet(); exportSafetyFile(el.dataset.site); });
+/** Before compiling: what's in the file, what isn't, and what will be flagged in it (spec: never disguise an incomplete file). */
 on('export-bundle', (el)=>{
-  closeSheet();
-  showToast('Preparing the safety file — the download starts in a moment');
-  window.location.href = '/api/sites/'+encodeURIComponent(el.dataset.site)+'/safety-file.pdf';
+  const siteId = el.dataset.site, site = S.state.sites[siteId];
+  const { items, total, counts } = computeReadiness(siteId);
+  const list = (st)=>items.filter(i=>i.status===st).map(i=>i.req.name);
+  const missing = list('missing'), expired = list('expired'), back = list('correction_required');
+  const workers = ((S.state.siteWorkers||{})[siteId]||[]).map(id=>S.state.workers[id]).filter(Boolean);
+  const noMedical = workers.filter(w=>!w.certificates.some(c=>c.kind==='medical_fitness' && certStatus(c)!=='expired'));
+  const inFile = (counts.complete||0)+(counts.expiring||0)+(counts.awaiting_review||0);
+  const row = (n, label, cls)=>'<div class="sfr-stat '+cls+'"><b>'+n+'</b><span>'+label+'</span></div>';
+  const names = (arr)=>arr.length ? '<ul class="plain-list">'+arr.slice(0,8).map(n=>'<li>'+n+'</li>').join('')+(arr.length>8?'<li>and '+(arr.length-8)+' more</li>':'')+'</ul>' : '';
+  const gaps = missing.length + expired.length + back.length;
+  openSheet(sheetHead('Safety file check', site.name)
+    +'<div class="sfr-grid">'+row(total,'Required','')+row(inFile,'In the file','ok')+row(missing.length,'Missing',missing.length?'bad':'')+row(expired.length+back.length,'Expired or sent back',expired.length+back.length?'bad':'')+'</div>'
+    +(counts.awaiting_review && !site.project ? '<div class="notice">'+counts.awaiting_review+' document'+(counts.awaiting_review===1?' is':'s are')+' included but still waiting for the site\'s review.</div>' : '')
+    +(counts.expiring ? '<div class="notice">'+counts.expiring+' document'+(counts.expiring===1?' expires':'s expire')+' within 30 days.</div>' : '')
+    +(missing.length ? '<div class="section-title">Missing</div>'+names(missing) : '')
+    +(expired.length+back.length ? '<div class="section-title">Expired or sent back</div>'+names(expired.concat(back)) : '')
+    +(noMedical.length ? '<div class="section-title">Workers without a valid medical</div>'+names(noMedical.map(w=>w.name)) : '')
+    +(gaps ? '<div class="notice alert-red" style="margin-top:12px;">The PDF lists every gap on its contents page, so the reader sees exactly what\'s outstanding. It is not presented as complete.</div>'
+      : '<div class="notice alert-green" style="margin-top:12px;">Everything required is in the file.</div>')
+    +'<a class="btn primary block" style="margin-top:12px;" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download>'+(gaps?'Download with the gaps listed':'Download the safety file')+'</a>'
+    +(gaps && isContractor() ? '<button class="btn secondary block" style="margin-top:8px;" data-action="guide-open" data-site="'+siteId+'">Fill the gaps first</button>' : ''));
 });
 on('approve-site', (el)=>act(()=>api.post('/api/sites/'+el.dataset.site+'/approve'), 'Site marked Site Ready', el));
 on('invitation-decide', async (el)=>{

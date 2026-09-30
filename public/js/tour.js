@@ -53,6 +53,7 @@ function contractorSteps(){
     { title: 'Welcome to SiteGuard', body: 'SiteGuard keeps your company\'s safety files for every site you work on. Your documents are stored once and reused wherever they are needed; each site sees only its own file. This walkthrough takes about two minutes.', go: go({ nav: 'dashboard', activeSiteId: null, moreView: null }) },
     { title: 'What you need to do', body: 'The dashboard puts your to-do list first: missing and expiring documents, corrections the site asked for, audit findings to fix, and requests with due dates.', target: '.hero, .dash-hero, .view-head' },
     { title: 'Join a site with its code', body: 'The site gives you a code. Type it under More → Join a site with a code, and your safety file for that site starts straight away with the site\'s requirements.', go: go({ nav: 'more', moreView: null }), target: '[data-action="join-site"], .view-head' },
+    { title: 'Your own projects', body: 'Working for a client who isn\'t on SiteGuard? Start a project: pick the documents they need (or copy another file\'s list), file them once from your library, and send a professional PDF or a secure link. The client doesn\'t need an account.', go: go({ nav: 'sites', activeSiteId: null, moreView: null }), target: '[data-action="new-project"], .view-head' },
   ];
   if(file){
     out.push(
@@ -178,10 +179,21 @@ let offered = false;
 export function maybeOfferTour(){
   if(offered || !S.state || !S.boot || !S.boot.org) return;
   offered = true;
-  if(/[?&]tour=1\b/.test(location.search)){ setTimeout(() => startTour({ autoplay: /[?&]autoplay=1\b/.test(location.search) }), 300); return; }
+  if(/[?&]tour=1\b/.test(location.search)){
+    const autoplay = /[?&]autoplay=1\b/.test(location.search);
+    history.replaceState(history.state, '', location.pathname);
+    setTimeout(() => startTour({ autoplay }), 300);
+    return;
+  }
   let seen = false;
   try{ seen = localStorage.getItem('sg_tutorial_seen') === '1'; }catch{ seen = true; }
   if(seen) return;
+  // Let a welcome message ("check your email…") finish first, so it never covers the buttons.
+  if(document.querySelector('.toast')){ setTimeout(showOffer, 3400); return; }
+  showOffer();
+}
+function showOffer(){
+  if(!S.state || document.querySelector('.overlay.tutorial, .tour')) return;
   const o = document.createElement('div');
   o.className = 'overlay tutorial';
   o.innerHTML = '<div class="sheet tut-card" role="dialog" aria-modal="true" aria-labelledby="tutT"><div class="tut-icon">'+ICONS.sparkle+'</div>'

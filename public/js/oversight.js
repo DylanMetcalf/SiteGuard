@@ -38,6 +38,26 @@ async function printWhenLoaded(html){
 }
 const loading = '<div class="card"><div class="site-card-sub">Loading…</div></div>';
 
+/* ================= Timeline ================= */
+/** The file's evidence trail: who did what, when, on either side. Loaded when opened. */
+export function timelineSection(siteId){
+  let html = '<div class="section-title">Timeline</div>';
+  if(!S.timelineOpen || S.timelineOpen !== siteId) return html + '<button class="btn secondary block" data-action="timeline-open" data-site="'+siteId+'">Show the full history of this file</button>';
+  const e = cached('timeline:'+siteId, '/api/sites/'+encodeURIComponent(siteId)+'/timeline');
+  if(e.error) return html + '<div class="card"><div class="site-card-sub">'+esc(e.error)+'</div></div>';
+  if(!e.data) return html + loading;
+  if(!e.data.events.length) return html + '<div class="card"><div class="site-card-sub">Nothing recorded yet.</div></div>';
+  let day = '';
+  return html + '<div class="card timeline">' + e.data.events.map(ev=>{
+    const d = new Date(ev.at).toLocaleDateString('en-ZA', { day:'numeric', month:'short', year:'numeric' });
+    const head = d !== day ? '<div class="tl-day">'+d+'</div>' : '';
+    day = d;
+    return head + '<div class="tl-row"><span class="tl-dot" aria-hidden="true"></span><div><div class="tl-action">'+esc(ev.action)+(ev.detail?' <span class="tl-detail">— '+esc(ev.detail)+'</span>':'')+'</div>'
+      +'<div class="site-card-sub">'+esc(ev.actor)+(ev.role?' · '+esc(ev.role):'')+' · '+new Date(ev.at).toLocaleTimeString('en-ZA', { hour:'2-digit', minute:'2-digit' })+'</div></div></div>';
+  }).join('') + '</div>';
+}
+on('timeline-open', (el)=>{ S.timelineOpen = el.dataset.site; S.keepScroll = true; render(); S.keepScroll = false; });
+
 /* ================= Suspension ================= */
 export function suspendedBanner(siteId){
   const s = S.state.sites[siteId];

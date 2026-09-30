@@ -421,7 +421,7 @@ function renderIncidentDetailSheet(siteId, incidentId){
       +'<div class="site-card-sub" style="margin-top:4px;"><strong style="color:var(--ink);">Corrective actions:</strong> '+(inc.correctiveActions||'Not yet recorded')+'</div><div class="divider"></div>';
   }
   if(inc.status==='closed') body += '<p class="site-card-sub">Closed '+timeAgo(inc.closedAt)+'.</p>';
-  else if(canReview() && !readOnly()){
+  else if((canReview() || (S.state.sites[siteId].project && isOrgAdmin())) && !readOnly()){
     body += '<label class="field-label" for="incRootCause">Root cause</label><textarea id="incRootCause" placeholder="What actually caused this?">'+(inc.rootCause||'')+'</textarea>'
       +'<label class="field-label" for="incCorrective">Corrective actions</label><textarea id="incCorrective" placeholder="What will prevent it happening again?">'+(inc.correctiveActions||'')+'</textarea>'
       +'<div style="display:flex;gap:8px;margin-top:10px;"><button class="btn secondary" style="flex:1;" data-action="save-investigation" data-id="'+incidentId+'">Save notes</button>'

@@ -34,6 +34,8 @@ interface SiteRow {
   emergency: Record<string, string>;
   created_at: Date;
   host_name: string;
+  project: boolean;
+  client_contact: string;
   workplace_id: string | null;
 }
 
@@ -41,8 +43,8 @@ export async function visibleSites(db: Db, ctx: OrgCtx): Promise<SiteRow[]> {
   return many<SiteRow>(
     db,
     isHost(ctx)
-      ? `select s.*, o.name as host_name from sites s join organisations o on o.id = s.org_id where s.org_id = $1 order by s.created_at`
-      : `select s.*, o.name as host_name from sites s join contractors c on c.id = s.contractor_id join organisations o on o.id = s.org_id
+      ? `select s.*, o.name as host_name, false as project from sites s join organisations o on o.id = s.org_id where s.org_id = $1 order by s.created_at`
+      : `select s.*, o.name as host_name, (o.managed_by_org is not null) as project from sites s join contractors c on c.id = s.contractor_id join organisations o on o.id = s.org_id
           where c.linked_org_id = $1 and s.status <> 'declined' order by s.created_at`,
     [ctx.org.id],
   );
@@ -131,6 +133,8 @@ export async function buildState(db: Db, ctx: OrgCtx) {
       hostName: s.host_name, status: s.status, createdAt: d(s.created_at)?.slice(0, 10),
       emergency: { musterPoint: '', contact: '', hospital: '', ...s.emergency },
       workplaceId: s.workplace_id ?? null,
+      // The contractor's own project: hostName is the client, nobody reviews it in SiteGuard.
+      project: !!s.project, clientContact: s.project ? s.client_contact : '',
     };
     state.requirements[s.id] = [];
     state.inspections[s.id] = [];

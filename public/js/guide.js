@@ -54,7 +54,7 @@ function render(siteId, fresh){
   const ro = readOnly();
   let html = sheetHead(fresh ? 'You\'ve joined '+site.name : 'Your safety file', fresh ? 'Let\'s build your safety file for this site' : site.name)
     +'<div class="bld-progress" style="margin:6px 0 4px;"><i style="width:'+pct+'%"></i></div>'
-    +'<div class="site-card-sub">'+p.handedIn+' of '+p.reqs.length+' handed in'+(p.r.counts.awaiting_review?' · '+p.r.counts.awaiting_review+' with the site for review':'')+(p.r.counts.complete?' · '+p.r.counts.complete+' approved':'')+'</div>';
+    +'<div class="site-card-sub">'+p.handedIn+' of '+p.reqs.length+' handed in'+(p.r.counts.awaiting_review?' · '+p.r.counts.awaiting_review+' with the site for review':'')+(p.r.counts.complete?' · '+p.r.counts.complete+((S.state.sites[siteId]||{}).project?' filed':' approved'):'')+'</div>';
 
   // 1. Company documents
   const compDone = p.company.length && !p.companyNeeds.length;

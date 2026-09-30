@@ -98,6 +98,9 @@ refuse.
 | Correct a contractor's invitation details (only until it joins) | ✓ | | | | |
 | Appointments register | ✓ | | | ✓ | |
 | Team, roles, billing, organisation settings | ✓ | | | ✓ | |
+| Create, edit and archive own projects; shape a project's requirement list | | | | ✓ | |
+| File documents to own projects (counted straight away) | | | | ✓ | ✓ |
+| See a visible file's timeline | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Suspend or lift a suspension on a contractor (all the mine's sites) | ✓ | | | | |
 | Set validity rules | ✓ | | | | |
 | Audit a contractor; close or reopen audit findings | ✓ | ✓ | | | |
@@ -314,6 +317,24 @@ storage), and routes in `routes/studio.ts`.
 - **Walkthrough** (`public/js/tour.js`) only sets navigation state and re-renders; it never calls
   a write endpoint.
 
+## Contractor projects
+
+- **Shape** (`routes/projects.ts`, migration 013). A client is an `organisations` row with
+  `managed_by_org` set to the contractor (kind `host`, no memberships, so nobody can sign in to
+  it). The contractor has one `contractors` entry in each client record (`linked_org_id` = itself),
+  and each project is an ordinary `sites` row for that client. `loadSite` flags `project`, and
+  every existing rule still applies: the contractor is on the contractor side, and host-only
+  routes are unreachable because no user belongs to the client record.
+- **Behaviour**: submissions to a project are `complete` straight away and don't notify
+  reviewers. There is no Site Ready, gate, audit or permit issuing. The cover, share page and
+  project page say it was prepared by the contractor. Client records are reused by name, and a
+  record left empty after a project moves to another client is removed. Projects archive (status
+  `declined`) and are never deleted, because the audit trail is append-only. Demo client records
+  carry the demo group and are purged with it.
+- **Limits**: `projectLimit` on plans (free: 2 active; enforced only when billing is configured).
+- **Timeline**: `GET /api/sites/:id/timeline` returns the file's audit events written by either
+  party (latest 200), through `loadSite`.
+
 ## Known limits and next steps
 
 These are deliberate scope boundaries, not hidden gaps:
@@ -334,7 +355,7 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 115 integration tests, including gate clearance and the public gate page, audits and findings, validity rules, suspension, safety file revisions, site-wide requests and work activities, plus the clean-start demo, document packs, company
+- `npm test`: 125 integration tests, including contractor projects (privacy, filing, requirement lists, client records, sharing, archive) and file timelines, gate clearance and the public gate page, audits and findings, validity rules, suspension, safety file revisions, site-wide requests and work activities, plus the clean-start demo, document packs, company
   documents reused on sites, Studio document statuses and deletion, and contractor details being
   read-only once joined, plus including the review workspace (visibility, section
   decisions, approvals carried across revisions, review links, notifications), join codes and the

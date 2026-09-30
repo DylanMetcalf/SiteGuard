@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { one, withTx, type Db } from '../db/pool.js';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
-import { actorRole, canReview, isUuid, loadSite, requireOrg, requireReviewer, requireWritable, type OrgCtx } from '../lib/authz.js';
+import { canAdminOrg, actorRole, canReview, isUuid, loadSite, requireOrg, requireReviewer, requireWritable, type OrgCtx } from '../lib/authz.js';
 import { audit, clip } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { appUrl, queueToOrg } from '../lib/email.js';
@@ -73,13 +73,18 @@ export default async function safetyRoutes(app: FastifyInstance) {
 
   app.patch('/api/incidents/:id', async (req) => {
     const ctx = requireOrg(req.ctx);
-    requireReviewer(ctx);
     requireWritable(ctx);
     const body = z.object({ rootCause: t(5000).default(''), correctiveActions: t(5000).default(''), close: z.boolean().default(false) }).parse(req.body);
     const { id } = req.params as { id: string };
     return withTx(async (db) => {
-      const { row, side, parties } = await loadChild(db, ctx, 'incidents', id);
-      if (side !== 'host') throw forbidden();
+      const { row, side, parties, site } = await loadChild(db, ctx, 'incidents', id);
+      // The site investigates; on a contractor's own project there is no site in SiteGuard, so the contractor's admins do.
+      if (site.project && side === 'contractor') {
+        if (!canAdminOrg(ctx)) throw forbidden('Only your company\'s owners and admins can close out incidents on a project.');
+      } else {
+        requireReviewer(ctx);
+        if (side !== 'host') throw forbidden();
+      }
       if (row.status === 'closed') throw conflict('This incident is already closed.');
       if (body.close && (!body.rootCause || !body.correctiveActions)) {
         throw badRequest('Record the root cause and corrective actions before closing the incident.');

@@ -5,6 +5,26 @@ Newest first.
 
 ---
 
+**DECISION** Contractor projects are built on a private client record (an organisation the contractor manages, which nobody can sign in to), not by letting a contractor own a site directly.
+**REASON** Every screen, export, share link and permission rule already works on "a host's site with a linked contractor". Keeping that shape means projects reuse all of it and no existing access rule changes. It also leaves a clean path to invite the client later. Approved by the owner on 30 Sep 2026.
+**DATE** 2026-09-30
+
+**DECISION** Documents filed to a project count straight away, and a project never shows "Site Ready"; the PDF cover and share page say it was prepared by the contractor and not reviewed by the client.
+**REASON** Nobody reviews a project inside SiteGuard, so a review status would be invented. The wording avoids overstating compliance.
+**DATE** 2026-09-30
+
+**DECISION** Projects are archived, not deleted.
+**REASON** The audit trail is append-only, and what was prepared and sent to a client is a record worth keeping.
+**DATE** 2026-09-30
+
+**DECISION** Free contractors get 2 active projects when billing is on; Contractor Pro is unlimited. Work for sites on SiteGuard stays free.
+**REASON** Projects are value the contractor gets for itself, so it's the natural upgrade; answering a mine's requirements must never cost the contractor.
+**DATE** 2026-09-30
+
+**DECISION** People who aren't signed in see a landing page (what SiteGuard is, for whom, how it works) with sign-up, sign-in, and a demo that opens straight into the auto-playing walkthrough.
+**REASON** The owner is sharing the link with testers; the first screen has to explain the product and invite sign-up, not ask for a password.
+**DATE** 2026-09-30
+
 **DECISION** Gate clearance is computed on every request from the file, the company and the worker's certificates; it is never stored as a flag.
 **REASON** A stored "cleared" goes stale the day a medical expires or a contractor is suspended. Security at the gate must see today's answer, with the reason when it's no.
 **DATE** 2026-09-30
@@ -27,10 +47,6 @@ Newest first.
 
 **DECISION** The in-app Walkthrough replaces the three-card first-run tutorial.
 **REASON** Showing the real screens teaches faster than describing them, and the same tour doubles as a hands-free demo (`?tour=1&autoplay=1`).
-**DATE** 2026-09-30
-
-**DECISION** Standalone contractor projects (a contractor building a safety file for a site that isn't on SiteGuard) are parked.
-**REASON** It changes the tenancy model: today every file belongs to a mine's site. It needs the owner's approval as an architectural change; the owner's spec (item 41) asks for it. See PARKING_LOT.
 **DATE** 2026-09-30
 
 **DECISION** Site Ready is withdrawn automatically when a file stops qualifying, rather than shown as "approved" until someone notices.

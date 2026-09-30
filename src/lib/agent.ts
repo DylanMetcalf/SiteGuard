@@ -322,7 +322,7 @@ export async function runAgent(): Promise<number> {
   const orgs = await withTx(async (db) => {
     const lock = await many<{ ok: boolean }>(db, 'select pg_try_advisory_xact_lock(727003) as ok');
     if (!lock[0]?.ok) return null;
-    return many<{ id: string; kind: string }>(db, `select id, kind from organisations`);
+    return many<{ id: string; kind: string }>(db, `select id, kind from organisations where managed_by_org is null`);
   });
   if (!orgs) return 0;
   let reviewed = 0;
@@ -382,7 +382,7 @@ export async function sendWeeklySummaries(now = new Date()): Promise<number> {
   const week = isoWeek(sast);
   const orgs = await many<{ id: string; name: string }>(
     pool,
-    `select id, name from organisations where not is_demo and coalesce((settings->>'weeklySummary')::boolean, true)`,
+    `select id, name from organisations where not is_demo and managed_by_org is null and coalesce((settings->>'weeklySummary')::boolean, true)`,
   );
   let sent = 0;
   for (const org of orgs) {

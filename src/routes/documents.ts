@@ -34,6 +34,8 @@ export interface Slot {
   libraryType: string | null;
   contractorOrgId: string | null;
   hostOrgId: string | null;
+  /** The contractor's own project: nobody reviews it, so a submission is filed straight away. */
+  project?: boolean;
 }
 
 /**
@@ -57,6 +59,7 @@ export async function resolveSlot(db: Db, ctx: OrgCtx, slot: string): Promise<Sl
   return {
     kind: 'site', side: access.side, name: r.name, siteId: r.site_id, siteName: access.site.name, parties: access.parties,
     requirementId: slot, libraryType: null, contractorOrgId: access.site.linked_org_id, hostOrgId: access.site.org_id,
+    project: access.site.project,
   };
 }
 
@@ -245,7 +248,8 @@ export default async function documentRoutes(app: FastifyInstance) {
         [doc.id, version, doc.pending_file_id, [body.note, ruleNote].filter(Boolean).join(' '), expiry, body.aiDrafted, ctx.user.id, ctx.user.name],
       );
       // Company library documents have no reviewer — they are the contractor's own record.
-      const status = s.kind === 'library' ? 'complete' : 'awaiting_review';
+      // A project file is the contractor's own: there is no client reviewer in SiteGuard, so it is filed as is.
+      const status = s.kind === 'library' || s.project ? 'complete' : 'awaiting_review';
       await db.query(
         `update documents set status = $2, version = $3, current_file_id = pending_file_id, pending_file_id = null,
                 note = $4, expiry_date = $5, updated_at = now() where id = $1`,
@@ -261,7 +265,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       }
       const resubmit = eff === 'correction_required' || eff === 'expired' || eff === 'expiring';
       await audit(db, ctx, body.aiDrafted ? 'Saved AI-drafted document' : resubmit ? 'Resubmitted document' : 'Submitted document', `${s.name} (${version})`, s.siteId);
-      if (s.kind === 'site' && s.hostOrgId) {
+      if (s.kind === 'site' && s.hostOrgId && !s.project) {
         await notifyOrg(db, s.hostOrgId, REVIEWERS, {
           kind: 'submitted', title: `${resubmit ? 'Resubmitted' : 'New'} for review: ${s.name}`,
           body: `${ctx.org.name} · ${s.siteName}${body.note ? ` — ${body.note}` : ''}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! },
