@@ -98,6 +98,13 @@ refuse.
 | Correct a contractor's invitation details (only until it joins) | ✓ | | | | |
 | Appointments register | ✓ | | | ✓ | |
 | Team, roles, billing, organisation settings | ✓ | | | ✓ | |
+| Suspend or lift a suspension on a contractor (all the mine's sites) | ✓ | | | | |
+| Set validity rules | ✓ | | | | |
+| Audit a contractor; close or reopen audit findings | ✓ | ✓ | | | |
+| Respond to an audit finding | | | | ✓ | ✓ |
+| See gate clearance and print QR gate cards for a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Send one request to every contractor on a site | ✓ | ✓ | | | |
+| See safety file revisions of a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 More rules the server enforces:
 
@@ -264,6 +271,36 @@ storage), and routes in `routes/studio.ts`.
 - **Clean-start demo** (`demo/clean.ts`): `POST /api/demo {clean:true}` creates an empty host and
   contractor organisation with one owner persona each; `settings.cleanDemo` keeps them 30 days.
 
+## Oversight: gate clearance, audits, suspension, validity rules, revisions
+
+- **Gate clearance** (`lib/gate.ts`, `routes/gate.ts`, migration 011). Worked out live on every
+  request, never stored, so it can't go stale. A worker is cleared when: the file is `site_ready`,
+  the contractor isn't suspended, the worker is active, and there is a valid medical and a valid
+  induction (`lib/validity.ts → certExpiry` applies the mine's months from the issue date; with a
+  rule set, a certificate without an issue date doesn't count). Each `site_workers` row gets an
+  unguessable `gate_token` (18 random bytes) on first use; the QR encodes `/gate/<token>`. The
+  public page is rate-limited, `no-store`, `noindex`, and shows name, occupation, employee number,
+  company and site only — never ID digits or certificates.
+- **Audits** (`routes/oversight.ts`, tables `contractor_audits`, `audit_findings`). Host
+  reviewers only, through `loadSite`. Findings move `open → responded → closed`; the mine can
+  reopen a responded finding with a note, which is appended to the response history. Both sides
+  are notified with `notifyOrg` in the write's transaction.
+- **Suspension** (`contractors.suspended_*`). Suspending runs `recheckSiteReady` on each of the
+  contractor's files (the lapse reason names the suspension); Site Ready approval and permit
+  create/issue return 409 while suspended.
+- **Validity rules** live in `organisations.settings.validityRules` (1–60 months each). On submit
+  (`routes/documents.ts`) a matching site requirement's expiry is capped at today + months and
+  the response carries a `ruleNote`. The contractor's company library copies are not capped; the
+  copy submitted to a site is.
+- **Safety file revisions** (migration 012, `lib/bundle.ts`). Compiling the PDF computes the file's
+  lines (section, name, status, version, expiry, included) and a SHA-256 of them; a new
+  `safety_file_versions` row is written only when the digest differs from the latest. The cover and
+  page stamps show the revision; `GET /api/sites/:id/safety-file/revisions` returns the history and
+  `diffContents` of the latest against the file as it stands. The contractor's agent adds a
+  low-priority "has changed since Rev n" item.
+- **Walkthrough** (`public/js/tour.js`) only sets navigation state and re-renders; it never calls
+  a write endpoint.
+
 ## Known limits and next steps
 
 These are deliberate scope boundaries, not hidden gaps:
@@ -284,7 +321,7 @@ These are deliberate scope boundaries, not hidden gaps:
 
 ## What was verified, and how
 
-- `npm test`: 89 integration tests, including the clean-start demo, document packs, company
+- `npm test`: 115 integration tests, including gate clearance and the public gate page, audits and findings, validity rules, suspension, safety file revisions, site-wide requests and work activities, plus the clean-start demo, document packs, company
   documents reused on sites, Studio document statuses and deletion, and contractor details being
   read-only once joined, plus including the review workspace (visibility, section
   decisions, approvals carried across revisions, review links, notifications), join codes and the

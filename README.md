@@ -60,6 +60,50 @@ and the site's requirements; a new requirement reaches every contractor's file a
 asks whether you run a site or are a contractor. (Inviting one contractor by email for a single
 job still works.)
 
+**Walkthrough**: *More → Walkthrough* (or the button on the dashboard) is a guided tour of every
+page for the mine or the contractor. It moves through the real screens, highlights each part and
+explains it in a sentence or two, with Back, Next and **Auto-play** for demos. Add `?tour=1` to the
+app's address to start it straight away (`?tour=1&autoplay=1` to play it hands-free). New users are
+offered it once.
+
+**Gate clearance and QR gate cards**: every worker assigned to a site gets a live gate status:
+**cleared** only when their company's safety file is Site Ready, the company isn't suspended, and
+their medical and induction are valid under the mine's rules; otherwise it says exactly why not.
+The mine's site page has a **Gate** tab (search, filter, print today's gate list); both sides can
+print **QR gate cards**. Security scans a card and sees CLEARED / NOT CLEARED with the reasons,
+without logging in and without ID numbers.
+
+**Monthly site audits**: the mine walks the contractor's work area with a 13-point checklist
+(Yes / No / N/A, own items can be added). The score is Yes ÷ (Yes + No). Every "No" becomes a
+**finding** with a due date that the contractor fixes and answers; the mine closes it or sends it
+back. The compliance agent reminds the mine when a contractor hasn't been audited for 30 days and
+flags overdue findings; audits print in the safety file's registers.
+
+**Suspend a contractor**: from a contractor's profile, a mine admin can suspend the company on all
+the mine's sites at once, with a reason the contractor sees. Site Ready is withdrawn, permits and
+Site Ready approval are refused, and nobody from that company is cleared at the gate until the
+suspension is lifted.
+
+**Validity rules**: under Organisation settings the mine decides how long it accepts medicals and
+inductions (from their issue date) and COID letters and liability insurance (from submission).
+The earlier of the rule and the document's own date applies; the contractor is told when a rule
+shortened an expiry.
+
+**Safety file revisions**: each time the safety file PDF is compiled with different contents,
+SiteGuard records a new revision (Rev 1, Rev 2…) with what was in it. *Revisions and what changed*
+on the file shows the history and exactly what has changed since the last revision, and the
+contractor's to-do list says when a file needs rebuilding. Downloading again with nothing changed
+does not create a revision.
+
+**Requests to every contractor at once**: on the mine's site page, *Request from contractors*
+sends one document request (e.g. "Updated Letter of Good Standing by 30 November") to every
+contractor on the site, or the ones you tick, linked to the matching requirement.
+
+**Work activities in risk assessments and method statements**: tick the activities (electrical,
+heights, lifting, hot work, confined space, excavation, mobile plant, machinery, underground,
+chemicals) and their hazards, controls, PPE and permits are written in. Drafts are for the
+contractor's competent person to check and sign.
+
 **Safety file guide**: straight after joining, the contractor gets a six-step guide for that
 site: company documents (submitted in one tap if already held), people and medicals, documents
 SiteGuard writes, certificates to upload, anything else they want to add (typed in; Document
@@ -198,5 +242,7 @@ docs/                      Architecture and deployment guides
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): tenancy model, permission matrix, how the UI gets its
   data, security measures, and known limits.
 - [docs/LAUNCH_GUIDE.md](docs/LAUNCH_GUIDE.md): plain-language launch steps, costs and demo script.
+- [docs/SPEC_COVERAGE.md](docs/SPEC_COVERAGE.md): the owner's 117-point evolution spec, point by point:
+  what exists, what update 2 added, and what is parked and why.
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): recommended hosting, Stripe/email/storage setup, and a
   go-live checklist.

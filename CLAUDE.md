@@ -31,6 +31,10 @@ haven't built.
   `.claude/skills/`; every blueprint must render with empty answers (tested).
 - Review workspace visibility lives in `resolveForUser` (`src/lib/review.ts`); section approvals are keyed by
   content hash. Notify the other side with `notifyOrg` (`src/lib/notify.ts`) inside the write's transaction.
+- Gate clearance is computed live in `lib/gate.ts` (never stored); the public `/gate/:token` page shows no ID numbers
+  or certificates. Suspension, audits and validity rules live in `routes/oversight.ts`; a mine's validity rules only
+  ever shorten an expiry (`lib/validity.ts`). Safety file revisions are recorded only when the contents change.
+- The Walkthrough (`public/js/tour.js`) only navigates: when a screen changes, check its step's `target` selector still exists.
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and
