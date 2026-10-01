@@ -228,6 +228,16 @@ covers.
 - **Backups.** Render backs up the paid database and snapshots the disk daily. Once a month, try a
   restore of the database into a new one to prove it works.
 
+- **Your platform overview.** In Render → **siteguard → Environment**, set `PLATFORM_ADMIN_EMAILS` to
+  your own email address. Sign up with that address and confirm it from the email. **More → Platform**
+  then shows sign-ups, plans, usage, failed emails and the latest feedback. Nobody else can see it.
+- **Privacy notice and terms.** `/privacy` and `/terms` are drafts that describe what SiteGuard does.
+  Before the first paid customer, ask an attorney to finish them. The pages list what is missing:
+  your company details, Information Officer, retention periods and governing law.
+- **Customers' own data.** An organisation's admin can download all of its data under **More →
+  Organisation settings → Download our data**. Point customers there if they ask for a copy.
+  See `docs/OPERATIONS.md` for backups and recovery.
+
 ## Sharing SiteGuard with testers
 
 Send people your app's address (for example `https://siteguard.onrender.com`). They land on a page

@@ -31,7 +31,7 @@ deliberately haven't built).
 | 7 Document states | 🟡 Missing, awaiting review, complete, expiring, expired and correction required. There is no *optional* or *not applicable*. | 🆕 Optional. Not applicable is handled by making an item optional or removing it (a site decision). |
 | 9 Studio returns to the file | ✅ "Create it in Document Studio" → attach → submit, in one flow. | — |
 | 10 Controlled AI generation | ✅ Drafts are marked AI-drafted, versioned, and go to human review. | — |
-| 11, 62 Jurisdiction-aware knowledge | 🟡 Requirement packs are structured data with a *source* per item (legal, client, site, best practice…). They are all South African, and jurisdiction is implicit. | 🆕 Packs carry jurisdiction, references and review status, and the UI says "confirm with your SHE advisor". |
+| 11, 62 Jurisdiction-aware knowledge | 🟡 Requirement packs are structured data with a *source* per item (legal, client, site, best practice…). They are all South African, and jurisdiction is implicit. | 🆕 Packs carry a jurisdiction, how they were verified and when they were researched; the pack picker shows it and says "confirm with your SHE advisor". |
 | 12 Site requirement builder | ✅ Add, remove, request, approve and reject; validity rules. | 🆕 Mandatory/optional. |
 | 13 Invite by email | ✅ Email invitations and site codes. | — |
 | 14 Contractor workspace | ✅ Library, sites, projects, workforce and Studio, with no fixed site. | — |
@@ -79,3 +79,8 @@ deliberately haven't built).
 
 Each phase adds tests (including tenant isolation for new data access), keeps existing behaviour
 and ships as its own commit.
+
+**Status (1 Oct 2026):** all nine phases are built and pushed. The desktop width was already 960px,
+so it needed no change. The security review of this round was a read-through of the new routes
+(export, platform overview, legal pages, entitlements, service worker); it led to a rate limit on
+the export and a more exact HTTPS statement on the privacy page.

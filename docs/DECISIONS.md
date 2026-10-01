@@ -5,6 +5,22 @@ Newest first.
 
 ---
 
+**DECISION** What each plan includes lives in one list (`lib/entitlements.ts`); routes ask `can()` / `requireFeature()` instead of checking plan names.
+**REASON** Plans and prices will change; one list means the compliance code never does. The web app is told what the organisation has, but the server decides.
+**DATE** 2026-10-01
+
+**DECISION** The privacy notice and terms are published as clearly marked drafts that describe what the software actually does, with gaps listed for the operator to complete.
+**REASON** The brief forbids inventing legal wording. Describing real behaviour is safe; legal commitments need an attorney.
+**DATE** 2026-10-01
+
+**DECISION** The platform overview is read-only, shows counts and organisation names only, and is a 404 for anyone not in `PLATFORM_ADMIN_EMAILS` with a confirmed email.
+**REASON** The operator needs to see sign-ups and health without reading customers' records. Requiring a confirmed email stops someone claiming the address by signing up first.
+**DATE** 2026-10-01
+
+**DECISION** The service worker is network-first and never caches `/api`.
+**REASON** Installable app and a friendly offline page without keeping personal records on phones, and every deploy is picked up on the next load.
+**DATE** 2026-10-01
+
 **DECISION** Contractor projects are built on a private client record (an organisation the contractor manages, which nobody can sign in to), not by letting a contractor own a site directly.
 **REASON** Every screen, export, share link and permission rule already works on "a host's site with a linked contractor". Keeping that shape means projects reuse all of it and no existing access rule changes. It also leaves a clean path to invite the client later. Approved by the owner on 30 Sep 2026.
 **DATE** 2026-09-30

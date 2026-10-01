@@ -260,6 +260,8 @@ docs/                      Architecture and deployment guides
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): tenancy model, permission matrix, how the UI gets its
   data, security measures, and known limits.
 - [docs/LAUNCH_GUIDE.md](docs/LAUNCH_GUIDE.md): plain-language launch steps, costs and demo script.
+- [docs/OPERATIONS.md](docs/OPERATIONS.md): backups, recovery targets and what to do when something breaks.
+- [docs/ROADMAP.md](docs/ROADMAP.md): the SiteGuard 2.0 audit and build plan, and what was built.
 - [docs/SPEC_COVERAGE.md](docs/SPEC_COVERAGE.md): the owner's 117-point evolution spec, point by point:
   what exists, what update 2 added, and what is parked and why.
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): recommended hosting, Stripe/email/storage setup, and a

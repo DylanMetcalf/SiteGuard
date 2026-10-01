@@ -233,7 +233,7 @@ export default async function orgRoutes(app: FastifyInstance) {
    * team and the audit trail. Uploaded files stay in storage; the export lists
    * them. No passwords, tokens or billing identifiers.
    */
-  app.get('/api/org/export', async (req, reply) => {
+  app.get('/api/org/export', rl(5), async (req, reply) => {
     const ctx = requireOrg(req.ctx);
     requireAdmin(ctx);
     const o = ctx.org;

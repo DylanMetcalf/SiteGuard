@@ -44,7 +44,7 @@ function privacy(): string {
 <p>Only members of the organisation that owns the record, and — for a site file — the mine and the contractor on that file. Gate pages show names and clearance only, never ID numbers or certificates. Share links are created deliberately, expire, and can be revoked.</p>
 <h3>Service providers</h3><ul>${processors.map((p) => `<li>${p}</li>`).join('')}</ul>
 <h3>Security</h3>
-<p>Every request is checked on the server against the caller's organisation and role. Data travels over HTTPS. Sign-in attempts are rate-limited and accounts lock after repeated failures.</p>
+<p>Every request is checked on the server against the caller's organisation and role. In production, data travels only over HTTPS. Sign-in attempts are rate-limited and accounts lock after repeated failures.</p>
 <h3>Your choices</h3>
 <p>An organisation's administrator can download a copy of the organisation's data (More → Organisation settings → Download our data), correct records, and remove members. To ask for access to, correction of, or deletion of your personal information, contact your organisation's administrator or ${contact()}. Records needed for the audit trail may have to be kept; the operator will explain what can be removed.</p>
 <h3>To be completed by the operator</h3>

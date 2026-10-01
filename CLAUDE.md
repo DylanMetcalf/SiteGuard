@@ -37,6 +37,11 @@ haven't built.
 - Contractor projects (`routes/projects.ts`) are ordinary files for a private client record (`organisations.managed_by_org`);
   `loadSite` sets `site.project`. Never add memberships to a client record; archive projects, never delete them.
 - The Walkthrough (`public/js/tour.js`) only navigates: when a screen changes, check its step's `target` selector still exists.
+- Plan checks go through `lib/entitlements.ts` (`can` / `requireFeature`), never plan names in routes.
+  Readiness counts an optional requirement only once filed (`countsTowardReadiness`, mirrored in `core.js`).
+- The platform overview (`routes/admin.ts`) is read-only, counts only, 404 unless `isPlatformAdmin`.
+  The service worker (`public/sw.js`) must never cache `/api`. `/privacy` and `/terms` are drafts:
+  describe real behaviour, never invent legal commitments.
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and
