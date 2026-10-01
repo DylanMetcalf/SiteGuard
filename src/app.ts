@@ -113,6 +113,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     if (req.ctx?.renewedUntil) renewCookie(reply, req.cookies[SESSION_COOKIE]!, req.ctx.renewedUntil);
 
     const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    if (req.ctx) req.ctx.write = mutating;
     const pathOnly = req.url.split('?')[0];
     if (!mutating || CSRF_EXEMPT.has(pathOnly)) return;
     if (req.ctx) {

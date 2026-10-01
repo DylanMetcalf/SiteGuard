@@ -12,8 +12,10 @@ after(teardown);
 describe('entitlements', () => {
   it('names the cheapest plan that includes a feature', () => {
     assert.equal(planWith('host', 'SHARE_LINKS')?.id, 'host_pro');
-    assert.equal(planWith('contractor', 'AI_GENERATION')?.id, 'contractor_pro');
-    assert.equal(planWith('contractor', 'MULTI_SITE'), undefined);
+    assert.equal(planWith('contractor', 'AI_GENERATION')?.id, 'contractor_starter');
+    assert.equal(planWith('contractor', 'SHARE_LINKS')?.id, 'contractor_pro');
+    assert.equal(planWith('contractor', 'CONTRACTOR_PROJECTS')?.id, 'contractor_starter');
+
     for (const list of Object.values(PLAN_FEATURES)) assert.ok(list.includes('SAFETY_FILE_BUILDER'), 'everyone can build a safety file');
   });
 

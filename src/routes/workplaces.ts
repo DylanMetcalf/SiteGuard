@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { many, one, withTx, type Db } from '../db/pool.js';
 import { canAdminOrg, isUuid, limitsEnforced, requireHostAdmin, requireOrg, requireWritable, type OrgCtx } from '../lib/authz.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
+import { sponsorFile } from '../lib/sponsorship.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { planOf } from '../lib/plans.js';
@@ -310,6 +311,7 @@ export async function joinWorkplaceByCode(db: Db, ctx: OrgCtx, code: string): Pr
   for (const [i, r] of w.requirements.entries()) {
     await db.query(`insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`, [site.id, r.category, r.name, r.source, r.why, i, !!r.optional]);
   }
+  await sponsorFile(db, site.id);
   await audit(db, ctx, 'Joined site with site code', `${w.name} — ${w.requirements.length} requirements`, site.id);
   await notifyOrg(db, w.org_id, [...REVIEWERS], { kind: 'accepted', title: `${ctx.org.name} joined ${w.name}`, body: `${ctx.org.trade ? ctx.org.trade + ' · ' : ''}They can now see the site's requirements and start their safety file.`, link: { kind: 'site', siteId: site.id } });
   await publishChange(db, [w.org_id, ctx.org.id]);

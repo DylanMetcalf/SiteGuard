@@ -42,7 +42,8 @@ function banners(){
   if(o.isDemo) html += '<div class="banner warn"><span>'+(o.cleanDemo ? 'Your practice space — kept for 30 days. Switch between the mine and the contractor with the menu above.' : 'Demo with sample data. Switch people with the menu above.')+'</span><button class="btn small secondary" data-action="leave-demo">Create a real account</button></div>';
   if(!S.boot.me.verified) html += '<div class="banner info"><span>Confirm your email address — we sent a link to '+S.boot.me.email+'.</span><button class="btn small secondary" data-action="resend-verification">Resend</button></div>';
   if(f.billing && !o.isDemo){
-    if(o.standing==='lapsed') html += '<div class="banner bad"><span>Read-only: '+(o.subscriptionStatus==='trialing'?'your trial has ended':'your subscription is inactive')+'. Everything stays viewable; choose a plan to keep making changes.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="goto-more" data-view="billing">Billing</button>':'')+'</div>';
+    if(isContractor() && !o.ownAccess && o.standing!=='lapsed') html += '<div class="banner info"><span>'+(o.subscriptionStatus==='trialing'?'Your trial has ended. ':'')+'Sites that sponsor you are still covered. Your own projects and other clients need a contractor plan.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="goto-more" data-view="billing">See plans</button>':'')+'</div>';
+    else if(o.standing==='lapsed') html += '<div class="banner bad"><span>Read-only: '+(o.subscriptionStatus==='trialing'?'your trial has ended':'your subscription is inactive')+'. Everything stays viewable; choose a plan to keep making changes.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="goto-more" data-view="billing">Billing</button>':'')+'</div>';
     else if(o.standing==='grace') html += '<div class="banner warn"><span>We couldn\'t take your last payment. Update your card to avoid interruption.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="billing-portal">Update card</button>':'')+'</div>';
     else if(o.subscriptionStatus==='trialing' && o.trialEndsAt){
       const days = Math.max(0, Math.ceil((new Date(o.trialEndsAt) - Date.now())/86400000));
@@ -392,7 +393,7 @@ function renderSiteDetail(siteId){
     +'<div class="view-head"><h1>'+site.name+'</h1><p>'+[site.location, isContractor()?(isProject(site)?'Project for '+site.hostName:site.hostName):contractor.name].filter(Boolean).join(' · ')+'</p></div>'
     +'<div class="subtabs" role="tablist">'
       +['compliance','activity','people'].map(t=>'<button role="tab" data-action="site-tab" data-tab="'+t+'" class="'+(S.siteTab===t?'active':'')+'" aria-selected="'+(S.siteTab===t)+'">'+({compliance:'Compliance',activity:'Site activity',people:'People'})[t]+'</button>').join('')
-    +'</div>' + suspendedBanner(siteId);
+    +'</div>' + suspendedBanner(siteId) + sponsorLine(site);
 
   if(S.siteTab==='activity') return html + renderSiteActivity(siteId);
   if(S.siteTab==='people') return html + renderSitePeople(siteId);
@@ -483,6 +484,25 @@ export function renderIncidentRow(inc, siteId, showSite){
     +'<div class="reqrow-meta">'+statusBadge+'<span class="srctag">'+(showSite?S.state.sites[siteId].name+' · ':'')+timeAgo(inc.date)+' · '+inc.reportedBy+'</span></div>'
     +'</div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
 }
+
+/** Who pays for this file: the mine sponsors the contractor's file on its own site (billing on only). */
+function sponsorLine(site){
+  if(!S.boot.features.billing || isProject(site) || site.status==='invited') return '';
+  if(isContractor()){
+    if(site.sponsored) return '<div class="sponsor-line"><span class="badge sage">Sponsored</span> '+site.hostName+' covers your work on this safety file.</div>';
+    return org().ownAccess ? '' : '<div class="notice" style="background:var(--amber-bg);color:var(--amber);">'+site.hostName+' isn\'t sponsoring this file right now. It stays readable; choose a contractor plan under Plan &amp; billing to keep working on it.</div>';
+  }
+  if(!(S.state.contractors[site.contractorId]||{}).linked || site.status==='declined') return '';
+  const admin = isOrgAdmin() && !readOnly() && site.status!=='declined';
+  return '<div class="sponsor-line"><span class="badge '+(site.sponsored?'sage':'')+'">'+(site.sponsored?'Sponsored by you':'Not sponsored')+'</span> '
+    +(site.sponsored ? 'The contractor works on this file without its own plan.' : 'The contractor needs its own plan to change this file.')
+    +(admin ? ' <button class="linkish" data-action="sponsorship" data-site="'+site.id+'" data-do="'+(site.sponsored?'end':'resume')+'">'+(site.sponsored?'End sponsorship':'Sponsor again')+'</button>' : '')+'</div>';
+}
+on('sponsorship', (el)=>{
+  const end = el.dataset.do==='end';
+  if(end && !confirm('Stop sponsoring this contractor\'s file? Their records stay readable, but they\'ll need their own plan to keep changing it.')) return;
+  return act(()=>api.post('/api/sites/'+encodeURIComponent(el.dataset.site)+'/sponsorship/'+(end?'end':'resume'), {}), end?'Sponsorship ended':'Sponsoring again', el);
+});
 
 function renderSiteActivity(siteId){
   const ro = readOnly();
@@ -985,9 +1005,13 @@ function renderBilling(){
   if(!billingCache){ loadBilling().catch(e=>showToast(e.message)); return '<div class="empty"><p>Loading…</p></div>'; }
   const b = billingCache;
   let html = '<div class="view-head"><h1>Plan &amp; billing</h1><p>'+org().name+'</p></div>';
+  const promo = '<div class="section-title">Have a promo code?</div><div class="card"><div class="row-actions"><input type="text" id="promoCode" maxlength="40" placeholder="e.g. PARTNER2026" style="flex:1;min-width:140px;" autocapitalize="characters"><button class="btn secondary" data-action="billing-redeem">Apply</button></div></div>';
   if(!b.enabled){
     return html + '<div class="card"><div class="site-card-sub">Billing isn\'t configured on this server (no Stripe keys), so every organisation has full access. Set STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and the plan price IDs to turn on plans, trials and seat limits.</div></div>';
   }
+  if(b.grant) html += '<div class="card checkpoint"><div class="site-card-title">'+escapeHtml(b.grant.plan)+' — given by SiteGuard</div><div class="site-card-sub">'+(b.grant.until ? 'Until '+escapeHtml(String(b.grant.until).slice(0,10))+'.' : 'No end date.')+' No payment needed while this lasts.</div></div>';
+  else if(isContractor() && !b.ownAccess) html += '<div class="notice">'+(b.sponsored ? 'You have no plan of your own. Sites that sponsor you are covered; your own projects and other clients need a contractor plan.' : 'You have no plan of your own and no site is sponsoring you right now. Everything stays readable; choose a plan to keep working.')+'</div>';
+  if(b.coupon) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">Promo code '+escapeHtml(b.coupon)+' will be applied when you subscribe.</div>';
   const current = b.plans.find(p=>p.id===b.plan);
   html += '<div class="card checkpoint"><div class="kv"><span>Current plan</span><span>'+escapeHtml(current?current.name:b.plan)+'</span></div>'
     +'<div class="kv"><span>Status</span><span>'+escapeHtml(b.status)+(b.status==='trialing'&&b.trialEndsAt?' until '+timeAgo(b.trialEndsAt):'')+'</span></div>'
@@ -999,10 +1023,10 @@ function renderBilling(){
   html += '<label class="field-label" for="billSeats">Seats</label><input type="number" id="billSeats" min="'+Math.max(1,b.seatsUsed)+'" value="'+Math.max(b.seatLimit, b.seatsUsed)+'">';
   html += b.plans.map(p=>'<div class="plan-card'+(p.id===b.plan?' current':'')+'"><div class="flexbetween"><div class="site-card-title">'+escapeHtml(p.name)+'</div>'+(p.id===b.plan?'<span class="badge approved">Current</span>':'')+'</div>'
     +'<div class="site-card-sub">'+escapeHtml(p.blurb)+'</div>'
-    +(p.paid ? (p.purchasable ? '<button class="btn '+(p.id===b.plan?'secondary':'primary')+' small" style="margin-top:8px;" data-action="billing-choose" data-plan="'+p.id+'">'+(b.hasSubscription ? (p.id===b.plan?'Update seats':'Switch to '+escapeHtml(p.name)) : 'Subscribe')+'</button>' : '<div class="site-card-sub" style="margin-top:6px;">Not available yet.</div>') : '<div class="site-card-sub" style="margin-top:6px;">Free — no card needed.</div>')
+    +(p.paid ? (p.purchasable ? '<button class="btn '+(p.id===b.plan?'secondary':'primary')+' small" style="margin-top:8px;" data-action="billing-choose" data-plan="'+p.id+'">'+(b.hasSubscription ? (p.id===b.plan?'Update seats':'Switch to '+escapeHtml(p.name)) : 'Subscribe')+'</button>' : '<div class="site-card-sub" style="margin-top:6px;">Not available yet.</div>') : '<div class="site-card-sub" style="margin-top:6px;">'+(p.id==='contractor_free' ? 'No subscription — covers only the files sites sponsor.' : 'No card needed.')+'</div>')
     +'</div>').join('');
   html += '<div class="site-card-sub" style="margin-top:8px;">Plan changes are prorated. Cancel any time from “Payment method &amp; invoices”; your data stays readable.</div>';
-  return html;
+  return html + promo;
 }
 export function invalidateBilling(){ billingCache = null; }
 
@@ -1277,6 +1301,12 @@ on('save-org', (el)=>{
   return act(()=>api.patch('/api/org', body), 'Company details saved', el);
 });
 on('toggle-digest', (el)=>act(()=>api.patch('/api/org/settings', { reminderDigest: el.checked }), el.checked?'Reminder digests on':'Reminder digests off'));
+on('billing-redeem', async (el)=>{
+  const code = (document.getElementById('promoCode')||{}).value||'';
+  if(!code.trim()){ showToast('Type the code first'); return; }
+  const ok = await act(()=>api.post('/api/billing/redeem', { code: code.trim() }), 'Code applied', el);
+  if(ok){ invalidateBilling(); render(); }
+});
 on('platform-refresh', ()=>{ invalidatePlatform(); render(); });
 on('save-reminder-days', (el)=>{
   const days = [...document.querySelectorAll('#reminderDays input:checked')].map(x=>Number(x.value));

@@ -98,7 +98,7 @@ export function renderAuth(){
     if(!si) return wrap('<div class="card"><h3>Invitation unavailable</h3>'+errorBox()+'<button class="btn secondary block" style="margin-top:12px;" data-action="auth-go" data-view="signin">Go to sign in</button></div>');
     const head = '<div class="view-head" style="text-align:center;"><h1>Site invitation</h1><p>'+escapeHtml(si.host_name)+' invited '+escapeHtml(si.contractor_name)+'</p></div>'
       +'<div class="card checkpoint"><div class="site-card-title">'+escapeHtml(si.site_name)+'</div><div class="site-card-sub">'+escapeHtml(si.location||'')+'</div>'
-      +'<div class="site-card-sub" style="margin-top:8px;">Accepting shows you exactly which documents the site needs and tracks your readiness as you upload them. SiteGuard is free for contractors.</div></div>';
+      +'<div class="site-card-sub" style="margin-top:8px;">Accepting shows you exactly which documents the site needs and tracks your readiness as you upload them. Your safety file for this site is sponsored by the site — no subscription needed for it.</div></div>';
     if(si.status !== 'pending'){
       return wrap(head+'<div class="card"><div class="site-card-sub">This invitation was already '+escapeHtml(si.status)+'.</div><button class="btn secondary block" style="margin-top:12px;" data-action="auth-done">Continue</button></div>');
     }
@@ -148,11 +148,11 @@ export function renderAuth(){
   }
 
   if(v === 'signup'){
-    return wrap('<div class="view-head" style="text-align:center;"><h1>Create your organisation</h1><p>Site owners get a 14-day trial with no card. Contractors are always free.</p></div><div class="card">'
+    return wrap('<div class="view-head" style="text-align:center;"><h1>Create your organisation</h1><p>Every account starts with a 14-day trial of the full product, no card needed.</p></div><div class="card">'
       +'<div class="field-label" style="margin-top:0;">Who are you signing up for?</div>'
       +'<div class="role-cards" role="radiogroup">'
         +roleCard('host', 'We run a site or mine', 'Create your sites, set what every contractor\'s safety file must contain, share a site code and vet what comes in.')
-        +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, or build a safety file for any client yourself. Free.')
+        +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, or build safety files for any client yourself.')
       +'</div>'
       +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name" placeholder="e.g. Thandi Nkosi">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email">'

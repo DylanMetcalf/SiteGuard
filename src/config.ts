@@ -56,6 +56,7 @@ const schema = z.object({
   STRIPE_PRICE_HOST_STARTER: z.string().optional(),
   STRIPE_PRICE_HOST_PRO: z.string().optional(),
   STRIPE_PRICE_CONTRACTOR_PRO: z.string().optional(),
+  STRIPE_PRICE_CONTRACTOR_STARTER: z.string().optional(),
 
   /** Allow creating throwaway demo sandboxes from the sign-in page. */
   DEMO_SANDBOX_ENABLED: bool(true),

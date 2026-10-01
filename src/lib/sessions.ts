@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Db } from '../db/pool.js';
+import { hasActiveSponsorship } from './sponsorship.js';
 import { one, pool } from '../db/pool.js';
 import { config, isProd } from '../config.js';
 import type { Ctx, OrgRow, Role, UserRow } from './authz.js';
@@ -72,6 +73,7 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
     if (m) {
       org = m.org;
       role = m.role;
+      if (org.kind === 'contractor') org.sponsored = await hasActiveSponsorship(pool, org.id);
     }
   }
 

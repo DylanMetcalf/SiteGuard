@@ -49,7 +49,7 @@ export function projectsSection(match){
 on('project-send', (el)=>{
   const siteId = el.dataset.site;
   // Secure links are a Contractor Pro feature once billing is on; the PDF always works.
-  if(S.boot.features.billing && org().plan === 'contractor_free'){
+  if(S.boot.features.billing && !(org().entitlements||{}).SHARE_LINKS){
     openSheet(sheetHead('Send to '+S.state.sites[siteId].hostName, S.state.sites[siteId].name)
       +'<div class="card"><div class="site-card-title" style="font-size:14px;">Email the PDF</div><div class="site-card-sub" style="margin:4px 0 10px;">Download the bound safety file and attach it to an email to your client.</div>'
       +'<button class="btn primary block" data-action="export-bundle" data-site="'+siteId+'">Check and download the PDF</button></div>'

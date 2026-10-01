@@ -71,7 +71,7 @@ async function inviteContractor(
   );
   const lines = [
     `${ctx.org.name} has invited ${contractor.name} to work on "${site.name}" and submit a safety file through SiteGuard.`,
-    'Accepting shows you exactly which documents the site needs and tracks your readiness as you upload them. SiteGuard is free for contractors.',
+    'Accepting shows you exactly which documents the site needs and tracks your readiness as you upload them. Working on this site\'s safety file is sponsored by the site.',
   ];
   const action = { label: 'View invitation', url: appUrl(`/site-invite?token=${token}`) };
   if (contractor.contact_email) {

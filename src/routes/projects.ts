@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { many, one, withTx, type Db } from '../db/pool.js';
 import { canAdminOrg, isContractor, isUuid, limitsEnforced, loadSite, requireOrg, requireWritable, type OrgCtx } from '../lib/authz.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
+import { requireFeature } from '../lib/entitlements.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { itemsFromPacks } from '../lib/templates.js';
@@ -73,12 +74,14 @@ export default async function projectRoutes(app: FastifyInstance) {
         emergency: emergencySchema.optional(),
       })
       .parse(req.body);
+    // A site's sponsorship never covers a contractor's own projects.
+    requireFeature(ctx, 'CONTRACTOR_PROJECTS');
     return withTx(async (db) => {
       await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
       const limit = planOf(ctx.org).projectLimit;
       if (limitsEnforced() && limit !== null) {
         const n = Number((await one<{ n: number }>(db, `select count(*)::int as n from sites s join organisations o on o.id = s.org_id where o.managed_by_org = $1 and s.status <> 'declined'`, [ctx.org.id]))!.n);
-        if (n >= limit) throw new HttpError(402, 'project_limit', `Your plan includes ${limit} project${limit === 1 ? '' : 's'}. Upgrade to Contractor Pro under Plan & billing for unlimited projects.`);
+        if (n >= limit) throw new HttpError(402, 'project_limit', `Your plan includes ${limit} project${limit === 1 ? '' : 's'}. Upgrade to Contractor Pro under Plan & billing for unlimited safety files.`);
       }
       const clientId = await clientRecord(db, ctx, body.clientName);
       const contractor = { id: await myEntryAt(db, ctx, clientId) };

@@ -30,14 +30,16 @@ before(async () => {
 after(teardown);
 
 describe('billing', () => {
-  it('new site owners start on a 14-day trial; contractors on the free plan', async () => {
+  it('everyone starts on a 14-day trial of the full product', async () => {
     const st = await host.state();
     assert.equal(st.org.subscriptionStatus, 'trialing');
     assert.equal(st.org.plan, 'host_pro');
     const c = (await signup(app, { orgName: 'Free Contractor', orgKind: 'contractor' })).agent;
     const cs = await c.state();
-    assert.equal(cs.org.plan, 'contractor_free');
+    assert.equal(cs.org.plan, 'contractor_pro');
+    assert.equal(cs.org.subscriptionStatus, 'trialing');
     assert.equal(cs.org.standing, 'ok');
+    assert.equal(cs.org.ownAccess, true);
   });
 
   it('rejects webhooks without a valid signature', async () => {

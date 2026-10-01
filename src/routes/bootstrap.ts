@@ -12,7 +12,8 @@ import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
 import { features, isPlatformAdmin } from '../config.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
-import { planOf, standing } from '../lib/plans.js';
+import { PLANS, grantActive, hasOwnAccess, planOf, standing } from '../lib/plans.js';
+import { sponsoredSiteIds } from '../lib/sponsorship.js';
 import { openFindings } from '../lib/agent.js';
 import { blueprintForRequirement } from '../lib/studio/blueprints.js';
 import { brandingOf } from '../lib/studio/generate.js';
@@ -131,8 +132,11 @@ export async function buildState(db: Db, ctx: OrgCtx) {
   }
 
   // ---- sites ----
+  // Which files a mine sponsors right now (the contractor works on them without its own plan).
+  const sponsored = await sponsoredSiteIds(db, sites.filter((s) => !s.project).map((s) => s.id));
   for (const s of sites) {
     state.sites[s.id] = {
+      sponsored: sponsored.has(s.id),
       suspended: null,
       id: s.id, name: s.name, location: s.location,
       // On the contractor side every site belongs to "me".
@@ -390,6 +394,10 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         plan: plan.id, planName: plan.name, subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
         currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, validityRules: rulesOf(c.org.settings), cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
         siteLimit: plan.siteLimit,
+        // Own access = subscription, trial in date or a promo/enterprise grant. Without it a
+        // contractor works only on sponsored files.
+        ownAccess: hasOwnAccess(c.org), sponsored: !!c.org.sponsored,
+        grant: grantActive(c.org) ? { plan: c.org.grant_plan, planName: PLANS[c.org.grant_plan!]?.name, until: d(c.org.grant_until), source: c.org.grant_source } : null,
         branding: brandingOf(c),
         entitlements: entitlementsFor(c.org),
       },

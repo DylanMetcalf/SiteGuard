@@ -9,6 +9,7 @@ import { createSession, destroySession, SESSION_COOKIE } from '../lib/sessions.j
 import { requireUser, requireOrg, canAdminOrg, type Role, type OrgCtx } from '../lib/authz.js';
 import { appUrl, queueEmail } from '../lib/email.js';
 import { defaultPlanFor, type OrgKind } from '../lib/plans.js';
+import { sponsorFile } from '../lib/sponsorship.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 
@@ -75,6 +76,7 @@ export async function acceptSiteInvitation(db: Db, ctx: OrgCtx, invitationId: st
   }
   await db.query(`update site_invitations set status = 'accepted', responded_at = now(), responded_by = $2 where id = $1`, [inv.id, ctx.user.id]);
   await db.query(`update sites set status = 'in_progress' where id = $1 and status = 'invited'`, [inv.site_id]);
+  await sponsorFile(db, inv.site_id);
   await audit(db, ctx, 'Accepted invitation', inv.site_name, inv.site_id);
   await notifyOrg(db, inv.org_id, ['owner', 'admin', 'reviewer'], { kind: 'accepted', title: `${ctx.org.name} joined ${inv.site_name}`, body: 'They can now see the site\'s requirements and start submitting documents.', link: { kind: 'site', siteId: inv.site_id } });
   await publishChange(db, [inv.org_id, ctx.org.id]);

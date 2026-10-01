@@ -63,7 +63,7 @@ STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... STRIPE_PRICE_*=...   # optional;
    - **Contractor Pro**: AI, share links, more seats.
 
    Put their price IDs in `STRIPE_PRICE_HOST_STARTER`, `STRIPE_PRICE_HOST_PRO` and
-   `STRIPE_PRICE_CONTRACTOR_PRO`. Plan limits live in `src/lib/plans.ts`.
+   `STRIPE_PRICE_CONTRACTOR_PRO`, `STRIPE_PRICE_CONTRACTOR_STARTER`. Plan limits live in `src/lib/plans.ts`; what each plan includes in `src/lib/entitlements.ts`.
 2. Add a webhook endpoint at `https://<APP_URL>/api/billing/webhook` for
    `checkout.session.completed` and `customer.subscription.created`, `.updated` and `.deleted`. Put
    its signing secret in `STRIPE_WEBHOOK_SECRET`.
