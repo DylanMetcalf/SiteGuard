@@ -675,6 +675,7 @@ export async function loadPacks(){
   return packsCache;
 }
 /** Checkbox list of starter packs; counts show only requirements the site doesn't already have. */
+const JURISDICTIONS = { ZA: 'South Africa' };
 export function packPicker(packs, checked, existingNames){
   const have = new Set((existingNames||[]).map(n=>n.toLowerCase()));
   return packs.map(p=>{
@@ -684,7 +685,8 @@ export function packPicker(packs, checked, existingNames){
       +'<span class="site-card-sub" style="display:block;">'+p.description+' · '+(fresh.length===p.items.length?p.items.length+' documents':fresh.length+' new of '+p.items.length)+'</span></span>'
       +'<input type="checkbox" class="pack-box" value="'+p.id+'"'+(checked.includes(p.id)?' checked':'')+(fresh.length?'':' disabled')+' aria-label="'+p.name+'"></label>'
       +'<details style="margin-top:6px;"><summary class="site-card-sub" style="cursor:pointer;">What\'s included</summary>'
-      + p.items.map(i=>'<div class="site-card-sub" style="padding:3px 0;'+(have.has(i.name.toLowerCase())?'text-decoration:line-through;':'')+'">'+i.category+' — '+i.name+'</div>').join('')
+      + p.items.map(i=>'<div class="site-card-sub" style="padding:3px 0;'+(have.has(i.name.toLowerCase())?'text-decoration:line-through;':'')+'">'+i.category+' — '+i.name+(i.optional?' (optional)':'')+'</div>').join('')
+      +(p.jurisdiction ? '<div class="site-card-sub" style="padding-top:6px;">'+escapeHtml(JURISDICTIONS[p.jurisdiction]||p.jurisdiction)+' · '+(p.verification==='researched'?'researched':escapeHtml(p.verification||''))+(p.reviewedOn?' '+escapeHtml(p.reviewedOn.slice(0,7)):'')+' · confirm with your SHE advisor</div>' : '')
       +'</details></div>';
   }).join('');
 }

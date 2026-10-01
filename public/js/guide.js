@@ -41,7 +41,8 @@ export function guideCard(siteId){
     +'<div class="site-card-title">'+p.handedIn+' of '+p.reqs.length+' handed in</div>'
     +'<div class="bld-progress" style="margin:8px 0;"><i style="width:'+pct+'%"></i></div>'
     +'<div class="site-card-sub">Next: '+next+'.</div>'
-    +'<button class="btn primary" style="margin-top:12px;" data-action="guide-open" data-site="'+siteId+'">'+(p.handedIn ? 'Continue my safety file' : 'Start my safety file')+'</button></div>';
+    +'<div class="row-actions" style="margin-top:12px;"><button class="btn primary" data-action="guide-open" data-site="'+siteId+'">'+(p.handedIn ? 'Continue my safety file' : 'Start my safety file')+'</button>'
+    +(p.write.length && !readOnly() ? '<button class="btn secondary" data-action="builder-open" data-site="'+siteId+'">'+ICONS.sparkle+' Write '+p.write.length+' document'+(p.write.length===1?'':'s')+' now</button>' : '')+'</div></div>';
 }
 
 const step = (n, done, title, sub, body) => '<div class="guide-step'+(done?' done':'')+'"><div class="guide-num">'+(done?ICONS.check:n)+'</div><div class="guide-body"><div class="qa-title">'+title+'</div><div class="site-card-sub">'+sub+'</div>'+(body||'')+'</div></div>';

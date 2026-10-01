@@ -150,6 +150,10 @@ function updateLiveDot(){ const d = document.querySelector('.live-dot'); if(d) d
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && S.boot && S.boot.org){ S.keepScroll = true; reload().catch(()=>{}).finally(()=>{ S.keepScroll=false; }); } });
 
 /* ============ boot ============ */
+// Installable app + a friendly offline page. Never caches records (see /sw.js).
+if('serviceWorker' in navigator && location.protocol !== 'file:'){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
+}
 (async function boot(){
   render();
   try{

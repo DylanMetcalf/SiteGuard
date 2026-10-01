@@ -9,6 +9,9 @@ import { many, one, pool } from '../db/pool.js';
 import { isPlatformAdmin } from '../config.js';
 import { notFound } from '../lib/errors.js';
 import { requireUser } from '../lib/authz.js';
+import { PLANS } from '../lib/plans.js';
+
+const planName = (id: string) => (PLANS as Record<string, { name: string }>)[id]?.name ?? id;
 
 const n = (sql: string, params: unknown[] = []) => one<{ n: number }>(pool, sql, params).then((r) => r?.n ?? 0);
 
@@ -49,10 +52,10 @@ export default async function adminRoutes(app: FastifyInstance) {
          from feedback f left join organisations o on o.id = f.org_id order by f.created_at desc limit 10`);
     return {
       generatedAt: new Date().toISOString(),
-      organisations: orgs, plans, subscriptionStatus: statuses,
+      organisations: orgs, plans: plans.map((p) => ({ ...p, plan: planName(p.plan) })), subscriptionStatus: statuses,
       usage: { users, activeUsers7d: active7, sites, projects, workplaces, documentsFiled: docsFiled, studioDocuments: studioDocs, safetyFileRevisions: safetyFiles, aiRequestsThisMonth: aiRequests },
       health: { emailFailed7d: emailFailed, emailStuck, uptimeSeconds: Math.round(process.uptime()) },
-      recentSignups: signups,
+      recentSignups: signups.map((o: { plan: string }) => ({ ...o, plan: planName(o.plan) })),
       recentFeedback: feedback,
     };
   });
