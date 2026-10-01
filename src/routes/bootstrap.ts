@@ -89,7 +89,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     for (const w of await many<any>(db, 'select * from workplaces where org_id = $1 order by created_at', [ctx.org.id])) {
       state.workplaces[w.id] = {
         id: w.id, name: w.name, location: w.location, code: canAdminOrg(ctx) ? w.join_code : null, joinOpen: w.join_open,
-        requirements: w.requirements, emergency: { musterPoint: '', contact: '', hospital: '', ...w.emergency }, createdAt: d(w.created_at)?.slice(0, 10),
+        requirements: w.requirements, emergency: { musterPoint: '', contact: '', hospital: '', ...w.emergency }, createdAt: d(w.created_at)?.slice(0, 10), archivedAt: d(w.archived_at),
       };
     }
   }
