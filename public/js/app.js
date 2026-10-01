@@ -11,6 +11,7 @@ import { refreshGuide } from './guide.js';
 import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
 import './inbox.js';
 import './builder.js';
+import './safetyfiles.js';
 import { maybeOfferTour } from './tour.js';
 
 const app = document.getElementById('app');

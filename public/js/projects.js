@@ -90,6 +90,7 @@ on('new-project-go', async (el)=>{
   if(r){
     closeSheet();
     S.nav = 'sites'; S.activeSiteId = r.id; S.siteTab = 'compliance'; render(); window.scrollTo(0,0);
+    setTimeout(()=>import('./guide.js').then(m=>m.openGuide(r.id, false)), 300);
     showToast('Project created with '+r.requirements+' document'+(r.requirements===1?'':'s')+' to gather');
   }
 });

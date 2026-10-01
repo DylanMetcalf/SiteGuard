@@ -188,6 +188,25 @@ export default async function projectRoutes(app: FastifyInstance) {
     });
   });
 
+  /** The order documents appear in the project's safety file PDF (the contractor's own file). */
+  app.post('/api/projects/:id/requirements/order', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireContractorAdmin(ctx);
+    requireWritable(ctx);
+    const { id } = req.params as { id: string };
+    const { ids } = z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(req.body);
+    return withTx(async (db) => {
+      const { site } = await loadProject(db, ctx, id);
+      const mine = await many<{ id: string }>(db, 'select id from requirements where site_id = $1', [site.id]);
+      const known = new Set(mine.map((r) => r.id));
+      if (ids.length !== known.size || new Set(ids).size !== ids.length || ids.some((x) => !known.has(x))) throw badRequest('List every document in the file exactly once.');
+      for (const [i, rid] of ids.entries()) await db.query('update requirements set position = $2 where id = $1', [rid, i]);
+      await audit(db, ctx, 'Rearranged project documents', `${ids.length} documents`, site.id);
+      await publishChange(db, [ctx.org.id]);
+      return { ok: true };
+    });
+  });
+
   /**
    * Archives a project: it disappears from the contractor's lists. Nothing is deleted, because the
    * audit trail and any filed documents are the record of what was prepared and sent.

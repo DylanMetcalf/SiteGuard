@@ -193,15 +193,17 @@ export default async function shareRoutes(app: FastifyInstance) {
     if (!isUuid(id)) throw notFound();
     await loadSite(pool, ctx, id);
     // Optional selection: which filed documents go into this copy (?only=reqId,reqId), and whether appointments and certificates do.
-    const q = req.query as { only?: string; appointments?: string; certificates?: string };
+    const q = req.query as { only?: string; appointments?: string; certificates?: string; preview?: string };
+    const preview = q.preview === '1';
     const only = typeof q.only === 'string' ? q.only.split(',').filter(Boolean).slice(0, 500) : undefined;
     if (only && only.some((x) => !isUuid(x))) throw notFound();
     const { pdf, filename, revision, created, partial } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`, {
-      only, appointments: q.appointments === '0' ? false : undefined, certificates: q.certificates === '0' ? false : undefined,
+      only, appointments: q.appointments === '0' ? false : undefined, certificates: q.certificates === '0' ? false : undefined, preview,
     });
     if (created) await audit(pool, ctx, 'Compiled safety file', `Rev ${revision}`, id);
     else if (partial) await audit(pool, ctx, 'Compiled safety file (selected documents)', `${only ? only.length : 'all'} document${only?.length === 1 ? '' : 's'} chosen`, id);
-    reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, false));
+    // A preview opens in the browser's PDF viewer; everything else downloads.
+    reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, preview));
     return reply.type('application/pdf').send(pdf);
   });
 

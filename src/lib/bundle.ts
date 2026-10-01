@@ -232,6 +232,8 @@ export interface FileSelection {
   only?: string[];
   appointments?: boolean;
   certificates?: boolean;
+  /** A look before downloading: nothing is recorded, and the copy is stamped as a preview. */
+  preview?: boolean;
 }
 
 export async function buildSafetyFile(_db: Db, siteId: string, generatedBy: string, selection: FileSelection = {}): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean; partial: boolean }> {
@@ -245,8 +247,9 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, se
   const all = await safetyFileItems(db, siteId);
   const { site, reqs, workers } = all;
   const partial = !!selection.only || selection.appointments === false || selection.certificates === false;
-  // A full compile is a revision; a copy with documents left out is labelled as a selection and records nothing.
-  const revision = partial
+  const preview = !!selection.preview;
+  // A full compile is a revision; a copy with documents left out (or a preview) is labelled and records nothing.
+  const revision = partial || preview
     ? { number: Number((await one<{ n: number }>(db, 'select coalesce(max(number), 0)::int as n from safety_file_versions where site_id = $1', [siteId]))!.n), created: false }
     : await recordRevision(db, siteId, toLines(all.items), generatedBy);
   const keep = selection.only ? new Set(selection.only) : null;
@@ -280,7 +283,9 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, se
         ? `${n('complete', 'expiring')} of ${reqStatuses.length} in the file · ${n('missing', 'expired')} outstanding`
         : `${n('complete', 'expiring')} approved · ${n('awaiting_review')} awaiting review · ${n('missing', 'expired', 'correction_required')} outstanding`],
       ['Workforce', `${workers.length} worker${workers.length === 1 ? '' : 's'} assigned`],
-      ['Revision', partial
+      ['Revision', preview
+        ? `Preview — not a recorded revision${revision.number ? ` (latest full revision: Rev ${revision.number})` : ''}`
+        : partial
         ? `Selected documents only — not a full revision${revision.number ? ` (latest full revision: Rev ${revision.number})` : ''}`
         : `Rev ${revision.number}${revision.created ? '' : ' (unchanged since it was compiled)'}`],
       ['Compiled', `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC by ${generatedBy}`],
@@ -288,10 +293,10 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, se
     items,
     registers,
     contentsNote: 'Only documents that have been submitted to the site are included. Missing, expired and returned documents are listed so the gaps are visible.',
-    stamp: `Safety file · ${site.name} · ${site.contractor_name} · ${partial ? 'Selection' : `Rev ${revision.number}`}`,
+    stamp: `Safety file · ${site.name} · ${site.contractor_name} · ${preview ? 'Preview' : partial ? 'Selection' : `Rev ${revision.number}`}`,
   });
   return {
-    pdf, filename: `Safety-file-${safeName(site.name)}-${partial ? 'selection' : `rev${revision.number}`}.pdf`,
+    pdf, filename: `Safety-file-${safeName(site.name)}-${preview ? 'preview' : partial ? 'selection' : `rev${revision.number}`}.pdf`,
     revision: revision.number, created: revision.created, partial,
   };
 }

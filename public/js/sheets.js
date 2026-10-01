@@ -237,6 +237,7 @@ function renderReqSheet(reqId){
         +'<label class="field-label" for="submitNote">Notes (optional)</label><textarea id="submitNote" placeholder="Add any context for the reviewer…"></textarea>'
         +'<button class="btn primary block" style="margin-top:10px;" data-action="submit-req" data-req="'+reqId+'"'+(doc.pendingFileId?'':' disabled')+' id="submitReqBtn">'+(reqId.startsWith('lib:')?'Save to library':eff==='missing'?'Submit for review':'Resubmit for review')+'</button>';
       if(reqId.startsWith('lib:') && doc.assetUrl) body += '<button class="btn danger block" style="margin-top:8px;" data-action="withdraw-doc" data-req="'+reqId+'">Remove from library</button>';
+      if(!reqId.startsWith('lib:') && eff!=='complete') body += '<button class="btn ghost block" style="margin-top:6px;" data-action="req-skip">Skip for now</button>';
     }
   } else if(canReview() && !ro){
     if((eff==='awaiting_review' || eff==='correction_required') && doc.assetUrl){
@@ -1179,3 +1180,4 @@ on('join-go', async (el)=>{
   // Straight into the guided safety file for the new site.
   setTimeout(()=>import('./guide.js').then(m=>m.openGuide(r.siteId, true)), 300);
 });
+on('req-skip', ()=>{ closeSheet(); showToast('Skipped for now — it stays on your list of outstanding documents'); });

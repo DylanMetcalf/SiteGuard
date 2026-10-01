@@ -236,6 +236,8 @@ a{color:inherit;}
 .btn.secondary{background:var(--paper-raised); color:var(--ink); border-color:var(--grey-line); box-shadow:var(--shadow-sm);}
 .btn.secondary:hover{border-color:color-mix(in srgb, var(--brand) 35%, var(--grey-line));}
 .btn.danger{background:transparent; border-color:color-mix(in srgb, var(--red) 45%, transparent); color:var(--red);}
+.btn.ghost{background:transparent; color:var(--grey); border-color:transparent;}
+.btn.ghost:hover{color:var(--ink);}
 .btn.block{width:100%;}
 .btn.small{padding:7px 12px; font-size:12.5px; border-radius:9px;}
 .btn.icon{padding:8px 10px;}
@@ -783,3 +785,8 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .sfr-list{max-height:40vh; overflow:auto;}
 
 .sponsor-line{font-size:12.5px;color:var(--grey);margin:-4px 0 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.hero-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.hero-actions .btn{display:inline-flex;align-items:center;gap:6px;}
+.hero-actions .btn svg{width:16px;height:16px;}
+.sfr-docs a{font-size:12px;margin-left:8px;white-space:nowrap;}
+.studio-top{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px;}

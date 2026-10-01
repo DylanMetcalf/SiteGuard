@@ -83,8 +83,8 @@ function render(siteId, fresh){
       +'<button class="btn secondary small" style="margin-top:8px;" data-action="guide-add" data-site="'+siteId+'">Add to my safety file</button>');
 
   // 6. Check and send
-  html += step(6, pct===100, 'Check and download', pct===100 ? 'Everything is handed in. The site will review each document and tell you in your inbox.' : 'The site reviews each document and tells you in your inbox if anything needs changing.',
-    '<div class="row-actions" style="margin-top:8px;"><button class="btn secondary small" data-action="guide-missing" data-site="'+siteId+'">See what\'s still missing</button><button class="btn secondary small" data-action="guide-pdf" data-site="'+siteId+'">Download my safety file (PDF)</button></div>');
+  html += step(6, pct===100, 'Check, preview and download', (pct===100 ? 'Everything is handed in.' : 'See exactly what is still outstanding before you download.')+((S.state.sites[siteId]||{}).project ? ' Then send the file to your client.' : ' The site reviews each document and tells you in your inbox if anything needs changing.'),
+    '<div class="row-actions" style="margin-top:8px;"><button class="btn primary small" data-action="export-bundle" data-site="'+siteId+'">Check and build the PDF</button><button class="btn secondary small" data-action="guide-missing" data-site="'+siteId+'">See what\'s still missing</button></div>');
   return html;
 }
 

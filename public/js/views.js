@@ -7,10 +7,11 @@ import {
   org, role, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId, isDemoMode,
   computeReadiness, siteSubmissionStatus, statusLabelForSubmission, gauge, gaugeColor, badge, timeAgo, dateTime, initials,
   openSafetyIssues, orgOpenSafetyIssuesCount, incidentTypeInfo, permitTypeInfo, permitEffectiveStatus, effectiveStatus, certStatus,
-  libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, openSheet, sheetHead, closeSheet, searchBox, matchSearch, searching, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq,
+  libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, openSheet, sheetHead, closeSheet, searchBox, matchSearch, searching, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq, actions,
 } from './core.js';
 import { computeTasks, sessionLabel } from './sheets.js';
 import { renderStudio } from './studio.js';
+import { buildButton } from './safetyfiles.js';
 import { renderPlatform, invalidatePlatform } from './platform.js';
 import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
@@ -54,7 +55,7 @@ function banners(){
 }
 
 export function bottomNav(){
-  const tabs = [['dashboard','Dashboard',ICONS.dashboard],['sites','Sites',ICONS.sites],null,['passport', isContractor()?'Documents':'Contractors', ICONS.passport],['more','More',ICONS.more]];
+  const tabs = [['dashboard','Dashboard',ICONS.dashboard],['sites',isContractor()?'Safety files':'Sites',ICONS.sites],null,['passport', isContractor()?'Documents':'Contractors', ICONS.passport],['more','More',ICONS.more]];
   return '<nav class="bottomnav"><div class="bottomnav-row">'
     + tabs.map(t=> t ? '<button data-action="nav" data-nav="'+t[0]+'" class="'+(S.nav===t[0]?'active':'')+'"'+(S.nav===t[0]?' aria-current="page"':'')+'>'+t[2]+'<span>'+t[1]+'</span></button>'
       : '<button class="fab" data-action="open-fab" aria-label="Quick actions">'+ICONS.plus+'</button>').join('')
@@ -183,6 +184,7 @@ function renderDashboard(){
   const head = '<div class="dash-hero"><div class="flexbetween" style="align-items:flex-start;"><div><p class="hero-eyebrow">'+org().name+'</p><h1>'+greeting()+'</h1>'
     +'<p class="greeting">'+(urgent ? urgent+' urgent item'+(urgent===1?'':'s')+' need'+(urgent===1?'s':'')+' you today.' : findings.length ? findings.length+' item'+(findings.length===1?'':'s')+' to look at — nothing urgent.' : 'Everything is in order across your sites.')+'</p></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn secondary small" data-action="start-tour">Walkthrough</button><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div></div>'
+    +(isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button><button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>' : '')
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
   const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
@@ -338,9 +340,9 @@ function renderSitesList(){
   const projectMatch = (s)=>matchSearch('sites', s.name, s.location, s.hostName);
   const projectsHtml = isContractor() ? projectsSection(projectMatch) + projectList.filter(projectMatch).map(portfolioRow).join('') : '';
   const nWp = Object.keys(S.state.workplaces||{}).length;
-  let html = '<div class="view-head"><div class="flexbetween"><h1>Sites</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')
-    +(isContractor() && isOrgAdmin() && !readOnly()?'<div style="display:flex;gap:6px;"><button class="btn secondary small" data-action="new-project">+ Project</button><button class="btn primary small" data-action="join-site">+ Join a site</button></div>':'')+'</div>'
-    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : sites.length+' site'+(sites.length===1?'':'s')+' on SiteGuard · '+projectList.length+' project'+(projectList.length===1?'':'s'))+'</p></div>';
+  let html = '<div class="view-head"><div class="flexbetween"><h1>'+(isContractor()?'Safety files':'Sites')+'</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')
+    +(isContractor() ? buildButton('small') : '')+'</div>'
+    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : 'One safety file per site or client, built from your company documents · '+sites.length+' on SiteGuard sites · '+projectList.length+' for your own clients')+'</p></div>';
   if(isHost() && nWp){
     html += ((nWp + sites.length) > 3 || searching('sites') ? searchBox('sites', 'Search sites, locations or contractors') : '')
       + '<div class="section-title">Sites contractors join with a code</div>' + (workplaceCards() || '<div class="list-empty">No site matches.</div>');
@@ -383,7 +385,7 @@ function renderSiteDetail(siteId){
 
   const canShare = !readOnly() && (isContractor() ? isOrgAdmin() : canReview());
   let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;justify-content:space-between;flex-wrap:wrap;">'
-    +'<button class="btn secondary small" data-action="back-sites">'+(isHost() && site.workplaceId && (S.state.workplaces||{})[site.workplaceId] ? '← '+S.state.workplaces[site.workplaceId].name : '← Sites')+'</button>'
+    +'<button class="btn secondary small" data-action="back-sites">'+(isHost() && site.workplaceId && (S.state.workplaces||{})[site.workplaceId] ? '← '+S.state.workplaces[site.workplaceId].name : isContractor() ? '← Safety files' : '← Sites')+'</button>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
     +'<button class="btn danger small icon" data-action="open-emergency" data-site="'+siteId+'" title="Emergency info" aria-label="Emergency info">'+ICONS.emergency+'</button>'
     +(isHost() && isOrgAdmin() && !readOnly() && !site.workplaceId ? '<button class="btn secondary small" data-action="edit-site" data-site="'+siteId+'">Edit</button>' : '')
@@ -792,7 +794,8 @@ function renderMore(){
   let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div>'
     +'<button class="tour-cta" data-action="start-tour"><span class="tour-cta-ic">'+ICONS.sparkle+'</span><span><strong>Walkthrough</strong><span class="site-card-sub">A guided tour of every page, with auto-play for demos</span></span>'+ICONS.chevron+'</button>'
     +'<div class="card">';
-  html += item('studio', ICONS.passport, 'Document Studio', 'Branded safety documents as PDF and Word');
+  if(isContractor() && !readOnly()) html += '<button class="menu-row" data-action="sfb-start"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">Create a safety file</div><div class="qa-sub">For a site on SiteGuard or any client</div></div>'+ICONS.chevron+'</button>';
+  html += item('studio', ICONS.passport, 'Document Studio', 'Your documents, plus branded safety documents as PDF and Word');
   if(isContractor() && isOrgAdmin() && !readOnly()) html += '<button class="menu-row" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">New project</div><div class="qa-sub">A safety file for a client who isn\'t on SiteGuard</div></div>'+ICONS.chevron+'</button>';
   if(isContractor() && isOrgAdmin()) html += '<button class="menu-row" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Join a site with a code</div><div class="qa-sub">Type the code the site gave you</div></div>'+ICONS.chevron+'</button>';
   const nf = (S.boot.agent||{findings:[]}).findings.length;
@@ -1211,14 +1214,35 @@ on('export-bundle', (el)=>{
     +(optionalOut.length ? '<div class="section-title">Optional, not in the file</div>'+names(optionalOut) : '')
     +(gaps ? '<div class="notice alert-red" style="margin-top:12px;">The PDF lists every gap on its contents page, so the reader sees exactly what\'s outstanding. It is not presented as complete.</div>'
       : '<div class="notice alert-green" style="margin-top:12px;">Everything required is in the file.</div>')
-    +(filed.length ? '<details class="sfr-pick"><summary>Choose what goes in this PDF</summary>'
+    +(filed.length ? '<details class="sfr-pick"'+(isHost()?' open':'')+'><summary>Choose documents — or download them one by one</summary>'
       +'<div class="site-card-sub" style="margin:6px 0;">Untick anything you don\'t want in this copy. A copy with documents left out says so on its cover and doesn\'t count as a new revision.</div>'
-      +'<div class="sfr-list">'+filed.map(i=>'<label class="toggle-row"><span>'+i.req.name+'<span class="site-card-sub" style="display:block;">'+i.req.category+'</span></span><input type="checkbox" class="sfr-doc" value="'+i.req.id+'" checked></label>').join('')
+      +'<div class="sfr-list sfr-docs">'+filed.map(i=>{ const d = S.state.documents[i.req.id]||{}; return '<label class="toggle-row"><span>'+i.req.name+'<span class="site-card-sub" style="display:block;">'+i.req.category+(d.assetUrl?' · <a href="'+d.assetUrl+'" target="_blank" rel="noopener">Open on its own</a>':'')+'</span></span><input type="checkbox" class="sfr-doc" value="'+i.req.id+'" checked></label>'; }).join('')
       +(appts?'<label class="toggle-row"><span>Appointment letters ('+appts+')</span><input type="checkbox" id="sfrAppts" checked></label>':'')
       +(certs?'<label class="toggle-row"><span>Workforce certificates ('+certs+')</span><input type="checkbox" id="sfrCerts" checked></label>':'')
       +'</div></details>' : '')
-    +'<button class="btn primary block" style="margin-top:12px;" data-action="safety-file-download" data-site="'+siteId+'">'+(gaps?'Download with the gaps listed':'Download the safety file')+'</button>'
+    +(site.project && isOrgAdmin() && !readOnly() ? arrangeHtml(siteId) : '')
+    +'<div class="row-actions" style="margin-top:12px;"><button class="btn primary" style="flex:1;" data-action="safety-file-download" data-site="'+siteId+'">'+(gaps?'Download with the gaps listed':'Download the safety file')+'</button>'
+    +'<button class="btn secondary" data-action="safety-file-download" data-preview="1" data-site="'+siteId+'">Preview</button></div>'
+    +(!readOnly() && (isContractor() ? isOrgAdmin() : canReview()) ? '<button class="btn secondary block" style="margin-top:8px;" data-action="'+(site.project?'project-send':'new-share-link')+'" data-site="'+siteId+'">'+(site.project?'Send to '+site.hostName:'Share with someone outside SiteGuard')+'</button>' : '')
     +(gaps && isContractor() ? '<button class="btn secondary block" style="margin-top:8px;" data-action="guide-open" data-site="'+siteId+'">Fill the gaps first</button>' : ''));
+});
+/** Your own project file: the order documents appear in the PDF. */
+function arrangeHtml(siteId){
+  const reqs = S.state.requirements[siteId]||[];
+  if(reqs.length < 2) return '';
+  return '<details class="sfr-pick"'+(S.arrangeOpen?' open':'')+'><summary>Arrange the order</summary><div class="sfr-list">'
+    + reqs.map((r,i)=>'<div class="toggle-row"><span>'+(i+1)+'. '+r.name+'<span class="site-card-sub" style="display:block;">'+r.category+'</span></span><span class="row-actions">'
+      +'<button class="btn secondary small icon" data-action="arrange-move" data-site="'+siteId+'" data-i="'+i+'" data-d="-1" aria-label="Move '+r.name+' up"'+(i===0?' disabled':'')+'>'+ICONS.up+'</button>'
+      +'<button class="btn secondary small icon" data-action="arrange-move" data-site="'+siteId+'" data-i="'+i+'" data-d="1" aria-label="Move '+r.name+' down"'+(i===reqs.length-1?' disabled':'')+'>'+ICONS.down+'</button></span></div>').join('')
+    + '</div></details>';
+}
+on('arrange-move', async (el)=>{
+  const siteId = el.dataset.site, i = Number(el.dataset.i), j = i + Number(el.dataset.d);
+  const ids = (S.state.requirements[siteId]||[]).map(r=>r.id);
+  if(j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  const ok = await act(()=>api.post('/api/projects/'+encodeURIComponent(siteId)+'/requirements/order', { ids }), null, el);
+  if(ok){ S.arrangeOpen = true; actions['export-bundle']({ dataset: { site: siteId } }); S.arrangeOpen = false; }
 });
 on('safety-file-download', (el)=>{
   const all = [...document.querySelectorAll('.sfr-doc')];
@@ -1229,6 +1253,11 @@ on('safety-file-download', (el)=>{
   if(a && !a.checked) q.set('appointments', '0');
   if(c && !c.checked) q.set('certificates', '0');
   if(all.length && !picked.length && !q.has('appointments') && !q.has('certificates') && !confirm('No documents are ticked, so the PDF will list the file\'s contents only. Continue?')) return;
+  if(el.dataset.preview){
+    q.set('preview', '1');
+    window.open('/api/sites/'+encodeURIComponent(el.dataset.site)+'/safety-file.pdf?'+q.toString(), '_blank', 'noopener');
+    return;
+  }
   closeSheet();
   showToast('Preparing the safety file — the download starts in a moment');
   window.location.href = '/api/sites/'+encodeURIComponent(el.dataset.site)+'/safety-file.pdf'+(q.toString() ? '?'+q.toString() : '');
