@@ -402,6 +402,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:2px s
 .live-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--sage); margin-right:5px; vertical-align:1px; box-shadow:0 0 0 3px color-mix(in srgb, var(--sage) 25%, transparent);}
 .live-dot.off{background:var(--grey); box-shadow:none;}
 .menu-row{display:flex; align-items:center; gap:14px; padding:12px 10px; margin:0 -10px; border:none; border-radius:var(--radius-sm); cursor:pointer; background:none; width:calc(100% + 20px); text-align:left; color:var(--ink); transition:background .12s ease;}
+a.menu-row{text-decoration:none;}
 .menu-row:hover{background:var(--paper-deep);}
 .menu-row .qa-sub{margin-top:0;}
 .kv{display:flex; justify-content:space-between; gap:10px; font-size:13.5px; padding:8px 0; border-bottom:1px solid var(--grey-line);}

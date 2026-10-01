@@ -790,6 +790,7 @@ function renderMore(){
   html += '</div><div class="section-title">Account</div><div class="card">'
     +'<button class="menu-row" data-action="open-profile"><div class="qa-icon">'+initials(myName())+'</div><div style="flex:1;"><div class="qa-title">'+myName()+'</div><div class="qa-sub">'+S.boot.me.email+'</div></div>'+ICONS.chevron+'</button>'
     +'<button class="menu-row" data-action="open-feedback"><div class="qa-icon">'+ICONS.alert+'</div><div style="flex:1;"><div class="qa-title">Report a problem or suggest an idea</div><div class="qa-sub">Goes straight to the SiteGuard team</div></div>'+ICONS.chevron+'</button>'
+    +'<a class="menu-row" href="/privacy" target="_blank" rel="noopener"><div class="qa-icon">'+ICONS.verify+'</div><div style="flex:1;"><div class="qa-title">Privacy &amp; terms</div><div class="qa-sub">How SiteGuard handles your information</div></div>'+ICONS.chevron+'</a>'
     +'<button class="menu-row" data-action="auth-signout"><div class="qa-icon">⎋</div><div><div class="qa-title">Sign out</div></div></button></div>';
   return html;
 }
@@ -1032,6 +1033,9 @@ function renderSettings(){
       +'<label class="field-label" for="inspectxUrl">InspectX base URL</label><input type="url" id="inspectxUrl" value="'+(s.inspectxBaseUrl||'')+'" placeholder="https://app.inspectx.example/i/">'
       +(ro?'':'<button class="btn secondary block" style="margin-top:10px;" data-action="save-integration">Save</button>')+'</div>';
   }
+  html += '<div class="section-title">Your data</div><div class="card"><div class="site-card-sub">Download everything '+o.name+' can see in SiteGuard — company details, team, sites and files, document records and the audit trail — as one file you can keep or move elsewhere. Uploaded documents are listed, not included; download those from each file.</div>'
+    +'<a class="btn secondary small" style="margin-top:10px;" href="/api/org/export" download>Download our data</a>'
+    +'<div class="site-card-sub" style="margin-top:8px;"><a href="/privacy" target="_blank" rel="noopener">Privacy notice</a> · <a href="/terms" target="_blank" rel="noopener">Terms of use</a></div></div>';
   html += '<div class="section-title">AI drafting</div><div class="card"><div class="site-card-sub">'
     +(S.boot.features.ai ? 'AI drafting and expiry-date detection are on. Requests go through SiteGuard\'s server — no API key is ever stored in your browser.'
       : S.boot.features.aiConfigured ? 'AI drafting is included in '+(isContractor()?'Contractor Pro':'Site Professional')+'. Upgrade under Plan &amp; billing to turn it on.'

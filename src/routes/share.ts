@@ -31,7 +31,7 @@ const STATUS_COLOR: Record<string, string> = {
   complete: '#2C6B44', missing: '#A23A2D', expiring: '#8E6410', expired: '#A23A2D', awaiting_review: '#2A4E62', correction_required: '#A23A2D',
 };
 
-export function page(title: string, body: string): string {
+export function page(title: string, body: string, foot = 'Shared from SiteGuard. This view reflects the live record at the time you opened it and is read-only. It does not itself constitute a guarantee of legal compliance.'): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>${esc(title)} · SiteGuard</title>
 <link rel="icon" type="image/png" href="/icons/icon-32.png">
@@ -49,7 +49,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey
 .warn{border-color:var(--red);color:var(--red)}a{color:var(--brand)}.foot{font-size:11px;color:var(--grey);margin-top:18px}
 .scroll{overflow-x:auto}
 </style></head><body><div class="wrap"><div class="brand"><span></span>SiteGuard</div>${body}
-<div class="foot">Shared from SiteGuard. This view reflects the live record at the time you opened it and is read-only. It does not itself constitute a guarantee of legal compliance.</div></div></body></html>`;
+<div class="foot">${foot}</div></div></body></html>`;
 }
 
 function gone(reply: FastifyReply, message: string) {

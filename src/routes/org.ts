@@ -11,6 +11,7 @@ import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import type { Db } from '../db/pool.js';
 import { rl } from './auth.js';
+import { buildState } from './bootstrap.js';
 
 export async function seatsUsed(db: Db, orgId: string): Promise<number> {
   const r = await one<{ n: number }>(
@@ -224,6 +225,33 @@ export default async function orgRoutes(app: FastifyInstance) {
       await publishChange(db, [ctx.org.id]);
     });
     return { ok: true };
+  });
+
+  /**
+   * Everything the organisation can see in SiteGuard, as one JSON file: its own
+   * records and the files it is a party to (the same view as the app), its
+   * team and the audit trail. Uploaded files stay in storage; the export lists
+   * them. No passwords, tokens or billing identifiers.
+   */
+  app.get('/api/org/export', async (req, reply) => {
+    const ctx = requireOrg(req.ctx);
+    requireAdmin(ctx);
+    const o = ctx.org;
+    const data = {
+      exportedAt: new Date().toISOString(),
+      exportedBy: ctx.user.name,
+      organisation: { id: o.id, name: o.name, kind: o.kind, reg: o.reg_number, coid: o.coid_number, vat: o.vat_number, address: o.address, trade: o.trade, plan: o.plan, createdAt: o.created_at },
+      members: await many(pool, `select u.name, u.email, u.title, m.role, m.created_at as "joinedAt" from memberships m join users u on u.id = m.user_id where m.org_id = $1 order by u.name`, [o.id]),
+      records: await buildState(pool, ctx),
+      auditTrail: await auditFor(pool, ctx, { limit: 5000 }),
+    };
+    await withTx(async (db) => { await audit(db, ctx, 'Exported organisation data', 'JSON export of records, team and audit trail'); });
+    const day = new Date().toISOString().slice(0, 10);
+    return reply
+      .header('cache-control', 'no-store')
+      .header('content-disposition', `attachment; filename="siteguard-export-${day}.json"`)
+      .type('application/json')
+      .send(JSON.stringify(data, null, 2));
   });
 
   app.get('/api/audit', async (req) => {
