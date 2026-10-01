@@ -1,4 +1,5 @@
 import { recheckSiteReady } from '../lib/siteready.js';
+import { can } from '../lib/entitlements.js';
 import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -11,7 +12,6 @@ import { publishChange } from '../lib/realtime.js';
 import { appUrl, queueToOrg } from '../lib/email.js';
 import { bumpVersion, effectiveStatus, libraryTypeFor, LIBRARY_TYPES } from '../lib/readiness.js';
 import { sniffType, storage } from '../lib/storage.js';
-import { aiAllowed } from '../lib/plans.js';
 import { extractExpiryDate } from '../lib/ai.js';
 import { rl } from './auth.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
@@ -155,7 +155,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       return f;
     });
     let detectedExpiry: string | null = null;
-    if (aiAllowed(ctx.org) && (stored.contentType.startsWith('image/') || stored.contentType === 'application/pdf') && stored.contentType !== 'image/heic') {
+    if (can(ctx.org, 'AI_GENERATION') && (stored.contentType.startsWith('image/') || stored.contentType === 'application/pdf') && stored.contentType !== 'image/heic') {
       detectedExpiry = await extractExpiryDate(ctx.org.id, buf, stored.contentType, req.log);
     }
     return { fileId: stored.id, fileName: stored.filename, detectedExpiry };

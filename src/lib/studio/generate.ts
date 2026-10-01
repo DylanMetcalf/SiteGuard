@@ -4,13 +4,13 @@
  * renders PDF and Word with the company's branding, and stores both.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { can } from '../entitlements.js';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Db } from '../../db/pool.js';
 import { many, one, pool, withTx } from '../../db/pool.js';
 import { config } from '../../config.js';
 import { loadSite, isUuid, type OrgCtx } from '../authz.js';
 import { badRequest, notFound } from '../errors.js';
-import { aiAllowed } from '../plans.js';
 import { anthropic, FALLBACK, recordTokens, reserveAiRequest } from '../ai.js';
 import { storage } from '../storage.js';
 import { storeFile } from '../../routes/documents.js';
@@ -217,7 +217,7 @@ export async function generateDocument(ctx: OrgCtx, req: GenerateRequest, log: F
 
   let content = draft;
   let ai = false;
-  if (aiAllowed(ctx.org)) {
+  if (can(ctx.org, 'AI_GENERATION')) {
     try {
       await reserveAiRequest(ctx.org.id);
       const tailored = await tailorWithAI(ctx, bp, input, draft, !!req.research, log);

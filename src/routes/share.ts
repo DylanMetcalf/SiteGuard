@@ -13,7 +13,7 @@ import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { newToken, sha256 } from '../lib/security.js';
 import { appUrl } from '../lib/email.js';
-import { planOf } from '../lib/plans.js';
+import { requireFeature } from '../lib/entitlements.js';
 import { computeReadiness, effectiveStatus } from '../lib/readiness.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
@@ -78,12 +78,7 @@ export default async function shareRoutes(app: FastifyInstance) {
         label: z.string().trim().max(200).default(''),
       })
       .parse(req.body);
-    if (limitsEnforced() && !planOf(ctx.org).ai && planOf(ctx.org).kind === 'contractor') {
-      throw new HttpError(402, 'plan', 'External share links are included in Contractor Pro. Upgrade under Billing.');
-    }
-    if (limitsEnforced() && planOf(ctx.org).id === 'host_starter') {
-      throw new HttpError(402, 'plan', 'External share links are included in Site Professional. Upgrade under Billing.');
-    }
+    requireFeature(ctx, 'SHARE_LINKS');
     return withTx(async (db) => {
       const { site, side } = await loadSite(db, ctx, b.siteId);
       const allowed = side === 'host' ? canReview(ctx) : canAdminOrg(ctx);

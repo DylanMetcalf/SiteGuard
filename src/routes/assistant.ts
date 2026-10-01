@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import { can } from '../lib/entitlements.js';
 import { z } from 'zod';
 import { requireOrg } from '../lib/authz.js';
 import { HttpError } from '../lib/errors.js';
-import { aiAllowed } from '../lib/plans.js';
 import { reserveAiRequest } from '../lib/ai.js';
 import { isTransientAiError, runAssistantAI, runAssistantOffline, type ChatMessage } from '../lib/assistant.js';
 import { rl } from './auth.js';
@@ -28,7 +28,7 @@ export default async function assistantRoutes(app: FastifyInstance) {
     while (history.length && history[0].role !== 'user') history = history.slice(1);
     if (!history.length || history[history.length - 1].role !== 'user') throw new HttpError(400, 'invalid', 'The last message must be from the user.');
 
-    if (aiAllowed(ctx.org)) {
+    if (can(ctx.org, 'AI_GENERATION')) {
       const abort = new AbortController();
       // The response closing before we finish means the browser went away.
       reply.raw.on('close', () => { if (!reply.raw.writableEnded) abort.abort(); });

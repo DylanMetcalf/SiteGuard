@@ -5,13 +5,14 @@
  * client never receives data it isn't allowed to see.
  */
 import { libraryTypeFor } from '../lib/readiness.js';
+import { can, entitlementsFor } from '../lib/entitlements.js';
 import { rulesOf } from '../lib/validity.js';
 import { reminderDaysOf } from '../jobs/reminders.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
 import { features } from '../config.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
-import { aiAllowed, planOf, standing } from '../lib/plans.js';
+import { planOf, standing } from '../lib/plans.js';
 import { openFindings } from '../lib/agent.js';
 import { blueprintForRequirement } from '../lib/studio/blueprints.js';
 import { brandingOf } from '../lib/studio/generate.js';
@@ -390,8 +391,9 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, validityRules: rulesOf(c.org.settings), cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
         siteLimit: plan.siteLimit,
         branding: brandingOf(c),
+        entitlements: entitlementsFor(c.org),
       },
-      features: { ...baseFeatures, ai: aiAllowed(c.org) },
+      features: { ...baseFeatures, ai: can(c.org, 'AI_GENERATION') },
       personas: await personasFor(pool, c),
       myContractorId: c.org.kind === 'contractor' ? c.org.id : null,
       state: await buildState(pool, c),
