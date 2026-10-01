@@ -39,6 +39,8 @@ const schema = z.object({
   EMAIL_FROM: z.string().default('SiteGuard <no-reply@siteguard.local>'),
   /** Where "Report a problem" messages are emailed (e.g. your own address). Unset → logged only. */
   SUPPORT_EMAIL: z.string().email().optional(),
+  /** Comma-separated emails of the people who run this service; they see the platform overview (More → Platform). */
+  PLATFORM_ADMIN_EMAILS: z.string().default(''),
 
   // AI drafting via server-side proxy. Unset → AI features are hidden.
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -98,3 +100,9 @@ export const features = {
   demo: config.DEMO_SANDBOX_ENABLED,
   devRoleSwitcher: config.DEV_ROLE_SWITCHER && !isProd,
 };
+
+const platformAdmins = new Set(config.PLATFORM_ADMIN_EMAILS.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean));
+/** Platform admins must also have confirmed their email, so nobody can claim the address by signing up first. */
+export function isPlatformAdmin(user: { email: string; email_verified_at: unknown; is_demo?: boolean }): boolean {
+  return !user.is_demo && !!user.email_verified_at && platformAdmins.has(user.email.toLowerCase());
+}

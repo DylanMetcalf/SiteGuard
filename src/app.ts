@@ -35,6 +35,7 @@ import projectRoutes from './routes/projects.js';
 import billingRoutes from './routes/billing.js';
 import shareRoutes from './routes/share.js';
 import legalRoutes from './routes/legal.js';
+import adminRoutes from './routes/admin.js';
 import eventRoutes from './routes/events.js';
 import demoRoutes from './routes/demo.js';
 import workforceRoutes from './routes/workforce.js';
@@ -180,6 +181,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(billingRoutes);
   await app.register(shareRoutes);
   await app.register(legalRoutes);
+  await app.register(adminRoutes);
   await app.register(eventRoutes);
   await app.register(demoRoutes);
   await app.register(workforceRoutes);

@@ -10,7 +10,7 @@ import { rulesOf } from '../lib/validity.js';
 import { reminderDaysOf } from '../jobs/reminders.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
-import { features } from '../config.js';
+import { features, isPlatformAdmin } from '../config.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
 import { planOf, standing } from '../lib/plans.js';
 import { openFindings } from '../lib/agent.js';
@@ -370,7 +370,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
     );
     const me = {
       id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, title: ctx.user.title, phone: ctx.user.phone,
-      verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo,
+      verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo, platformAdmin: isPlatformAdmin(ctx.user),
     };
     if (!ctx.org || !ctx.role) {
       return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: null, features: baseFeatures };

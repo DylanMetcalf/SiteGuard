@@ -46,7 +46,7 @@ describe('organisation data export', () => {
   });
 
   it('is for organisation admins only', async () => {
-    const email = uniqueEmail();
+    const email = uniqueEmail('member');
     assert.equal((await host.post('/api/org/invites', { email, role: 'member' })).status, 200);
     const token = await lastEmailToken(email, '/invite');
     const member = (await signup(app, { orgName: '', orgKind: 'host', email, inviteToken: token })).agent;

@@ -11,6 +11,7 @@ import {
 } from './core.js';
 import { computeTasks, sessionLabel } from './sheets.js';
 import { renderStudio } from './studio.js';
+import { renderPlatform, invalidatePlatform } from './platform.js';
 import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
 import { renderWorkplace, workplaceCards } from './workplaces.js';
@@ -787,6 +788,7 @@ function renderMore(){
   html += item('team', ICONS.people, 'Team & roles', 'Invite colleagues and set what they can do');
   if(isOrgAdmin()) html += item('billing', ICONS.card, 'Plan & billing', org().planName+' · '+org().seatLimit+' seats');
   if(isOrgAdmin()) html += item('settings', ICONS.gear, 'Organisation settings', 'Company details, notifications, integrations');
+  if(S.boot.me.platformAdmin) html += item('platform', ICONS.dashboard, 'Platform', 'Sign-ups, plans, usage and health across the service');
   html += '</div><div class="section-title">Account</div><div class="card">'
     +'<button class="menu-row" data-action="open-profile"><div class="qa-icon">'+initials(myName())+'</div><div style="flex:1;"><div class="qa-title">'+myName()+'</div><div class="qa-sub">'+S.boot.me.email+'</div></div>'+ICONS.chevron+'</button>'
     +'<button class="menu-row" data-action="open-feedback"><div class="qa-icon">'+ICONS.alert+'</div><div style="flex:1;"><div class="qa-title">Report a problem or suggest an idea</div><div class="qa-sub">Goes straight to the SiteGuard team</div></div>'+ICONS.chevron+'</button>'
@@ -807,6 +809,7 @@ const MORE_VIEWS = {
   settings: renderSettings,
   agent: renderAgent,
   studio: renderStudio,
+  platform: renderPlatform,
 };
 
 /* ---- Safety Centre (cross-site incidents & permits) ---- */
@@ -1125,7 +1128,7 @@ on('back-sites', ()=>{
 });
 on('focus-site', (el, e)=>{ e.stopPropagation(); S.focusSiteId = el.dataset.site; render(); });
 on('site-tab', (el)=>{ S.siteTab = el.dataset.tab; render(); });
-on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); render(); window.scrollTo(0,0); });
+on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); render(); window.scrollTo(0,0); });
 on('doc-centre-filter', (el)=>{ S.docCentreFilter = el.dataset.filter; render(); });
 on('doc-centre-jump', (el)=>{ S.docCentreFilter = el.dataset.filter; S.hostPeopleTab = 'documents'; S.nav='passport'; render(); });
 on('safety-filter', (el)=>{ S.safetyFilter = el.dataset.filter; render(); });
@@ -1274,6 +1277,7 @@ on('save-org', (el)=>{
   return act(()=>api.patch('/api/org', body), 'Company details saved', el);
 });
 on('toggle-digest', (el)=>act(()=>api.patch('/api/org/settings', { reminderDigest: el.checked }), el.checked?'Reminder digests on':'Reminder digests off'));
+on('platform-refresh', ()=>{ invalidatePlatform(); render(); });
 on('save-reminder-days', (el)=>{
   const days = [...document.querySelectorAll('#reminderDays input:checked')].map(x=>Number(x.value));
   if(!days.length){ showToast('Tick at least one reminder'); return; }
