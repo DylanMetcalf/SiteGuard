@@ -19,7 +19,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { createHash } from 'node:crypto';
 import { many, one, withTx, type Db } from '../db/pool.js';
 import { certExpiry, rulesOf } from './validity.js';
-import { daysUntil, effectiveStatus, type DocStatus } from './readiness.js';
+import { countsTowardReadiness, daysUntil, effectiveStatus, type DocStatus } from './readiness.js';
 import { storage } from './storage.js';
 import { pdfFromDefinition, tint } from './studio/render-pdf.js';
 import { pdfSafe } from './studio/model.js';
@@ -32,6 +32,7 @@ const AMBER = '#8A5200';
 const RED = '#9E2A21';
 const NAVY = '#16325C';
 const INCLUDED: DocStatus[] = ['complete', 'expiring', 'awaiting_review'];
+const SESSION_TYPE: Record<string, string> = { toolbox: 'Toolbox talk', induction: 'Site induction', awareness: 'Awareness training', briefing: 'Site briefing', meeting: 'Safety meeting', training: 'Training' };
 const LABEL: Record<DocStatus, [string, string]> = {
   complete: ['Approved', GREEN], expiring: ['Approved (expiring soon)', AMBER], awaiting_review: ['Awaiting review', NAVY],
   missing: ['Missing', RED], expired: ['Expired', RED], correction_required: ['Correction needed', RED],
@@ -52,6 +53,8 @@ const fmtTime = (d: string | Date | null | undefined) =>
 
 interface FileRef { storage_key: string; content_type: string; filename: string }
 export interface BundleItem {
+  /** The site requirement this item fills, when it is one. */
+  reqId?: string;
   section: string;
   name: string;
   sub?: string;
@@ -110,15 +113,18 @@ async function safetyFileItems(db: Db, siteId: string) {
   ))!;
   const reqs = await many<any>(
     db,
-    `select r.category, r.name, d.status, d.expiry_date, d.version, f.storage_key, f.content_type, f.filename
+    `select r.id, r.category, r.name, r.optional, d.status, d.expiry_date, d.version, f.storage_key, f.content_type, f.filename
        from requirements r left join documents d on d.requirement_id = r.id left join files f on f.id = d.current_file_id
       where r.site_id = $1 order by r.position, r.created_at`,
     [siteId],
   );
   const items: BundleItem[] = reqs.map((r) => {
     const st = effectiveStatus(r.status ? { status: r.status, expiry_date: r.expiry_date } : null);
+    const optionalGap = !countsTowardReadiness(st, r.optional);
     return {
-      section: 'Site requirements', name: r.name, sub: r.category, status: LABEL[st], version: r.version, expiry: r.expiry_date,
+      reqId: r.id,
+      section: 'Site requirements', name: r.name, sub: r.optional ? `${r.category} · optional` : r.category,
+      status: optionalGap ? ['Optional — not in the file', MUTED] : LABEL[st], version: r.version, expiry: r.expiry_date,
       file: INCLUDED.includes(st) && r.storage_key ? { storage_key: r.storage_key, content_type: r.content_type, filename: r.filename } : null,
     };
   });
@@ -220,20 +226,40 @@ async function recordRevision(db: Db, siteId: string, lines: FileLine[], generat
  * Compiles the safety file. Runs in one transaction holding a per-site lock, so two people
  * compiling at once get consecutive revisions, and a PDF that fails to render records nothing.
  */
-export async function buildSafetyFile(_db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean }> {
+/** Leaving documents out of one copy of the file. Gaps are always listed; only filed documents can be left out. */
+export interface FileSelection {
+  /** Requirement ids whose documents go in; the rest of the filed ones are listed as "not in this copy". */
+  only?: string[];
+  appointments?: boolean;
+  certificates?: boolean;
+}
+
+export async function buildSafetyFile(_db: Db, siteId: string, generatedBy: string, selection: FileSelection = {}): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean; partial: boolean }> {
   return withTx(async (db) => {
     await db.query('select pg_advisory_xact_lock(hashtext($1))', ['safety-file:' + siteId]);
-    return compileSafetyFile(db, siteId, generatedBy);
+    return compileSafetyFile(db, siteId, generatedBy, selection);
   });
 }
 
-async function compileSafetyFile(db: Db, siteId: string, generatedBy: string): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean }> {
-  const { site, reqs, items, workers } = await safetyFileItems(db, siteId);
-  const revision = await recordRevision(db, siteId, toLines(items), generatedBy);
+async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, selection: FileSelection): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean; partial: boolean }> {
+  const all = await safetyFileItems(db, siteId);
+  const { site, reqs, workers } = all;
+  const partial = !!selection.only || selection.appointments === false || selection.certificates === false;
+  // A full compile is a revision; a copy with documents left out is labelled as a selection and records nothing.
+  const revision = partial
+    ? { number: Number((await one<{ n: number }>(db, 'select coalesce(max(number), 0)::int as n from safety_file_versions where site_id = $1', [siteId]))!.n), created: false }
+    : await recordRevision(db, siteId, toLines(all.items), generatedBy);
+  const keep = selection.only ? new Set(selection.only) : null;
+  const items = all.items
+    .filter((i) => !(i.section === 'Appointments' && selection.appointments === false) && !(i.section === 'Workforce certificates' && selection.certificates === false))
+    .map((i) => (keep && i.reqId && i.file && !keep.has(i.reqId) ? { ...i, status: ['Not in this copy', MUTED] as [string, string], file: null } : i));
 
   const registers = await siteRegisters(db, siteId, workers);
   const { brand, logo } = await loadBranding(db, site.linked_org_id);
-  const reqStatuses = reqs.map((r) => effectiveStatus(r.status ? { status: r.status, expiry_date: r.expiry_date } : null));
+  const reqStatuses = reqs
+    .map((r) => ({ st: effectiveStatus(r.status ? { status: r.status, expiry_date: r.expiry_date } : null), optional: r.optional }))
+    .filter((x) => countsTowardReadiness(x.st, x.optional))
+    .map((x) => x.st);
   const n = (...s: DocStatus[]) => reqStatuses.filter((x) => s.includes(x)).length;
   const ready = site.status === 'site_ready' && site.verification_id;
 
@@ -254,15 +280,20 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string): P
         ? `${n('complete', 'expiring')} of ${reqStatuses.length} in the file · ${n('missing', 'expired')} outstanding`
         : `${n('complete', 'expiring')} approved · ${n('awaiting_review')} awaiting review · ${n('missing', 'expired', 'correction_required')} outstanding`],
       ['Workforce', `${workers.length} worker${workers.length === 1 ? '' : 's'} assigned`],
-      ['Revision', `Rev ${revision.number}${revision.created ? '' : ' (unchanged since it was compiled)'}`],
+      ['Revision', partial
+        ? `Selected documents only — not a full revision${revision.number ? ` (latest full revision: Rev ${revision.number})` : ''}`
+        : `Rev ${revision.number}${revision.created ? '' : ' (unchanged since it was compiled)'}`],
       ['Compiled', `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC by ${generatedBy}`],
     ],
     items,
     registers,
     contentsNote: 'Only documents that have been submitted to the site are included. Missing, expired and returned documents are listed so the gaps are visible.',
-    stamp: `Safety file · ${site.name} · ${site.contractor_name} · Rev ${revision.number}`,
+    stamp: `Safety file · ${site.name} · ${site.contractor_name} · ${partial ? 'Selection' : `Rev ${revision.number}`}`,
   });
-  return { pdf, filename: `Safety-file-${safeName(site.name)}-rev${revision.number}.pdf`, revision: revision.number, created: revision.created };
+  return {
+    pdf, filename: `Safety-file-${safeName(site.name)}-${partial ? 'selection' : `rev${revision.number}`}.pdf`,
+    revision: revision.number, created: revision.created, partial,
+  };
 }
 
 /** A company's own selection of documents, merged into one PDF. */
@@ -294,7 +325,7 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
   const incidents = await many<any>(db, `select type, occurred_on, status, description, root_cause, corrective_actions from incidents where site_id = $1 order by occurred_on`, [siteId]);
   const talks = await many<any>(
     db,
-    `select t.topic, t.held_on, t.presenter_name, (select string_agg(a.attendee_name, ', ' order by a.attendee_name) from toolbox_attendance a where a.talk_id = t.id) as attendees
+    `select t.topic, t.held_on, t.presenter_name, t.kind, (select string_agg(a.attendee_name, ', ' order by a.attendee_name) from toolbox_attendance a where a.talk_id = t.id) as attendees
        from toolbox_talks t where t.site_id = $1 order by t.held_on`,
     [siteId],
   );
@@ -326,9 +357,9 @@ async function siteRegisters(db: Db, siteId: string, workers: any[]): Promise<un
     ...table('Incidents', ['14%', '16%', '12%', '*', '24%'], ['Date', 'Type', 'Status', 'Description', 'Root cause / actions'],
       incidents.map((i) => [c(fmt(i.occurred_on)), c(nice(i.type)), c(nice(i.status)), c(i.description), c([i.root_cause, i.corrective_actions].filter(Boolean).join(' — '))]),
       'No incidents recorded.'),
-    ...table('Toolbox talks', ['14%', '*', '20%', '34%'], ['Date', 'Topic', 'Presenter', 'Attendees (signed)'],
-      talks.map((x) => [c(fmt(x.held_on)), c(x.topic), c(x.presenter_name), c(x.attendees)]),
-      'No toolbox talks recorded.'),
+    ...table('Toolbox talks, inductions and training', ['12%', '14%', '*', '18%', '30%'], ['Date', 'Type', 'Topic', 'Presenter', 'Attendees (signed)'],
+      talks.map((x) => [c(fmt(x.held_on)), c(SESSION_TYPE[x.kind] ?? 'Toolbox talk'), c(x.topic), c(x.presenter_name), c(x.attendees)]),
+      'No toolbox talks, inductions or training recorded.'),
     ...table('Site audits', ['14%', '18%', '10%', '*'], ['Date', 'Auditor', 'Score', 'Findings (status)'],
       audits.map((a) => [c(fmt(a.audited_on)), c(a.auditor_name), c(`${a.score}%`), c(a.findings || a.summary || 'No findings')]),
       'No site audits recorded.'),

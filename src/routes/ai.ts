@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import { can } from '../lib/entitlements.js';
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireOrg, requireWritable } from '../lib/authz.js';
 import { HttpError } from '../lib/errors.js';
-import { aiAllowed } from '../lib/plans.js';
 import { templateDraft } from '../lib/drafts.js';
 import { DRAFT_TYPES, reserveAiRequest, streamDraft } from '../lib/ai.js';
 import { rl } from './auth.js';
@@ -26,7 +26,7 @@ export default async function aiRoutes(app: FastifyInstance) {
     };
     // Without an AI key (or on a plan without AI), fall back to a template draft
     // built from the job description, so drafting always works.
-    if (!aiAllowed(ctx.org)) {
+    if (!can(ctx.org, 'AI_GENERATION')) {
       reply.header('x-draft-mode', 'template').header('cache-control', 'no-store').type('text/plain; charset=utf-8');
       return templateDraft(input);
     }

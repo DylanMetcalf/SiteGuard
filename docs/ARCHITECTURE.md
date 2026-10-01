@@ -108,6 +108,10 @@ refuse.
 | See gate clearance and print QR gate cards for a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Send one request to every contractor on a site | ✓ | ✓ | | | |
 | See safety file revisions of a visible site | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Make a site's or one file's requirement optional / required | ✓ | | | own projects only | |
+| Record toolbox talks, induction, awareness, briefing, meeting or training sessions | ✓ | ✓ | | ✓ | ✓ |
+| Set reminder days; download the organisation's data (JSON) | ✓ | | | ✓ | |
+| Platform overview (More → Platform) | only addresses in `PLATFORM_ADMIN_EMAILS` with a confirmed email; 404 for everyone else | | | | |
 
 More rules the server enforces:
 
@@ -334,6 +338,25 @@ storage), and routes in `routes/studio.ts`.
 - **Limits**: `projectLimit` on plans (free: 2 active; enforced only when billing is configured).
 - **Timeline**: `GET /api/sites/:id/timeline` returns the file's audit events written by either
   party (latest 200), through `loadSite`.
+
+## Plans, privacy pages, data export, platform overview, offline shell
+
+- **Entitlements** (`lib/entitlements.ts`): `PLAN_FEATURES` lists what each plan includes. Routes call
+  `requireFeature(ctx, 'SHARE_LINKS')` (402 with the plan that includes it) or `can(org, 'AI_GENERATION')`.
+  Without Stripe configured nothing is gated. AI also needs a key and stops when an account lapses.
+  Bootstrap sends `org.entitlements` for display only. Site and project limits stay in `lib/plans.ts`.
+- **Required vs optional** (`requirements.optional`, migration 014): `countsTowardReadiness()` in
+  `lib/readiness.ts` (mirrored in `public/js/core.js`) counts an optional item only once it is filed.
+- **Privacy and terms** (`routes/legal.ts`): server-rendered `/privacy` and `/terms`, marked as drafts for
+  legal review; the list of service providers follows what is configured (email, Stripe, AI).
+- **Data export** (`GET /api/org/export`): org admins only, rate-limited and audited. It contains the
+  organisation's details, members, the same state the app shows (`buildState`) and the audit trail.
+  Uploaded files are listed, not included. There are no password hashes, tokens or Stripe IDs.
+- **Platform overview** (`routes/admin.ts`, `public/js/platform.js`): counts by kind, plan and
+  subscription status, usage, email health, the latest sign-ups and feedback. Demo organisations are
+  left out. It is read-only.
+- **Service worker** (`public/sw.js`): network-first for pages and static files, with `/offline.html`
+  when there is no connection. It never caches `/api` and never runs cross-origin requests.
 
 ## Known limits and next steps
 

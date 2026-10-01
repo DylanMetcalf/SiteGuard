@@ -15,12 +15,41 @@ interface Item {
   line: string;
 }
 
-const bucket = (days: number) => (days < 0 ? 'expired' : days <= 7 ? '7d' : '30d');
+/** Days before expiry when reminders go out, unless an organisation chooses its own (Settings → Notifications). */
+export const DEFAULT_REMINDER_DAYS = [30, 7];
+/** The farthest ahead any organisation can ask to be reminded. */
+const MAX_AHEAD = 180;
+
+/** An organisation's reminder days, largest first; falls back to the default for anything unusable. */
+export function reminderDaysOf(settings: unknown): number[] {
+  const raw = ((settings ?? {}) as Record<string, unknown>).reminderDays;
+  const days = Array.isArray(raw) ? [...new Set(raw.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= MAX_AHEAD))] : [];
+  return (days.length ? days : DEFAULT_REMINDER_DAYS).sort((a, b) => b - a);
+}
+
+/**
+ * Which reminder a date falls in for this schedule: "expired", or the nearest threshold not yet passed
+ * (e.g. 12 days left on 60/30/14/7/1 → "14d"). Null when it's further away than the first reminder.
+ */
+export function bucket(days: number, schedule: number[] = DEFAULT_REMINDER_DAYS): string | null {
+  if (days < 0) return 'expired';
+  const hit = schedule.filter((t) => days <= t).sort((a, b) => a - b)[0];
+  return hit === undefined ? null : `${hit}d`;
+}
 const when = (days: number) => (days < 0 ? `expired ${-days} day${days === -1 ? '' : 's'} ago` : days === 0 ? 'expires today' : `expires in ${days} day${days === 1 ? '' : 's'}`);
 
 async function collect(db: Db): Promise<Item[]> {
   const items: Item[] = [];
   const optedIn = `coalesce((o.settings->>'reminderDigest')::boolean, true)`;
+  // Each recipient organisation's own schedule, looked up once per run.
+  const schedules = new Map<string, number[]>();
+  const scheduleOf = async (orgId: string) => {
+    if (!schedules.has(orgId)) {
+      const o = await many<{ settings: unknown }>(db, 'select settings from organisations where id = $1', [orgId]);
+      schedules.set(orgId, reminderDaysOf(o[0]?.settings));
+    }
+    return schedules.get(orgId)!;
+  };
 
   // Site documents.
   for (const r of await many(
@@ -28,13 +57,15 @@ async function collect(db: Db): Promise<Item[]> {
     `select d.id, d.expiry_date, (d.expiry_date - current_date) as days, r.name, s.name as site_name, s.org_id as host_id, c.linked_org_id
        from documents d join requirements r on r.id = d.requirement_id join sites s on s.id = r.site_id
        join contractors c on c.id = s.contractor_id join organisations o on o.id = s.org_id
-      where d.status in ('complete', 'expiring') and d.expiry_date is not null and d.expiry_date <= current_date + 30
+      where d.status in ('complete', 'expiring') and d.expiry_date is not null and d.expiry_date <= current_date + ${MAX_AHEAD}
         and d.expiry_date >= current_date - 60 and s.status <> 'declined' and not o.is_demo`,
   )) {
-    const b = bucket(r.days);
     const line = `${r.name} on ${r.site_name} ${when(r.days)}.`;
-    if (r.linked_org_id) items.push({ key: `doc:${r.id}:${r.expiry_date}:${b}:c`, orgId: r.linked_org_id, roles: null, line });
-    if (b === 'expired') items.push({ key: `doc:${r.id}:${r.expiry_date}:${b}:h`, orgId: r.host_id, roles: ['owner', 'admin', 'reviewer'], line });
+    if (r.linked_org_id) {
+      const b = bucket(r.days, await scheduleOf(r.linked_org_id));
+      if (b) items.push({ key: `doc:${r.id}:${r.expiry_date}:${b}:c`, orgId: r.linked_org_id, roles: null, line });
+    }
+    if (r.days < 0) items.push({ key: `doc:${r.id}:${r.expiry_date}:expired:h`, orgId: r.host_id, roles: ['owner', 'admin', 'reviewer'], line });
   }
 
   // Contractor library documents.
@@ -43,10 +74,12 @@ async function collect(db: Db): Promise<Item[]> {
     `select d.id, d.expiry_date, (d.expiry_date - current_date) as days, d.library_type, d.library_org_id
        from documents d join organisations o on o.id = d.library_org_id
       where d.library_org_id is not null and d.status = 'complete' and d.expiry_date is not null
-        and d.expiry_date <= current_date + 30 and d.expiry_date >= current_date - 60 and not o.is_demo and ${optedIn}`,
+        and d.expiry_date <= current_date + ${MAX_AHEAD} and d.expiry_date >= current_date - 60 and not o.is_demo and ${optedIn}`,
   )) {
+    const b = bucket(r.days, await scheduleOf(r.library_org_id));
+    if (!b) continue;
     items.push({
-      key: `lib:${r.id}:${r.expiry_date}:${bucket(r.days)}`,
+      key: `lib:${r.id}:${r.expiry_date}:${b}`,
       orgId: r.library_org_id,
       roles: ['owner', 'admin'],
       line: `Company document "${String(r.library_type).replace(/-/g, ' ')}" ${when(r.days)}.`,
@@ -58,11 +91,13 @@ async function collect(db: Db): Promise<Item[]> {
     db,
     `select c.id, c.expires_on, (c.expires_on - current_date) as days, c.name, w.full_name, w.org_id
        from worker_certificates c join workers w on w.id = c.worker_id join organisations o on o.id = w.org_id
-      where w.active and c.expires_on is not null and c.expires_on <= current_date + 30 and c.expires_on >= current_date - 60
+      where w.active and c.expires_on is not null and c.expires_on <= current_date + ${MAX_AHEAD} and c.expires_on >= current_date - 60
         and not o.is_demo and ${optedIn}`,
   )) {
+    const b = bucket(r.days, await scheduleOf(r.org_id));
+    if (!b) continue;
     items.push({
-      key: `cert:${r.id}:${r.expires_on}:${bucket(r.days)}`,
+      key: `cert:${r.id}:${r.expires_on}:${b}`,
       orgId: r.org_id,
       roles: ['owner', 'admin'],
       line: `${r.full_name}'s ${r.name} ${when(r.days)}.`,
@@ -139,7 +174,8 @@ export async function runReminders(): Promise<number> {
     }
     const stamp = new Date().toISOString().slice(0, 13);
     for (const [email, { name, orgId, lines }] of perRecipient) {
-      const list = [...lines];
+      // Most urgent first: anything already expired leads the email.
+      const list = [...lines].sort((a, b) => Number(/expired \d/.test(b)) - Number(/expired \d/.test(a)));
       await queueEmail(db, {
         orgId,
         to: email,

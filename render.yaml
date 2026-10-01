@@ -49,6 +49,9 @@ services:
       # Your own address: "Report a problem" messages from users are emailed here.
       - key: SUPPORT_EMAIL
         sync: false
+      # Your own address(es), comma-separated: you see More → Platform once the email is confirmed.
+      - key: PLATFORM_ADMIN_EMAILS
+        sync: false
       # Claude API key from console.anthropic.com. Blank = built-in templates and rules.
       - key: ANTHROPIC_API_KEY
         sync: false

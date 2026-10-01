@@ -5,12 +5,14 @@
  * client never receives data it isn't allowed to see.
  */
 import { libraryTypeFor } from '../lib/readiness.js';
+import { can, entitlementsFor } from '../lib/entitlements.js';
 import { rulesOf } from '../lib/validity.js';
+import { reminderDaysOf } from '../jobs/reminders.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
-import { features } from '../config.js';
+import { features, isPlatformAdmin } from '../config.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
-import { aiAllowed, planOf, standing } from '../lib/plans.js';
+import { planOf, standing } from '../lib/plans.js';
 import { openFindings } from '../lib/agent.js';
 import { blueprintForRequirement } from '../lib/studio/blueprints.js';
 import { brandingOf } from '../lib/studio/generate.js';
@@ -71,7 +73,12 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     incidents: {},
     permits: {},
     diary: {},
-    settings: host ? { inspectxEnabled: false, inspectxBaseUrl: '', ...(ctx.org.settings as object) } : { inspectxEnabled: false, inspectxBaseUrl: '' },
+    settings: host
+      ? { inspectxEnabled: false, inspectxBaseUrl: '', ...(ctx.org.settings as object), reminderDays: reminderDaysOf(ctx.org.settings) }
+      : {
+          inspectxEnabled: false, inspectxBaseUrl: '', reminderDays: reminderDaysOf(ctx.org.settings),
+          reminderDigest: (ctx.org.settings as Record<string, unknown> | null)?.reminderDigest, weeklySummary: (ctx.org.settings as Record<string, unknown> | null)?.weeklySummary,
+        },
     shareLinks: [],
     workplaces: {},
   };
@@ -176,7 +183,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
 
     // ---- requirements ----
     for (const r of await many(db, `select * from requirements where site_id = any($1::uuid[]) order by position, created_at`, [activeIds])) {
-      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name) });
+      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, optional: !!r.optional, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name) });
     }
 
     // ---- documents (site requirements) ----
@@ -363,7 +370,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
     );
     const me = {
       id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, title: ctx.user.title, phone: ctx.user.phone,
-      verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo,
+      verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo, platformAdmin: isPlatformAdmin(ctx.user),
     };
     if (!ctx.org || !ctx.role) {
       return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: null, features: baseFeatures };
@@ -384,8 +391,9 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, validityRules: rulesOf(c.org.settings), cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
         siteLimit: plan.siteLimit,
         branding: brandingOf(c),
+        entitlements: entitlementsFor(c.org),
       },
-      features: { ...baseFeatures, ai: aiAllowed(c.org) },
+      features: { ...baseFeatures, ai: can(c.org, 'AI_GENERATION') },
       personas: await personasFor(pool, c),
       myContractorId: c.org.kind === 'contractor' ? c.org.id : null,
       state: await buildState(pool, c),

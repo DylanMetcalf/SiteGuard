@@ -13,7 +13,7 @@ import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { newToken, sha256 } from '../lib/security.js';
 import { appUrl } from '../lib/email.js';
-import { planOf } from '../lib/plans.js';
+import { requireFeature } from '../lib/entitlements.js';
 import { computeReadiness, effectiveStatus } from '../lib/readiness.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
@@ -31,7 +31,7 @@ const STATUS_COLOR: Record<string, string> = {
   complete: '#2C6B44', missing: '#A23A2D', expiring: '#8E6410', expired: '#A23A2D', awaiting_review: '#2A4E62', correction_required: '#A23A2D',
 };
 
-export function page(title: string, body: string): string {
+export function page(title: string, body: string, foot = 'Shared from SiteGuard. This view reflects the live record at the time you opened it and is read-only. It does not itself constitute a guarantee of legal compliance.'): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>${esc(title)} · SiteGuard</title>
 <link rel="icon" type="image/png" href="/icons/icon-32.png">
@@ -49,7 +49,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey
 .warn{border-color:var(--red);color:var(--red)}a{color:var(--brand)}.foot{font-size:11px;color:var(--grey);margin-top:18px}
 .scroll{overflow-x:auto}
 </style></head><body><div class="wrap"><div class="brand"><span></span>SiteGuard</div>${body}
-<div class="foot">Shared from SiteGuard. This view reflects the live record at the time you opened it and is read-only. It does not itself constitute a guarantee of legal compliance.</div></div></body></html>`;
+<div class="foot">${foot}</div></div></body></html>`;
 }
 
 function gone(reply: FastifyReply, message: string) {
@@ -78,12 +78,7 @@ export default async function shareRoutes(app: FastifyInstance) {
         label: z.string().trim().max(200).default(''),
       })
       .parse(req.body);
-    if (limitsEnforced() && !planOf(ctx.org).ai && planOf(ctx.org).kind === 'contractor') {
-      throw new HttpError(402, 'plan', 'External share links are included in Contractor Pro. Upgrade under Billing.');
-    }
-    if (limitsEnforced() && planOf(ctx.org).id === 'host_starter') {
-      throw new HttpError(402, 'plan', 'External share links are included in Site Professional. Upgrade under Billing.');
-    }
+    requireFeature(ctx, 'SHARE_LINKS');
     return withTx(async (db) => {
       const { site, side } = await loadSite(db, ctx, b.siteId);
       const allowed = side === 'host' ? canReview(ctx) : canAdminOrg(ctx);
@@ -197,8 +192,15 @@ export default async function shareRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     if (!isUuid(id)) throw notFound();
     await loadSite(pool, ctx, id);
-    const { pdf, filename, revision, created } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`);
+    // Optional selection: which filed documents go into this copy (?only=reqId,reqId), and whether appointments and certificates do.
+    const q = req.query as { only?: string; appointments?: string; certificates?: string };
+    const only = typeof q.only === 'string' ? q.only.split(',').filter(Boolean).slice(0, 500) : undefined;
+    if (only && only.some((x) => !isUuid(x))) throw notFound();
+    const { pdf, filename, revision, created, partial } = await buildSafetyFile(pool, id, `${ctx.user.name} (${ctx.org.name})`, {
+      only, appointments: q.appointments === '0' ? false : undefined, certificates: q.certificates === '0' ? false : undefined,
+    });
     if (created) await audit(pool, ctx, 'Compiled safety file', `Rev ${revision}`, id);
+    else if (partial) await audit(pool, ctx, 'Compiled safety file (selected documents)', `${only ? only.length : 'all'} document${only?.length === 1 ? '' : 's'} chosen`, id);
     reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, false));
     return reply.type('application/pdf').send(pdf);
   });

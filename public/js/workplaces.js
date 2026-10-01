@@ -117,15 +117,22 @@ function queueHtml(files){
     }).join('')+'</div>').join('');
 }
 
+on('wp-optional', (el)=>{
+  const optional = el.dataset.optional === '1';
+  S.keepScroll = true;
+  act(()=>api.post('/api/workplaces/'+el.dataset.id+'/requirements/optional', { name: unescapeHtml(el.dataset.name), optional }), optional ? 'Now optional for every contractor on this site' : 'Now required for every contractor on this site', el).finally(()=>{ S.keepScroll = false; });
+});
+
 function requirementsHtml(w, admin){
-  let html = '<div class="site-card-sub" style="margin:4px 2px 10px;">Every contractor on this site must meet these. New requirements are added to every contractor\'s file straight away.</div>';
+  let html = '<div class="site-card-sub" style="margin:4px 2px 10px;">What every contractor\'s safety file for this site must contain. <strong>Required</strong> documents count towards Site Ready; <strong>optional</strong> ones are welcome but never hold a contractor up. Changes reach every contractor\'s file straight away.</div>';
   if(admin) html += '<div class="row-actions" style="margin-bottom:10px;"><button class="btn primary small" data-action="wp-add-list" data-id="'+w.id+'">Add from a list</button><button class="btn secondary small" data-action="wp-add-own" data-id="'+w.id+'">Add your own</button></div>';
   if(!w.requirements.length) return html + '<div class="empty"><h3>No requirements yet</h3><p>Add the general safety file list, or your own items.</p></div>';
   const cats = [...new Set(w.requirements.map(r=>r.category))];
   cats.forEach(cat=>{
     html += '<div class="section-title">'+cat+'</div><div class="card">'+w.requirements.filter(r=>r.category===cat).map(r=>'<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+r.name+'</div>'
-      +'<div class="reqrow-meta"><span class="srctag">'+(SOURCE_LABEL[r.source]||r.source)+'</span></div>'+(r.why?'<div class="site-card-sub" style="margin-top:3px;">'+r.why+'</div>':'')+'</div>'
-      +(admin?'<button class="btn secondary small" data-action="wp-remove" data-id="'+w.id+'" data-name="'+r.name+'" aria-label="Remove '+r.name+'">Remove</button>':'')+'</div>').join('')+'</div>';
+      +'<div class="reqrow-meta">'+(r.optional?'<span class="badge grey">Optional</span>':'<span class="badge missing">Required</span>')+'<span class="srctag">'+(SOURCE_LABEL[r.source]||r.source)+'</span></div>'+(r.why?'<div class="site-card-sub" style="margin-top:3px;">'+r.why+'</div>':'')+'</div>'
+      +(admin?'<div class="req-actions"><button class="btn secondary small" data-action="wp-optional" data-id="'+w.id+'" data-name="'+r.name+'" data-optional="'+(r.optional?'0':'1')+'">'+(r.optional?'Make required':'Make optional')+'</button>'
+        +'<button class="btn secondary small" data-action="wp-remove" data-id="'+w.id+'" data-name="'+r.name+'" aria-label="Remove '+r.name+'">Remove</button></div>':'')+'</div>').join('')+'</div>';
   });
   return html;
 }

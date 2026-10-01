@@ -175,11 +175,15 @@ export function computeReadiness(siteId){
   const reqs = S.state.requirements[siteId] || [];
   const items = reqs.map(req=>{
     const doc = S.state.documents[req.id] || {status:'missing'};
-    return {req, doc, status: effectiveStatus(doc)};
+    const status = effectiveStatus(doc);
+    // Same rule as the server: an optional document counts only once it's in the file.
+    const counted = !req.optional || status==='complete' || status==='expiring' || status==='awaiting_review';
+    return {req, doc, status, counted};
   });
-  const total = items.length;
+  const countedItems = items.filter(it=>it.counted);
+  const total = countedItems.length;
   const counts = {complete:0, missing:0, expiring:0, expired:0, awaiting_review:0, correction_required:0};
-  items.forEach(it=> counts[it.status] = (counts[it.status]||0)+1 );
+  countedItems.forEach(it=> counts[it.status] = (counts[it.status]||0)+1 );
   const percent = total? Math.round((counts.complete/total)*100) : 0;
   return {items, total, counts, percent};
 }

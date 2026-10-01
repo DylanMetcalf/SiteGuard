@@ -112,11 +112,6 @@ export function standing(org: OrgBilling): 'ok' | 'grace' | 'lapsed' {
   }
 }
 
-export function aiAllowed(org: OrgBilling): boolean {
-  // Without billing configured there is nothing to upsell, so don't gate by plan.
-  return features.ai && (!features.billing || planOf(org).ai) && standing(org) !== 'lapsed';
-}
-
 /** Plans an organisation of the given kind may move to. */
 export function plansFor(kind: OrgKind): Plan[] {
   return Object.values(PLANS).filter((p) => p.kind === kind);

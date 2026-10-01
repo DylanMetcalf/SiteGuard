@@ -28,6 +28,11 @@ export function effectiveStatus(doc: { status: string; expiry_date?: string | nu
   return doc.status as DocStatus;
 }
 
+/** An optional document counts only once it's in the file (handed in, approved or expiring soon). */
+export function countsTowardReadiness(status: DocStatus, optional: boolean): boolean {
+  return !optional || status === 'complete' || status === 'expiring' || status === 'awaiting_review';
+}
+
 export interface Readiness {
   total: number;
   counts: Record<DocStatus, number>;
@@ -36,9 +41,9 @@ export interface Readiness {
 }
 
 export async function computeReadiness(db: Db, siteId: string): Promise<Readiness> {
-  const rows = await many<{ status: string | null; expiry_date: string | null }>(
+  const rows = await many<{ status: string | null; expiry_date: string | null; optional: boolean }>(
     db,
-    `select d.status, d.expiry_date from requirements r
+    `select d.status, d.expiry_date, r.optional from requirements r
        left join documents d on d.requirement_id = r.id
       where r.site_id = $1`,
     [siteId],
@@ -46,8 +51,13 @@ export async function computeReadiness(db: Db, siteId: string): Promise<Readines
   const counts: Record<DocStatus, number> = {
     complete: 0, missing: 0, expiring: 0, expired: 0, awaiting_review: 0, correction_required: 0,
   };
-  for (const r of rows) counts[effectiveStatus(r.status ? { status: r.status, expiry_date: r.expiry_date } : null)]++;
-  const total = rows.length;
+  let total = 0;
+  for (const r of rows) {
+    const st = effectiveStatus(r.status ? { status: r.status, expiry_date: r.expiry_date } : null);
+    if (!countsTowardReadiness(st, r.optional)) continue;
+    counts[st]++;
+    total++;
+  }
   const percent = total ? Math.round((counts.complete / total) * 100) : 0;
   let submission: Readiness['submission'];
   if (!total) submission = 'no_requirements';

@@ -9,8 +9,9 @@ import {
   openSafetyIssues, orgOpenSafetyIssuesCount, incidentTypeInfo, permitTypeInfo, permitEffectiveStatus, effectiveStatus, certStatus,
   libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, openSheet, sheetHead, closeSheet, searchBox, matchSearch, searching, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq,
 } from './core.js';
-import { computeTasks } from './sheets.js';
+import { computeTasks, sessionLabel } from './sheets.js';
 import { renderStudio } from './studio.js';
+import { renderPlatform, invalidatePlatform } from './platform.js';
 import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
 import { renderWorkplace, workplaceCards } from './workplaces.js';
@@ -453,7 +454,7 @@ function renderSiteDetail(siteId){
     grouped[cat].forEach(it=>{
       html += '<div class="reqrow" data-action="open-req" data-req="'+it.req.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main">'
         +'<div class="reqrow-name">'+it.req.name+'</div>'
-        +'<div class="reqrow-meta">'+badge(it.status)+'<span class="srctag">'+SOURCE_LABEL[it.req.source]+'</span>'+(it.doc.expiryDate?'<span class="srctag">expires '+timeAgo(it.doc.expiryDate)+'</span>':'')+'</div>'
+        +'<div class="reqrow-meta">'+(it.req.optional && !it.counted ? '<span class="badge grey">Optional</span>' : badge(it.status))+'<span class="srctag">'+SOURCE_LABEL[it.req.source]+(it.req.optional?' · optional':'')+'</span>'+(it.doc.expiryDate?'<span class="srctag">expires '+timeAgo(it.doc.expiryDate)+'</span>':'')+'</div>'
         +'</div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
     });
     html += '</div>';
@@ -563,11 +564,13 @@ function renderSitePeople(siteId){
   if(workers.length && !isProject(S.state.sites[siteId])) html += gateSection(siteId);
 
   const talks = (S.state.toolboxTalks||{})[siteId] || [];
-  html += '<div class="section-title">Toolbox talks</div>';
-  if(canEdit() && !ro) html += '<button class="btn secondary block" data-action="new-toolbox-talk" data-site="'+siteId+'" style="margin-bottom:10px;">+ Record a toolbox talk</button>';
+  html += '<div class="section-title">Toolbox talks, inductions &amp; training</div>';
+  if(canEdit() && !ro) html += '<div class="row-actions" style="margin:0 0 10px;"><button class="btn secondary" style="flex:1;" data-action="new-toolbox-talk" data-site="'+siteId+'">+ Toolbox talk</button>'
+    +'<button class="btn secondary" style="flex:1;" data-action="new-toolbox-talk" data-kind="induction" data-site="'+siteId+'">+ Site induction</button>'
+    +'<button class="btn secondary" style="flex:1;" data-action="new-toolbox-talk" data-kind="training" data-site="'+siteId+'">+ Other session</button></div>';
   html += talks.length ? '<div class="card">' + talks.map(t=>'<div class="reqrow" data-action="open-toolbox-talk" data-site="'+siteId+'" data-id="'+t.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main"><div class="reqrow-name">'+t.topic+'</div>'
-      +'<div class="reqrow-meta"><span class="srctag">'+timeAgo(t.heldOn)+' · '+t.presenter+'</span><span class="badge '+(t.attendance.length?'complete':'missing')+'">'+t.attendance.length+' signed</span></div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>').join('')+'</div>'
-    : '<div class="card"><div class="site-card-sub">No toolbox talks recorded. Record the talk, then pass the device round so each attendee signs.</div></div>';
+      +'<div class="reqrow-meta"><span class="srctag">'+sessionLabel(t.kind)+'</span><span class="srctag">'+timeAgo(t.heldOn)+' · '+t.presenter+'</span><span class="badge '+(t.attendance.length?'complete':'missing')+'">'+t.attendance.length+' signed</span></div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>').join('')+'</div>'
+    : '<div class="card"><div class="site-card-sub">Nothing recorded yet. Record the session, then pass the device round so each attendee signs. A signed site induction counts as that worker\'s induction at the gate.</div></div>';
 
   const appts = (S.state.appointments||[]).filter(a=>a.siteId===siteId);
   html += '<div class="section-title">Appointments for this site</div>';
@@ -785,9 +788,11 @@ function renderMore(){
   html += item('team', ICONS.people, 'Team & roles', 'Invite colleagues and set what they can do');
   if(isOrgAdmin()) html += item('billing', ICONS.card, 'Plan & billing', org().planName+' · '+org().seatLimit+' seats');
   if(isOrgAdmin()) html += item('settings', ICONS.gear, 'Organisation settings', 'Company details, notifications, integrations');
+  if(S.boot.me.platformAdmin) html += item('platform', ICONS.dashboard, 'Platform', 'Sign-ups, plans, usage and health across the service');
   html += '</div><div class="section-title">Account</div><div class="card">'
     +'<button class="menu-row" data-action="open-profile"><div class="qa-icon">'+initials(myName())+'</div><div style="flex:1;"><div class="qa-title">'+myName()+'</div><div class="qa-sub">'+S.boot.me.email+'</div></div>'+ICONS.chevron+'</button>'
     +'<button class="menu-row" data-action="open-feedback"><div class="qa-icon">'+ICONS.alert+'</div><div style="flex:1;"><div class="qa-title">Report a problem or suggest an idea</div><div class="qa-sub">Goes straight to the SiteGuard team</div></div>'+ICONS.chevron+'</button>'
+    +'<a class="menu-row" href="/privacy" target="_blank" rel="noopener"><div class="qa-icon">'+ICONS.verify+'</div><div style="flex:1;"><div class="qa-title">Privacy &amp; terms</div><div class="qa-sub">How SiteGuard handles your information</div></div>'+ICONS.chevron+'</a>'
     +'<button class="menu-row" data-action="auth-signout"><div class="qa-icon">⎋</div><div><div class="qa-title">Sign out</div></div></button></div>';
   return html;
 }
@@ -804,6 +809,7 @@ const MORE_VIEWS = {
   settings: renderSettings,
   agent: renderAgent,
   studio: renderStudio,
+  platform: renderPlatform,
 };
 
 /* ---- Safety Centre (cross-site incidents & permits) ---- */
@@ -1019,13 +1025,20 @@ function renderSettings(){
   html += '<div class="section-title">Notifications</div><div class="card">'
     +'<div class="toggle-row"><label for="digestToggle">Email reminder digests (expiring documents &amp; certificates, open incidents, overdue requests)</label><input type="checkbox" id="digestToggle" '+(s.reminderDigest===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-digest"')+'></div>'
     +'<div class="toggle-row"><label for="weeklyToggle">Monday compliance summary for admins (from the compliance agent)</label><input type="checkbox" id="weeklyToggle" '+(s.weeklySummary===false?'':'checked')+' '+(ro?'disabled':'data-action-change="toggle-weekly"')+'></div>'
-    +'<div class="site-card-sub" style="margin-top:6px;">Invitations, correction requests, requests for information, permit requests and serious incidents are always emailed.</div></div>';
+    +'<div class="field-label" style="margin-top:12px;">Remind us before a document or certificate expires</div>'
+    +'<div class="check-grid" id="reminderDays">'+[90,60,30,14,7,1].map(d=>'<label class="check-chip"><input type="checkbox" value="'+d+'"'+((s.reminderDays||[30,7]).includes(d)?' checked':'')+(ro?' disabled':'')+'> '+(d===1?'1 day':d+' days')+'</label>').join('')+'</div>'
+    +'<div class="site-card-sub" style="margin-top:6px;">One email at each point you tick, and one when it expires. Nothing is repeated, so the list stays short.</div>'
+    +(ro?'':'<button class="btn secondary small" style="margin-top:8px;" data-action="save-reminder-days">Save reminder days</button>')
+    +'<div class="site-card-sub" style="margin-top:10px;">Invitations, correction requests, requests for information, permit requests and serious incidents are always emailed.</div></div>';
   if(isHost()){
     html += '<div class="section-title">InspectX integration</div><div class="card"><div class="site-card-sub" style="margin-bottom:10px;">SiteGuard works fully without InspectX. Once enabled, inspections with an external reference link straight across.</div>'
       +'<div class="toggle-row"><label for="inspectxToggle">Enable InspectX links</label><input type="checkbox" id="inspectxToggle" '+(s.inspectxEnabled?'checked':'')+'></div>'
       +'<label class="field-label" for="inspectxUrl">InspectX base URL</label><input type="url" id="inspectxUrl" value="'+(s.inspectxBaseUrl||'')+'" placeholder="https://app.inspectx.example/i/">'
       +(ro?'':'<button class="btn secondary block" style="margin-top:10px;" data-action="save-integration">Save</button>')+'</div>';
   }
+  html += '<div class="section-title">Your data</div><div class="card"><div class="site-card-sub">Download everything '+o.name+' can see in SiteGuard — company details, team, sites and files, document records and the audit trail — as one file you can keep or move elsewhere. Uploaded documents are listed, not included; download those from each file.</div>'
+    +'<a class="btn secondary small" style="margin-top:10px;" href="/api/org/export" download>Download our data</a>'
+    +'<div class="site-card-sub" style="margin-top:8px;"><a href="/privacy" target="_blank" rel="noopener">Privacy notice</a> · <a href="/terms" target="_blank" rel="noopener">Terms of use</a></div></div>';
   html += '<div class="section-title">AI drafting</div><div class="card"><div class="site-card-sub">'
     +(S.boot.features.ai ? 'AI drafting and expiry-date detection are on. Requests go through SiteGuard\'s server — no API key is ever stored in your browser.'
       : S.boot.features.aiConfigured ? 'AI drafting is included in '+(isContractor()?'Contractor Pro':'Site Professional')+'. Upgrade under Plan &amp; billing to turn it on.'
@@ -1115,7 +1128,7 @@ on('back-sites', ()=>{
 });
 on('focus-site', (el, e)=>{ e.stopPropagation(); S.focusSiteId = el.dataset.site; render(); });
 on('site-tab', (el)=>{ S.siteTab = el.dataset.tab; render(); });
-on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); render(); window.scrollTo(0,0); });
+on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); render(); window.scrollTo(0,0); });
 on('doc-centre-filter', (el)=>{ S.docCentreFilter = el.dataset.filter; render(); });
 on('doc-centre-jump', (el)=>{ S.docCentreFilter = el.dataset.filter; S.hostPeopleTab = 'documents'; S.nav='passport'; render(); });
 on('safety-filter', (el)=>{ S.safetyFilter = el.dataset.filter; render(); });
@@ -1151,8 +1164,13 @@ on('export-register', (el)=>{ closeSheet(); exportSafetyFile(el.dataset.site); }
 on('export-bundle', (el)=>{
   const siteId = el.dataset.site, site = S.state.sites[siteId];
   const { items, total, counts } = computeReadiness(siteId);
-  const list = (st)=>items.filter(i=>i.status===st).map(i=>i.req.name);
+  const list = (st)=>items.filter(i=>i.counted && i.status===st).map(i=>i.req.name);
   const missing = list('missing'), expired = list('expired'), back = list('correction_required');
+  const optionalOut = items.filter(i=>!i.counted).map(i=>i.req.name);
+  // Documents with a file in them can be left out of this PDF; the rest are listed as gaps either way.
+  const filed = items.filter(i=>['complete','expiring','awaiting_review'].includes(i.status));
+  const appts = (S.state.appointments||[]).filter(a=>a.siteId===siteId).length;
+  const certs = ((S.state.siteWorkers||{})[siteId]||[]).reduce((n, id)=>n + (((S.state.workers[id]||{}).certificates)||[]).length, 0);
   const workers = ((S.state.siteWorkers||{})[siteId]||[]).map(id=>S.state.workers[id]).filter(Boolean);
   const noMedical = workers.filter(w=>!w.certificates.some(c=>c.kind==='medical_fitness' && certStatus(c)!=='expired'));
   const inFile = (counts.complete||0)+(counts.expiring||0)+(counts.awaiting_review||0);
@@ -1166,10 +1184,30 @@ on('export-bundle', (el)=>{
     +(missing.length ? '<div class="section-title">Missing</div>'+names(missing) : '')
     +(expired.length+back.length ? '<div class="section-title">Expired or sent back</div>'+names(expired.concat(back)) : '')
     +(noMedical.length ? '<div class="section-title">Workers without a valid medical</div>'+names(noMedical.map(w=>w.name)) : '')
+    +(optionalOut.length ? '<div class="section-title">Optional, not in the file</div>'+names(optionalOut) : '')
     +(gaps ? '<div class="notice alert-red" style="margin-top:12px;">The PDF lists every gap on its contents page, so the reader sees exactly what\'s outstanding. It is not presented as complete.</div>'
       : '<div class="notice alert-green" style="margin-top:12px;">Everything required is in the file.</div>')
-    +'<a class="btn primary block" style="margin-top:12px;" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download>'+(gaps?'Download with the gaps listed':'Download the safety file')+'</a>'
+    +(filed.length ? '<details class="sfr-pick"><summary>Choose what goes in this PDF</summary>'
+      +'<div class="site-card-sub" style="margin:6px 0;">Untick anything you don\'t want in this copy. A copy with documents left out says so on its cover and doesn\'t count as a new revision.</div>'
+      +'<div class="sfr-list">'+filed.map(i=>'<label class="toggle-row"><span>'+i.req.name+'<span class="site-card-sub" style="display:block;">'+i.req.category+'</span></span><input type="checkbox" class="sfr-doc" value="'+i.req.id+'" checked></label>').join('')
+      +(appts?'<label class="toggle-row"><span>Appointment letters ('+appts+')</span><input type="checkbox" id="sfrAppts" checked></label>':'')
+      +(certs?'<label class="toggle-row"><span>Workforce certificates ('+certs+')</span><input type="checkbox" id="sfrCerts" checked></label>':'')
+      +'</div></details>' : '')
+    +'<button class="btn primary block" style="margin-top:12px;" data-action="safety-file-download" data-site="'+siteId+'">'+(gaps?'Download with the gaps listed':'Download the safety file')+'</button>'
     +(gaps && isContractor() ? '<button class="btn secondary block" style="margin-top:8px;" data-action="guide-open" data-site="'+siteId+'">Fill the gaps first</button>' : ''));
+});
+on('safety-file-download', (el)=>{
+  const all = [...document.querySelectorAll('.sfr-doc')];
+  const picked = all.filter(x=>x.checked).map(x=>x.value);
+  const a = document.getElementById('sfrAppts'), c = document.getElementById('sfrCerts');
+  const q = new URLSearchParams();
+  if(picked.length < all.length) q.set('only', picked.join(','));
+  if(a && !a.checked) q.set('appointments', '0');
+  if(c && !c.checked) q.set('certificates', '0');
+  if(all.length && !picked.length && !q.has('appointments') && !q.has('certificates') && !confirm('No documents are ticked, so the PDF will list the file\'s contents only. Continue?')) return;
+  closeSheet();
+  showToast('Preparing the safety file — the download starts in a moment');
+  window.location.href = '/api/sites/'+encodeURIComponent(el.dataset.site)+'/safety-file.pdf'+(q.toString() ? '?'+q.toString() : '');
 });
 on('approve-site', (el)=>act(()=>api.post('/api/sites/'+el.dataset.site+'/approve'), 'Site marked Site Ready', el));
 on('invitation-decide', async (el)=>{
@@ -1239,6 +1277,12 @@ on('save-org', (el)=>{
   return act(()=>api.patch('/api/org', body), 'Company details saved', el);
 });
 on('toggle-digest', (el)=>act(()=>api.patch('/api/org/settings', { reminderDigest: el.checked }), el.checked?'Reminder digests on':'Reminder digests off'));
+on('platform-refresh', ()=>{ invalidatePlatform(); render(); });
+on('save-reminder-days', (el)=>{
+  const days = [...document.querySelectorAll('#reminderDays input:checked')].map(x=>Number(x.value));
+  if(!days.length){ showToast('Tick at least one reminder'); return; }
+  return act(()=>api.patch('/api/org/settings', { reminderDays: days }), 'Reminder days saved', el);
+});
 on('toggle-weekly', (el)=>act(()=>api.patch('/api/org/settings', { weeklySummary: el.checked }), el.checked?'Weekly summary on':'Weekly summary off'));
 on('save-integration', (el)=>act(()=>api.patch('/api/org/settings', { inspectxEnabled: document.getElementById('inspectxToggle').checked, inspectxBaseUrl: document.getElementById('inspectxUrl').value.trim() }), 'Settings saved', el));
 on('resend-verification', (el)=>act(()=>api.post('/api/auth/resend-verification'), 'Confirmation email sent', el));

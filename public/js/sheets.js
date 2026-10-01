@@ -180,7 +180,11 @@ function renderReqSheet(reqId){
   const ro = readOnly();
 
   let body = sheetHead(req.name, req.category + (site?' · '+site.name:''));
-  body += '<div style="margin:10px 0;">'+badge(eff)+' <span class="srctag" style="margin-left:6px;">'+SOURCE_LABEL[req.source]+'</span></div>';
+  body += '<div style="margin:10px 0;">'+badge(eff)+' <span class="srctag" style="margin-left:6px;">'+SOURCE_LABEL[req.source]+'</span>'+(req.optional?'<span class="srctag" style="margin-left:6px;">Optional</span>':'')+'</div>';
+  // The mine decides what's required on its sites; the contractor's admins do on their own projects.
+  const canSetOptional = site && !ro && ((isHost() && isOrgAdmin()) || (site.project && isOrgAdmin()));
+  if(canSetOptional) body += '<div class="toggle-row" style="border:none;padding:0 0 6px;"><span>'+(req.optional ? 'Optional — welcome in the file but doesn\'t hold up readiness' : 'Required — counts towards '+(site.project?'the file being complete':'Site Ready'))+'</span>'
+    +'<button class="btn secondary small" data-action="req-optional" data-req="'+reqId+'" data-optional="'+(req.optional?'0':'1')+'">'+(req.optional?'Make required':'Make optional')+'</button></div>';
   if(req.why) body += '<p style="font-size:13.5px;color:var(--ink-soft);">'+req.why+'</p>';
   if(doc.version){
     body += '<div class="divider"></div><div class="site-card-sub">Version '+doc.version+' · updated '+timeAgo(doc.updatedAt)+'</div>';
@@ -320,6 +324,10 @@ on('comment-req', async (el)=>{
 on('withdraw-doc', async (el)=>{
   if(!confirm('Remove this document? Earlier versions stay in the history.')) return;
   if(await act(()=>api.del(docUrl(el.dataset.req)), 'Removed', el)) closeSheet();
+});
+on('req-optional', async (el)=>{
+  const optional = el.dataset.optional === '1';
+  if(await act(()=>api.post('/api/requirements/'+el.dataset.req+'/optional', { optional }), optional ? 'Now optional' : 'Now required', el)) openReqSheet(el.dataset.req);
 });
 on('remove-requirement', async (el)=>{
   if(!confirm('Remove this requirement from the site?')) return;
@@ -667,6 +675,7 @@ export async function loadPacks(){
   return packsCache;
 }
 /** Checkbox list of starter packs; counts show only requirements the site doesn't already have. */
+const JURISDICTIONS = { ZA: 'South Africa' };
 export function packPicker(packs, checked, existingNames){
   const have = new Set((existingNames||[]).map(n=>n.toLowerCase()));
   return packs.map(p=>{
@@ -676,12 +685,13 @@ export function packPicker(packs, checked, existingNames){
       +'<span class="site-card-sub" style="display:block;">'+p.description+' · '+(fresh.length===p.items.length?p.items.length+' documents':fresh.length+' new of '+p.items.length)+'</span></span>'
       +'<input type="checkbox" class="pack-box" value="'+p.id+'"'+(checked.includes(p.id)?' checked':'')+(fresh.length?'':' disabled')+' aria-label="'+p.name+'"></label>'
       +'<details style="margin-top:6px;"><summary class="site-card-sub" style="cursor:pointer;">What\'s included</summary>'
-      + p.items.map(i=>'<div class="site-card-sub" style="padding:3px 0;'+(have.has(i.name.toLowerCase())?'text-decoration:line-through;':'')+'">'+i.category+' — '+i.name+'</div>').join('')
+      + p.items.map(i=>'<div class="site-card-sub" style="padding:3px 0;'+(have.has(i.name.toLowerCase())?'text-decoration:line-through;':'')+'">'+i.category+' — '+i.name+(i.optional?' (optional)':'')+'</div>').join('')
+      +(p.jurisdiction ? '<div class="site-card-sub" style="padding-top:6px;">'+escapeHtml(JURISDICTIONS[p.jurisdiction]||p.jurisdiction)+' · '+(p.verification==='researched'?'researched':escapeHtml(p.verification||''))+(p.reviewedOn?' '+escapeHtml(p.reviewedOn.slice(0,7)):'')+' · confirm with your SHE advisor</div>' : '')
       +'</details></div>';
   }).join('');
 }
 export const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
-export const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">A starting point, not legal advice — every requirement stays editable for this site. Confirm the final list with your SHE advisor.</div>';
+export const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">South African lists, researched from published legislation and guidance (September 2026). A starting point, not legal advice: every item stays editable, and each can be made optional. Confirm the final list with your SHE advisor.</div>';
 
 function renderNewSiteSheet(packs, prefill){
   const pf = prefill || {};
@@ -936,15 +946,21 @@ on('open-appointment', (el)=>{
 on('revoke-appointment', async (el)=>{ if(confirm('Revoke this appointment? It stays on the register as revoked.') && await act(()=>api.post('/api/appointments/'+el.dataset.id+'/revoke'), 'Appointment revoked', el)) closeSheet(); });
 
 /* ============ TOOLBOX TALKS ============ */
-function renderNewToolboxSheet(siteId){
-  return sheetHead('Record a toolbox talk', S.state.sites[siteId].name)
+export const SESSION_KINDS = [['toolbox','Toolbox talk'],['induction','Site induction'],['awareness','Awareness training'],['briefing','Site briefing'],['meeting','Safety meeting'],['training','Training session']];
+export const sessionLabel = (k)=>(SESSION_KINDS.find(x=>x[0]===k)||SESSION_KINDS[0])[1];
+function renderNewToolboxSheet(siteId, kind){
+  return sheetHead('Record a session', S.state.sites[siteId].name)
+    +'<label class="field-label" for="ttKind">Type</label><select id="ttKind" class="field" data-action-change="tt-kind">'+SESSION_KINDS.map(([k,l])=>'<option value="'+k+'"'+(k===(kind||'toolbox')?' selected':'')+'>'+l+'</option>').join('')+'</select>'
+    +'<div class="site-card-sub" id="ttKindHelp" style="margin-top:4px;">'+(kind==='induction'?'Each worker who signs is recorded as inducted for this site on this date, which counts at the gate.':'Everyone attending signs on this device afterwards.')+'</div>'
     +'<label class="field-label" for="ttTopic">Topic</label><input type="text" id="ttTopic" placeholder="e.g. Isolation and lock-out before work on the drive station">'
-    +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="ttPresenter">Presented by</label><input type="text" id="ttPresenter" value="'+myName()+'"></div></div>'
-    +'<label class="field-label" for="ttContent">Talk content / key points</label><textarea id="ttContent" style="min-height:110px;" placeholder="What was covered"></textarea>'
+    +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="ttDuration">Minutes</label><input type="number" id="ttDuration" min="1" max="1440" inputmode="numeric" placeholder="15"></div></div>'
+    +'<label class="field-label" for="ttPresenter">Presented by</label><input type="text" id="ttPresenter" value="'+myName()+'">'
+    +'<label class="field-label" for="ttContent">Content / key points</label><textarea id="ttContent" style="min-height:110px;" placeholder="What was covered"></textarea>'
     +'<button class="btn secondary small" style="margin-top:6px;" data-action="draft-toolbox">'+ICONS.sparkle+(S.boot.features.ai?' Draft content with AI':' Draft talk from topic')+'</button>'
     +'<button class="btn primary block" style="margin-top:12px;" data-action="save-toolbox" data-site="'+siteId+'">Save and collect signatures</button>';
 }
-on('new-toolbox-talk', (el)=>openSheet(renderNewToolboxSheet(el.dataset.site)));
+on('new-toolbox-talk', (el)=>openSheet(renderNewToolboxSheet(el.dataset.site, el.dataset.kind)));
+on('tt-kind', (el)=>{ const h = document.getElementById('ttKindHelp'); if(h) h.textContent = el.value==='induction' ? 'Each worker who signs is recorded as inducted for this site on this date, which counts at the gate.' : 'Everyone attending signs on this device afterwards.'; });
 on('draft-toolbox', async (el)=>{
   const topic = (val('ttTopic'));
   if(!topic){ document.getElementById('ttTopic').focus(); return; }
@@ -957,7 +973,8 @@ on('draft-toolbox', async (el)=>{
 on('save-toolbox', async (el)=>{
   const topic = (val('ttTopic'));
   if(!topic){ document.getElementById('ttTopic').focus(); return; }
-  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/toolbox-talks', { topic, heldOn: val('ttDate'), presenter: (val('ttPresenter')), content: document.getElementById('ttContent').value }), 'Toolbox talk saved', el);
+  const kind = val('ttKind') || 'toolbox', mins = parseInt(val('ttDuration'), 10);
+  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/toolbox-talks', { topic, kind, durationMinutes: mins > 0 ? mins : undefined, heldOn: val('ttDate'), presenter: (val('ttPresenter')), content: document.getElementById('ttContent').value }), sessionLabel(kind)+' saved', el);
   if(r) openToolbox(el.dataset.site, r.id);
 });
 function renderToolboxSheet(siteId, talkId){
@@ -965,7 +982,8 @@ function renderToolboxSheet(siteId, talkId){
   if(!t) return sheetHead('Not found');
   const workers = ((S.state.siteWorkers||{})[siteId]||[]).map(id=>S.state.workers[id]).filter(Boolean);
   const signed = new Set(t.attendance.map(a=>a.workerId).filter(Boolean));
-  let body = sheetHead(t.topic, timeAgo(t.heldOn)+' · presented by '+t.presenter+' · '+t.orgName);
+  let body = sheetHead(t.topic, sessionLabel(t.kind)+' · '+timeAgo(t.heldOn)+(t.durationMinutes?' · '+t.durationMinutes+' min':'')+' · presented by '+t.presenter+' · '+t.orgName);
+  if(t.kind==='induction') body += '<div class="notice">Workers chosen from the list who sign here are recorded as inducted for this site from '+t.heldOn+'. Gate clearance counts it'+(isHost()?' under your induction validity rule':'')+'.</div>';
   if(t.content) body += '<details><summary style="font-size:12.5px;color:var(--grey);cursor:pointer;">Talk content</summary><div class="ai-output">'+t.content+'</div></details>';
   body += '<div class="section-title">Attendance ('+t.attendance.length+')</div>';
   body += t.attendance.length ? t.attendance.map(a=>'<div class="cert-row"><div><div style="font-weight:600;">'+a.name+'</div><div class="site-card-sub">'+dateTime(a.signedAt)+'</div></div><img class="sig-thumb" src="'+a.signatureUrl+'" alt="Signature of '+a.name+'"></div>').join('')

@@ -402,6 +402,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:2px s
 .live-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--sage); margin-right:5px; vertical-align:1px; box-shadow:0 0 0 3px color-mix(in srgb, var(--sage) 25%, transparent);}
 .live-dot.off{background:var(--grey); box-shadow:none;}
 .menu-row{display:flex; align-items:center; gap:14px; padding:12px 10px; margin:0 -10px; border:none; border-radius:var(--radius-sm); cursor:pointer; background:none; width:calc(100% + 20px); text-align:left; color:var(--ink); transition:background .12s ease;}
+a.menu-row{text-decoration:none;}
 .menu-row:hover{background:var(--paper-deep);}
 .menu-row .qa-sub{margin-top:0;}
 .kv{display:flex; justify-content:space-between; gap:10px; font-size:13.5px; padding:8px 0; border-bottom:1px solid var(--grey-line);}
@@ -775,3 +776,8 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .tl-dot{position:absolute; left:-6px; top:12px; width:10px; height:10px; border-radius:50%; background:var(--sage); box-shadow:0 0 0 3px var(--paper-raised);}
 .tl-action{font-size:13.5px; font-weight:600;}
 .tl-detail{font-weight:400; color:var(--ink-soft);}
+/* ===== Optional requirements; choosing what goes in the PDF ===== */
+.req-actions{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
+.sfr-pick{margin-top:12px; border:1px solid var(--grey-line); border-radius:var(--radius-sm); padding:10px 12px;}
+.sfr-pick summary{cursor:pointer; font-weight:600; font-size:14px;}
+.sfr-list{max-height:40vh; overflow:auto;}

@@ -79,6 +79,6 @@ export function renderLanding(features){
     +'<div class="lp-cta"><button class="btn primary" data-action="auth-go" data-view="signup">Create a free account</button>'
     +(demo?'<button class="btn secondary" data-action="start-demo">Explore the demo</button>':'')
     +'<button class="linkish" data-action="auth-go" data-view="signin">I already have an account</button></div></section>'
-    +'<footer class="lp-foot"><span>SiteGuard</span><span>Requirement lists are a starting point, not legal advice. SiteGuard shows the status held in its records; it does not certify legal compliance.</span></footer>'
+    +'<footer class="lp-foot"><span>SiteGuard</span><span>Requirement lists are a starting point, not legal advice. SiteGuard shows the status held in its records; it does not certify legal compliance.</span><span><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span></footer>'
     +'</div>';
 }

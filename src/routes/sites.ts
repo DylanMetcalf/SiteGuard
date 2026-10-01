@@ -23,6 +23,8 @@ export const requirementSchema = z.object({
   name: text(200).min(1),
   source: z.enum(['legal', 'client', 'site', 'project', 'company', 'best_practice', 'platform']),
   why: text(1000).default(''),
+  /** Optional documents are welcome in the file but don't hold up readiness or Site Ready. */
+  optional: z.boolean().default(false),
 });
 export const packIdsSchema = z.array(z.enum(TEMPLATE_PACKS.map((p) => p.id) as [string, ...string[]])).max(TEMPLATE_PACKS.length);
 const newContractorSchema = z.object({
@@ -148,7 +150,7 @@ export default async function siteRoutes(app: FastifyInstance) {
         if (!isUuid(body.templateSiteId)) throw notFound();
         reqs = await many(
           db,
-          `select r.category, r.name, r.source, r.why from requirements r join sites s on s.id = r.site_id
+          `select r.category, r.name, r.source, r.why, r.optional from requirements r join sites s on s.id = r.site_id
             where r.site_id = $1 and s.org_id = $2 order by r.position, r.created_at`,
           [body.templateSiteId, ctx.org.id],
         );
@@ -157,8 +159,8 @@ export default async function siteRoutes(app: FastifyInstance) {
       if (body.templatePackIds?.length) reqs = reqs.concat(itemsFromPacks(body.templatePackIds, reqs.map((r) => r.name)));
       for (const [i, r] of reqs.entries()) {
         await db.query(
-          `insert into requirements (site_id, category, name, source, why, position) values ($1, $2, $3, $4, $5, $6)`,
-          [site.id, r.category, r.name, r.source, r.why, i],
+          `insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`,
+          [site.id, r.category, r.name, r.source, r.why, i, !!(r as { optional?: boolean }).optional],
         );
       }
       await audit(db, ctx, 'Created site', body.name, site.id);
@@ -242,9 +244,9 @@ export default async function siteRoutes(app: FastifyInstance) {
       if (side !== 'host') throw forbidden();
       const r = (await one<{ id: string }>(
         db,
-        `insert into requirements (site_id, category, name, source, why, position)
-         values ($1, $2, $3, $4, $5, coalesce((select max(position) + 1 from requirements where site_id = $1), 0)) returning id`,
-        [site.id, body.category, body.name, body.source, body.why],
+        `insert into requirements (site_id, category, name, source, why, position, optional)
+         values ($1, $2, $3, $4, $5, coalesce((select max(position) + 1 from requirements where site_id = $1), 0), $6) returning id`,
+        [site.id, body.category, body.name, body.source, body.why, body.optional],
       ))!;
       await audit(db, ctx, 'Added requirement', body.name, site.id);
       await recheckSiteReady(db, site.id, `new requirement: ${body.name}`);
@@ -265,8 +267,9 @@ export default async function siteRoutes(app: FastifyInstance) {
       if (await one(db, 'select 1 from requirements where site_id = $1 and lower(name) = lower($2)', [site.id, body.name])) throw conflict('That document is already in your safety file for this site.');
       const r = (await one<{ id: string }>(
         db,
-        `insert into requirements (site_id, category, name, source, why, position)
-         values ($1, $2, $3, 'company', $4, coalesce((select max(position) + 1 from requirements where site_id = $1), 0)) returning id`,
+        // The contractor's own extras are optional: adding one never lowers its readiness.
+        `insert into requirements (site_id, category, name, source, why, position, optional)
+         values ($1, $2, $3, 'company', $4, coalesce((select max(position) + 1 from requirements where site_id = $1), 0), true) returning id`,
         [site.id, body.category, body.name, `Added by ${ctx.org.name} to its safety file for this site.`],
       ))!;
       await audit(db, ctx, 'Added own document to safety file', body.name, site.id);
@@ -306,6 +309,34 @@ export default async function siteRoutes(app: FastifyInstance) {
       await recheckSiteReady(db, site.id, `requirements added: ${names}`);
       await publishChange(db, parties);
       return { added: items.length };
+    });
+  });
+
+  /**
+   * Required or optional. The mine decides on its sites; on a contractor's own project the
+   * contractor's admins do. An optional document that isn't in the file doesn't hold up readiness.
+   */
+  app.post('/api/requirements/:id/optional', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireWritable(ctx);
+    const { id } = req.params as { id: string };
+    if (!isUuid(id)) throw notFound();
+    const { optional } = z.object({ optional: z.boolean() }).parse(req.body);
+    return withTx(async (db) => {
+      const r = await one<{ site_id: string; name: string }>(db, 'select site_id, name from requirements where id = $1', [id]);
+      if (!r) throw notFound();
+      const { site, side, parties } = await loadSite(db, ctx, r.site_id);
+      if (site.project && side === 'contractor') {
+        if (!canAdminOrg(ctx)) throw forbidden('Only your company\'s owners and admins can change a project\'s requirements.');
+      } else {
+        requireHostAdmin(ctx);
+        if (side !== 'host') throw forbidden();
+      }
+      await db.query('update requirements set optional = $2 where id = $1', [id, optional]);
+      await audit(db, ctx, optional ? 'Made requirement optional' : 'Made requirement required', r.name, r.site_id);
+      if (!optional) await recheckSiteReady(db, r.site_id, `${r.name} made required`);
+      await publishChange(db, parties);
+      return { ok: true };
     });
   });
 

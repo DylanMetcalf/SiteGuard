@@ -29,20 +29,20 @@ function hostSteps(){
       { title: wp.name + ' at a glance', body: 'How many contractors are on the site, how many documents are waiting for you, what is outstanding, and who is Site Ready — tap any number to go straight there.', go: go({ nav: 'sites', activeSiteId: null, activeWorkplaceId: wp.id, wpTab: 'contractors' }), target: '.attn-grid' },
       { title: 'One review queue', body: 'Every document contractors submit for this site lands here. Open it, read it, and approve it or send it back with a note. Documents written in SiteGuard can be approved section by section.', go: go({ wpTab: 'queue' }), target: '[data-action="wp-tab"][data-tab="queue"]' },
       { title: 'Gate clearance', body: 'Who may enter today. A worker is cleared only when their company\'s safety file is Site Ready, the company isn\'t suspended, and their medical and induction are valid under your rules. Print a gate list or QR gate cards that security can scan.', go: go({ wpTab: 'gate' }), target: '[data-action="wp-tab"][data-tab="gate"]' },
-      { title: 'What every safety file must contain', body: 'The site\'s requirements, each marked as a legal, site or best-practice requirement so nobody mistakes a site rule for the law. New requirements go to every contractor\'s file at once, and you can send one request to all contractors.', go: go({ wpTab: 'requirements' }), target: '[data-action="wp-tab"][data-tab="requirements"]' },
+      { title: 'What every safety file must contain', body: 'The site\'s requirements, each marked as a legal, site or best-practice requirement so nobody mistakes a site rule for the law, and as required or optional — optional ones never hold up Site Ready. New requirements go to every contractor\'s file at once, and you can send one request to all contractors.', go: go({ wpTab: 'requirements' }), target: '[data-action="wp-tab"][data-tab="requirements"]' },
     );
   }
   if(file){
     out.push(
       { title: 'A contractor\'s safety file', body: 'Readiness for one contractor on one site: each requirement, its status and expiry. When everything is approved you mark it Site Ready, and a verification code proves it. Download the whole file as one bound PDF, with revisions recorded.', go: go({ nav: 'sites', activeWorkplaceId: null, activeSiteId: file.id, siteTab: 'compliance' }), target: '.readiness-hero, .bundle-link, .view-head' },
       { title: 'Audits, permits and incidents', body: 'Site activity holds your monthly contractor audits (scored, with findings tracked until you close them), permits to work, incidents, the site diary and inspections.', go: go({ siteTab: 'activity' }), target: '[data-action="site-tab"][data-tab="activity"]' },
-      { title: 'People on site', body: 'The contractor\'s workers for this site, their medicals and inductions, gate clearance, toolbox talks signed on one device, and statutory appointments.', go: go({ siteTab: 'people' }), target: '[data-action="site-tab"][data-tab="people"]' },
+      { title: 'People on site', body: 'The contractor\'s workers for this site, their medicals and inductions, gate clearance, toolbox talks, site inductions and training signed on one device (an induction recorded here counts at the gate), and statutory appointments.', go: go({ siteTab: 'people' }), target: '[data-action="site-tab"][data-tab="people"]' },
     );
   }
   out.push(
     { title: 'Contractors', body: 'Every contractor you work with, searchable and filtered by trade. Their company details are theirs to keep up to date. From a contractor\'s profile you can suspend them on all your sites at once if you need to.', go: go({ nav: 'passport', activeSiteId: null, activeWorkplaceId: null }), target: '[data-action="nav"][data-nav="passport"]' },
     { title: 'Log anything, anywhere', body: 'The + button is always there: report an incident, issue a permit, log the diary or record a toolbox talk from site.', go: go({ nav: 'dashboard' }), target: '.fab' },
-    { title: 'Everything else', body: 'More holds Document Studio, the compliance agent, the assistant, the Safety Centre, the audit trail, verification, your team, and settings — including your validity rules for medicals, inductions, COID letters and insurance.', go: go({ nav: 'more', moreView: null }), target: '[data-action="nav"][data-nav="more"]' },
+    { title: 'Everything else', body: 'More holds Document Studio, the compliance agent, the assistant, the Safety Centre, the audit trail, verification, your team, and settings — including your validity rules for medicals, inductions, COID letters and insurance, when expiry reminders go out, and a download of all your data.', go: go({ nav: 'more', moreView: null }), target: '[data-action="nav"][data-nav="more"]' },
   );
   return out;
 }
@@ -57,14 +57,14 @@ function contractorSteps(){
   ];
   if(file){
     out.push(
-      { title: 'Your safety file for ' + file.name, body: 'Each requirement with its status. The guide walks you through what is missing: upload it, reuse it from your library, or create it in Document Studio. Download the whole file as one bound PDF — SiteGuard records a revision whenever it changes.', go: go({ nav: 'sites', activeSiteId: file.id, siteTab: 'compliance' }), target: '.guide-card, .readiness-hero, .view-head' },
+      { title: 'Your safety file for ' + file.name, body: 'Each requirement with its status. The guide walks you through what is missing: upload it, reuse it from your library, or let SiteGuard write the missing documents in one go with "Write documents now". Download the whole file as one bound PDF, or tick just the documents someone asked for — SiteGuard records a revision whenever the full file changes.', go: go({ nav: 'sites', activeSiteId: file.id, siteTab: 'compliance' }), target: '.builder-card, .readiness-hero, .view-head' },
       { title: 'Audits and permits', body: 'When the site audits your work, the score and each finding appear here. Fix it, say what was done, and the site closes it. Request permits to work here too.', go: go({ siteTab: 'activity' }), target: '[data-action="site-tab"][data-tab="activity"]' },
       { title: 'Your people and gate cards', body: 'Assign your workers to the site. Each one shows whether they are cleared at the gate and, if not, exactly why. Print QR gate cards for security to scan.', go: go({ siteTab: 'people' }), target: '[data-action="site-tab"][data-tab="people"]' },
     );
   }
   out.push(
     { title: 'Your document library', body: 'Every document you hold, grouped by status, with expiry dates. Replace one here and SiteGuard shows every site file it affects.', go: go({ nav: 'passport', activeSiteId: null }), target: '[data-action="nav"][data-nav="passport"]' },
-    { title: 'Document Studio', body: 'Don\'t have a document? Create it: risk assessments, method statements (tick the work activities and the hazards, controls and PPE are filled in), policies, appointment letters and more, branded as yours. Drafts are for you to check and sign — they are not a certification.', go: go({ nav: 'more', moreView: 'studio' }), target: '.view-head' },
+    { title: 'Document Studio', body: 'Don\'t have a document? Create it: risk assessments, method statements (tick the work activities and the tools used, and the hazards, controls, PPE and pre-use checks are filled in), policies, appointment letters and more, branded as yours. Drafts are for you to check and sign — they are not a certification.', go: go({ nav: 'more', moreView: 'studio' }), target: '.view-head' },
     { title: 'Log anything, anywhere', body: 'The + button is always there: upload a document, record a toolbox talk with signatures on one device, report an incident or log the diary.', go: go({ nav: 'dashboard', moreView: null }), target: '.fab' },
   );
   return out;
