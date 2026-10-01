@@ -14,13 +14,20 @@
  */
 export interface Tool {
   label: string;
-  category: 'Power tools' | 'Hot work' | 'Access equipment' | 'Electrical equipment' | 'Lifting equipment' | 'Plant and vehicles' | 'Other equipment';
+  category: 'Hand tools' | 'Power tools' | 'Hot work' | 'Access equipment' | 'Electrical equipment' | 'Lifting equipment' | 'Plant and vehicles' | 'Other equipment';
   hazards: [hazard: string, control: string][];
   ppe: string[];
   inspection: string;
 }
 
 export const TOOLS: Tool[] = [
+  { label: 'Hand tools (hammers, spanners, screwdrivers, pliers)', category: 'Hand tools', ppe: ['Safety glasses', 'Gloves suited to the task'],
+    inspection: 'Handles sound and secure, no mushroomed heads or worn jaws, insulated tools rated and undamaged for electrical work',
+    hazards: [['Struck by or cut by a slipping tool', 'Right tool and size for the job; tools in good condition; pull rather than push on spanners; keep hands clear of the line of force.'],
+      ['Tools dropped from height', 'Tool lanyards and tool bags when working at height; barricade the area below.']] },
+  { label: 'Utility knife / cutting tools', category: 'Hand tools', ppe: ['Cut-resistant gloves', 'Safety glasses'],
+    inspection: 'Retractable or self-retracting blade, sharp blade, handle intact',
+    hazards: [['Cuts to hands and legs', 'Self-retracting blades; cut away from the body on a stable surface; cut-resistant gloves; replace blunt blades; never leave blades exposed.']] },
   { label: 'Angle grinder', category: 'Power tools', ppe: ['Face shield over safety glasses', 'Hearing protection'],
     inspection: 'Guard fitted, disc rated for the speed and undamaged, dead-man switch working, cord and plug intact',
     hazards: [['Disc shattering and flying fragments', 'Correct disc for the material and speed; guard always fitted; stand to the side on start-up; never use a damaged disc.'],

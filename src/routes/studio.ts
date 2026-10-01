@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { TOOLS } from '../lib/knowledge.js';
 import { z } from 'zod';
 import { canAdminOrg, isUuid, requireAdmin, requireOrg, requireWritable } from '../lib/authz.js';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
@@ -15,6 +16,13 @@ const values = z.record(z.string().max(40), z.string().max(4000)).refine((o) => 
 
 export default async function studioRoutes(app: FastifyInstance) {
   /** The document library: categories, and each blueprint's questions. */
+  /** The tool and equipment library (hazards, controls, checks, PPE) used by sessions and documents. */
+  app.get('/api/tools', async (req, reply) => {
+    requireOrg(req.ctx);
+    reply.header('cache-control', 'private, max-age=3600');
+    return { tools: TOOLS.map((t) => ({ label: t.label, category: t.category })) };
+  });
+
   app.get('/api/studio/blueprints', async (req) => {
     requireOrg(req.ctx);
     return {

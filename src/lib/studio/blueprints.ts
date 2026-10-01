@@ -140,38 +140,42 @@ function signOff(): Section {
   return sec('Approval and sign-off', { type: 'signatures', roles: ['Prepared by', 'Reviewed by (SHE)', 'Approved by (CEO / Manager)', 'Accepted by (Client representative)'] });
 }
 
-/** Likelihood/consequence scoring on a 5×5 matrix. */
-function rate(l: number, c: number) {
-  const s = l * c;
-  return { score: s, label: s >= 15 ? 'High' : s >= 8 ? 'Medium' : 'Low' };
+/**
+ * Likelihood × consequence scoring. Companies use different matrices, so the size is a
+ * choice (5×5 by default); ratings are judged on a 1–5 scale and scaled to the chosen size.
+ */
+export const MATRIX_SIZES: Record<string, number> = { '5×5 (scores 1–25)': 5, '4×4 (scores 1–16)': 4, '3×3 (scores 1–9)': 3 };
+const band = (s: number, n: number) => (s >= Math.round(0.6 * n * n) ? 'High' : s >= Math.round(0.32 * n * n) ? 'Medium' : 'Low');
+function rate(l: number, c: number, n = 5) {
+  const sl = Math.max(1, Math.ceil((l * n) / 5)), sc = Math.max(1, Math.ceil((c * n) / 5));
+  const s = sl * sc;
+  return { score: s, label: band(s, n) };
 }
+const L_NAMES: Record<number, string[]> = { 5: ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost certain'], 4: ['Unlikely', 'Possible', 'Likely', 'Almost certain'], 3: ['Unlikely', 'Possible', 'Likely'] };
+const C_NAMES: Record<number, string[]> = { 5: ['Insignificant', 'Minor', 'Moderate', 'Major', 'Catastrophic'], 4: ['Minor', 'Moderate', 'Major', 'Catastrophic'], 3: ['Minor', 'Serious', 'Major'] };
+function matrixBlock(n: number): Block {
+  const rows: string[][] = [];
+  for (let l = n; l >= 1; l--) rows.push([`${l} ${L_NAMES[n][l - 1]}`, ...Array.from({ length: n }, (_, k) => { const s = l * (k + 1); return `${s} ${band(s, n)}`; })]);
+  return { type: 'table', columns: ['Likelihood \\ Consequence', ...C_NAMES[n].map((c, k) => `${k + 1} ${c}`)], rows };
+}
+const matrixField: Field = { id: 'matrix', label: 'Risk matrix your company uses', type: 'select', options: Object.keys(MATRIX_SIZES) };
+const matrixOf = (i: BuildInput) => MATRIX_SIZES[v(i, 'matrix')] ?? 5;
 const SEVERE = /from height|falling objects|electr|arc flash|engulf|oxygen|toxic|explos|fire|collapse|struck|crush|entangle|dropped|swinging|overturn|fall of ground|power lines|re-energis|flammable gas/i;
 
-function hazardTable(text: string, owner: string, tools: Tool[] = []): Block {
+function hazardTable(text: string, owner: string, tools: Tool[] = [], n = 5): Block {
   const { hazards } = hazardsFor(text);
   // Work hazards first, then each ticked tool's own, without repeats.
   const pairs: [string, string][] = hazards.slice(0, 16).map((h) => [h, HAZARD_CONTROLS[h] ?? 'Controls to be defined by the risk assessment team.']);
   for (const t of tools) for (const [h, c] of t.hazards) if (!pairs.some(([x]) => x === h)) pairs.push([`${h} (${t.label.toLowerCase()})`, c]);
   const rows = pairs.slice(0, 40).map(([h, control], n) => {
     const c = SEVERE.test(h) ? 5 : 3;
-    const before = rate(SEVERE.test(h) ? 4 : 3, c);
-    const after = rate(SEVERE.test(h) ? 2 : 1, c);
+    const before = rate(SEVERE.test(h) ? 4 : 3, c, n);
+    const after = rate(SEVERE.test(h) ? 2 : 1, c, n);
     return [String(n + 1), h, `${before.score} ${before.label}`, control, `${after.score} ${after.label}`, owner];
   });
   return { type: 'table', columns: ['#', 'Hazard / risk', 'Inherent risk', 'Controls', 'Residual risk', 'Responsible'], widths: [0.4, 2, 1, 3.2, 1, 1.2], rows };
 }
 
-const MATRIX: Block = {
-  type: 'table',
-  columns: ['Likelihood \\ Consequence', '1 Insignificant', '2 Minor', '3 Moderate', '4 Major', '5 Catastrophic'],
-  rows: [
-    ['5 Almost certain', '5 Low', '10 Medium', '15 High', '20 High', '25 High'],
-    ['4 Likely', '4 Low', '8 Medium', '12 Medium', '16 High', '20 High'],
-    ['3 Possible', '3 Low', '6 Low', '9 Medium', '12 Medium', '15 High'],
-    ['2 Unlikely', '2 Low', '4 Low', '6 Low', '8 Medium', '10 Medium'],
-    ['1 Rare', '1 Low', '2 Low', '3 Low', '4 Low', '5 Low'],
-  ],
-};
 
 const PPE_BASE = ['Hard hat', 'Safety boots (steel toe)', 'High-visibility vest or reflective clothing', 'Safety glasses', 'Hearing protection where noise exceeds 85 dB(A)', 'Gloves suited to the task'];
 function ppeFor(text: string, tools: Tool[] = []): string[] {
@@ -293,9 +297,9 @@ const shePlan: Blueprint = {
 
 const riskAssessment: Blueprint = {
   id: 'risk-assessment', code: 'RA', name: 'Site-specific Risk Assessment', category: 'Risk assessments',
-  description: 'Hazard identification and risk assessment (HIRA) with a 5×5 risk matrix and controls for the job.',
+  description: 'Hazard identification and risk assessment (HIRA) with your company\'s risk matrix (5×5, 4×4 or 3×3) and controls for the job.',
   matches: /risk assessment|hira|baseline risk/i, reviewMonths: 12,
-  fields: [common.site, common.scope, activityField, toolsField,
+  fields: [common.site, common.scope, activityField, toolsField, matrixField,
     { id: 'steps', label: 'Main steps of the job (optional)', type: 'lines', placeholder: 'One per line, e.g. Isolate conveyor; Erect scaffold; Remove idlers…' },
     { id: 'team', label: 'Risk assessment team', type: 'text', placeholder: 'e.g. J. Dlamini (supervisor), P. Naidoo (safety officer)' }],
   guidance: 'A HIRA: every hazard linked to the job steps, realistic inherent and residual ratings on the 5×5 matrix, specific controls following the hierarchy of controls. Include at least 8 hazards.',
@@ -304,6 +308,7 @@ const riskAssessment: Blueprint = {
     const work = workText(i);
     const tools = toolsOf(i);
     const steps = lines(v(i, 'steps'));
+    const n = matrixOf(i);
     const { profiles } = hazardsFor(work);
     return {
       title: 'Site-specific Risk Assessment',
@@ -312,9 +317,9 @@ const riskAssessment: Blueprint = {
         ...purposeScope(i, 'To identify the hazards of this job, assess their risks and set controls that reduce them to an acceptable level before work starts.'),
         sec('Assessment details', { type: 'fields', items: [['Task', scope], ['Site', siteLabel(i)], ['Work types identified', profiles.map((p) => p.label).join(', ') || 'General site work'], ['Assessment team', v(i, 'team', i.preparer.name)]] }),
         legalSection(['Construction Regulations, 2014, regulation 9 (risk assessment), where applicable']),
-        sec('Method', para('Each hazard is rated for likelihood (1–5) and consequence (1–5) before controls (inherent risk) and after controls (residual risk). Controls follow the hierarchy: elimination, substitution, engineering, administrative controls, then PPE. No task may start while a residual risk is High.'), MATRIX),
+        sec('Method', para(`Each hazard is rated for likelihood (1–${n}) and consequence (1–${n}) on a ${n}×${n} matrix, before controls (inherent risk) and after controls (residual risk). Controls follow the hierarchy: elimination, substitution, engineering, administrative controls, then PPE. No task may start while a residual risk is High. Ratings are a starting point for the assessment team to confirm.`), matrixBlock(n)),
         ...(steps.length ? [sec('Job steps', numbered(steps))] : []),
-        sec('Hazard identification and risk register', hazardTable(work, 'Supervisor', tools)),
+        sec('Hazard identification and risk register', hazardTable(work, 'Supervisor', tools, n)),
         ...(tools.length ? [sec('Tools and equipment', { type: 'table', columns: ['Tool / equipment', 'Check before use'], widths: [1.4, 3], rows: tools.map((t) => [t.label, t.inspection]) } as Block)] : []),
         sec('Personal protective equipment', bullets(ppeFor(work, tools))),
         sec('Communication', para('This risk assessment is explained to every worker at a toolbox talk before the job starts and whenever it changes. Workers sign the attendance register to confirm they understand it.')),

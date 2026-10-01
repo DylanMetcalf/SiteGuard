@@ -107,6 +107,11 @@ describe('tools and equipment in risk assessments and method statements', () => 
       assert.match(out, /Guard fitted, disc rated/, id);
       assert.match(out, /Face shield over safety glasses/, id);
     }
+    const bp3 = blueprintById('risk-assessment')!;
+    const three = JSON.stringify(bp3.build({ values: { scope: 'Roof work', matrix: '3×3 (scores 1–9)' }, company: { name: 'Mu' }, preparer: { name: 'T' } }));
+    assert.match(three, /3×3 matrix/);
+    assert.doesNotMatch(three, /25 High/);
+    assert.match(JSON.stringify(bp3.build({ values: { scope: 'Roof work' }, company: { name: 'Mu' }, preparer: { name: 'T' } })), /25 High/, '5×5 by default');
     const bad = await con.post('/api/studio/documents', { blueprintId: 'risk-assessment', values: { scope: 'Roof', tools: 'Lightsaber' } });
     assert.equal(bad.status, 400);
     const ok = await con.post('/api/studio/documents', { blueprintId: 'risk-assessment', values: { scope: 'Roof', tools: 'Angle grinder; Scaffold / mobile scaffold tower' } });

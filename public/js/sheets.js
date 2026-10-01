@@ -142,7 +142,7 @@ const PURPOSE = {
   safetyfile: (id)=>{ S.activeSiteId=id; S.nav='sites'; S.siteTab='compliance'; render(); },
   upload: (id)=>{ S.activeSiteId=id; S.nav='sites'; S.siteTab='compliance'; render(); showToast('Tap a requirement to attach a file'); },
   diary: (id)=>openSheet(renderNewDiarySheet(id)),
-  toolbox: (id)=>openSheet(renderNewToolboxSheet(id)),
+  toolbox: (id)=>{ openSheet(renderNewToolboxSheet(id)); fillTools(); },
   incident: (id)=>openSheet(renderReportIncidentSheet(id)),
   inspection: (id)=>openSheet(renderNewInspectionSheet(id)),
   request: (id)=>openSheet(renderRequestSheet(id)),
@@ -954,13 +954,24 @@ function renderNewToolboxSheet(siteId, kind){
     +'<label class="field-label" for="ttKind">Type</label><select id="ttKind" class="field" data-action-change="tt-kind">'+SESSION_KINDS.map(([k,l])=>'<option value="'+k+'"'+(k===(kind||'toolbox')?' selected':'')+'>'+l+'</option>').join('')+'</select>'
     +'<div class="site-card-sub" id="ttKindHelp" style="margin-top:4px;">'+(kind==='induction'?'Each worker who signs is recorded as inducted for this site on this date, which counts at the gate.':'Everyone attending signs on this device afterwards.')+'</div>'
     +'<label class="field-label" for="ttTopic">Topic</label><input type="text" id="ttTopic" placeholder="e.g. Isolation and lock-out before work on the drive station">'
-    +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="ttDuration">Minutes</label><input type="number" id="ttDuration" min="1" max="1440" inputmode="numeric" placeholder="15"></div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;"><div style="flex:1;min-width:130px;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;min-width:90px;"><label class="field-label" for="ttTime">Time</label><input type="time" id="ttTime"></div><div style="flex:1;min-width:80px;"><label class="field-label" for="ttDuration">Minutes</label><input type="number" id="ttDuration" min="1" max="1440" inputmode="numeric" placeholder="15"></div></div>'
+    +'<div class="site-card-sub" style="margin-top:4px;">A future date schedules the session; people sign on the day.</div>'
+    +'<label class="field-label" for="ttWork">Work being done (optional)</label><input type="text" id="ttWork" maxlength="200" placeholder="e.g. Electrical work on the conveyor drive">'
+    +'<details class="sfr-pick" id="ttToolsBox"><summary>Tools and equipment in use</summary><div class="site-card-sub" style="margin:6px 0;">Each tool you tick adds its hazards, controls, pre-use checks and PPE to the talk.</div><div id="ttTools" class="check-grid"><span class="site-card-sub">Loading…</span></div></details>'
     +'<label class="field-label" for="ttPresenter">Presented by</label><input type="text" id="ttPresenter" value="'+myName()+'">'
     +'<label class="field-label" for="ttContent">Content / key points</label><textarea id="ttContent" style="min-height:110px;" placeholder="What was covered"></textarea>'
     +'<button class="btn secondary small" style="margin-top:6px;" data-action="draft-toolbox">'+ICONS.sparkle+(S.boot.features.ai?' Draft content with AI':' Draft talk from topic')+'</button>'
     +'<button class="btn primary block" style="margin-top:12px;" data-action="save-toolbox" data-site="'+siteId+'">Save and collect signatures</button>';
 }
-on('new-toolbox-talk', (el)=>openSheet(renderNewToolboxSheet(el.dataset.site, el.dataset.kind)));
+let toolList = null;
+async function fillTools(){
+  try{ toolList = toolList || (await api.get('/api/tools')).tools; }catch{ return; }
+  const box = document.getElementById('ttTools');
+  if(!box) return;
+  const cats = [...new Set(toolList.map(t=>t.category))];
+  box.innerHTML = cats.map(c=>'<div class="site-card-sub" style="width:100%;margin-top:6px;font-weight:600;">'+escapeHtml(c)+'</div>'+toolList.filter(t=>t.category===c).map(t=>'<label class="check-chip"><input type="checkbox" class="tt-tool" value="'+escapeHtml(t.label)+'"> '+escapeHtml(t.label)+'</label>').join('')).join('');
+}
+on('new-toolbox-talk', (el)=>{ openSheet(renderNewToolboxSheet(el.dataset.site, el.dataset.kind)); fillTools(); });
 on('tt-kind', (el)=>{ const h = document.getElementById('ttKindHelp'); if(h) h.textContent = el.value==='induction' ? 'Each worker who signs is recorded as inducted for this site on this date, which counts at the gate.' : 'Everyone attending signs on this device afterwards.'; });
 on('draft-toolbox', async (el)=>{
   const topic = (val('ttTopic'));
@@ -975,7 +986,9 @@ on('save-toolbox', async (el)=>{
   const topic = (val('ttTopic'));
   if(!topic){ document.getElementById('ttTopic').focus(); return; }
   const kind = val('ttKind') || 'toolbox', mins = parseInt(val('ttDuration'), 10);
-  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/toolbox-talks', { topic, kind, durationMinutes: mins > 0 ? mins : undefined, heldOn: val('ttDate'), presenter: (val('ttPresenter')), content: document.getElementById('ttContent').value }), sessionLabel(kind)+' saved', el);
+  const tools = [...document.querySelectorAll('.tt-tool:checked')].map(x=>unescapeHtml(x.value));
+  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/toolbox-talks', { topic, kind, durationMinutes: mins > 0 ? mins : undefined, heldOn: val('ttDate'), startTime: val('ttTime') || undefined,
+    workType: val('ttWork'), tools, presenter: (val('ttPresenter')), content: document.getElementById('ttContent').value }), sessionLabel(kind)+(val('ttDate') > todayStr() ? ' scheduled' : ' saved'), el);
   if(r) openToolbox(el.dataset.site, r.id);
 });
 function renderToolboxSheet(siteId, talkId){
@@ -983,7 +996,7 @@ function renderToolboxSheet(siteId, talkId){
   if(!t) return sheetHead('Not found');
   const workers = ((S.state.siteWorkers||{})[siteId]||[]).map(id=>S.state.workers[id]).filter(Boolean);
   const signed = new Set(t.attendance.map(a=>a.workerId).filter(Boolean));
-  let body = sheetHead(t.topic, sessionLabel(t.kind)+' · '+timeAgo(t.heldOn)+(t.durationMinutes?' · '+t.durationMinutes+' min':'')+' · presented by '+t.presenter+' · '+t.orgName);
+  let body = sheetHead(t.topic, sessionLabel(t.kind)+(t.heldOn > todayStr() ? ' · scheduled for '+t.heldOn : ' · '+timeAgo(t.heldOn))+(t.startTime?' at '+t.startTime:'')+(t.durationMinutes?' · '+t.durationMinutes+' min':'')+(t.workType?' · '+t.workType:'')+' · presented by '+t.presenter+' · '+t.orgName);
   if(t.kind==='induction') body += '<div class="notice">Workers chosen from the list who sign here are recorded as inducted for this site from '+t.heldOn+'. Gate clearance counts it'+(isHost()?' under your induction validity rule':'')+'.</div>';
   if(t.content) body += '<details><summary style="font-size:12.5px;color:var(--grey);cursor:pointer;">Talk content</summary><div class="ai-output">'+t.content+'</div></details>';
   body += '<div class="section-title">Attendance ('+t.attendance.length+')</div>';

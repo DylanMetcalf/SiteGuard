@@ -13,6 +13,8 @@ import { publishChange } from '../lib/realtime.js';
 import { storeFile } from './documents.js';
 import { fileUrl } from './bootstrap.js';
 import { rl } from './auth.js';
+import { TOOLS } from '../lib/knowledge.js';
+import { saToday } from '../lib/validity.js';
 
 const t = (max: number) => z.string().trim().max(max);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -122,7 +124,7 @@ export async function workforceState(db: Db, ctx: OrgCtx, activeSiteIds: string[
     for (const tt of talks) {
       byId[tt.id] = {
         id: tt.id, siteId: tt.site_id, topic: tt.topic, content: tt.content, presenter: tt.presenter_name, heldOn: tt.held_on, orgName: tt.org_name,
-        kind: tt.kind, durationMinutes: tt.duration_minutes, attendance: [],
+        kind: tt.kind, durationMinutes: tt.duration_minutes, startTime: tt.start_time, workType: tt.work_type, tools: tt.tools, attendance: [],
       };
       toolboxTalks[tt.site_id].push(byId[tt.id]);
     }
@@ -349,18 +351,28 @@ export default async function workforceRoutes(app: FastifyInstance) {
         topic: t(300).min(1), content: t(20000).default(''), heldOn: optDate, presenter: t(200).optional(),
         kind: z.enum(SESSION_KINDS).default('toolbox'),
         durationMinutes: z.number().int().min(1).max(1440).optional(),
+        startTime: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+        workType: t(200).default(''),
+        tools: z.array(z.string().max(200)).max(30).default([]).refine((a) => a.every((x) => TOOLS.some((tl) => tl.label === x)), 'Unknown tool'),
       })
       .parse(req.body);
+    // The tools in use add their hazards, controls, checks and PPE to what was covered.
+    const picked = TOOLS.filter((tl) => b.tools.includes(tl.label));
+    if (picked.length) {
+      const lines = picked.map((tl) => `${tl.label}\n  Check before use: ${tl.inspection}.\n${tl.hazards.map(([h, c]) => `  • ${h} — ${c}`).join('\n')}\n  PPE: ${tl.ppe.join(', ')}.`);
+      b.content = `${b.content ? b.content.trim() + '\n\n' : ''}Tools and equipment in use${b.workType ? ` (${b.workType})` : ''}:\n${lines.join('\n\n')}`.slice(0, 20000);
+    }
     const { id } = req.params as { id: string };
     return withTx(async (db) => {
       const { site, parties } = await loadSite(db, ctx, id);
       const tt = (await one<{ id: string }>(
         db,
-        `insert into toolbox_talks (site_id, org_id, topic, content, presenter_name, held_on, kind, duration_minutes)
-         values ($1, $2, $3, $4, $5, coalesce($6::date, current_date), $7, $8) returning id`,
-        [site.id, ctx.org.id, b.topic, b.content, b.presenter || ctx.user.name, b.heldOn ?? null, b.kind, b.durationMinutes ?? null],
+        `insert into toolbox_talks (site_id, org_id, topic, content, presenter_name, held_on, kind, duration_minutes, start_time, work_type, tools)
+         values ($1, $2, $3, $4, $5, coalesce($6::date, current_date), $7, $8, $9, $10, $11) returning id`,
+        [site.id, ctx.org.id, b.topic, b.content, b.presenter || ctx.user.name, b.heldOn ?? null, b.kind, b.durationMinutes ?? null, b.startTime ?? null, b.workType, picked.map((tl) => tl.label)],
       ))!;
-      await audit(db, ctx, `Recorded ${SESSION_LABELS[b.kind].toLowerCase()}`, b.topic, site.id);
+      const scheduled = b.heldOn && b.heldOn > saToday();
+      await audit(db, ctx, `${scheduled ? 'Scheduled' : 'Recorded'} ${SESSION_LABELS[b.kind].toLowerCase()}`, `${b.topic}${scheduled ? ' — ' + b.heldOn : ''}`, site.id);
       await publishChange(db, parties);
       return { id: tt.id };
     });
@@ -380,9 +392,11 @@ export default async function workforceRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     if (!isUuid(id)) throw notFound();
     return withTx(async (db) => {
-      const tt = await one<{ site_id: string; topic: string }>(db, 'select site_id, topic from toolbox_talks where id = $1', [id]);
+      const tt = await one<{ site_id: string; topic: string; held_on: string }>(db, 'select site_id, topic, held_on from toolbox_talks where id = $1', [id]);
       if (!tt) throw notFound();
       const { parties } = await loadSite(db, ctx, tt.site_id);
+      // A scheduled session is signed on the day it happens, so an induction never counts early.
+      if (tt.held_on > saToday()) throw conflict(`This session is scheduled for ${tt.held_on}. People sign on the day.`);
       if (b.workerId) {
         const ok = await one(
           db,
