@@ -33,6 +33,7 @@ window.addEventListener('popstate', (e)=>{
   if(consumeSkippedPop()) return;
   if(document.querySelector('.overlay:not(.tutorial)')){ closeSheet(true); return; }
   const st = e.state;
+  if(S.boot && !S.boot.authenticated && (!st || st.publicPage || !st.nav)){ S.authView = (st && st.publicPage) || 'landing'; render(); window.scrollTo(0,0); return; }
   if(!st || !st.nav || st.sheet || !S.boot || !S.boot.authenticated || sameNav(st, navOf())) return;
   S.nav = st.nav; S.moreView = st.moreView; S.activeSiteId = st.activeSiteId; if(st.siteTab) S.siteTab = st.siteTab; S.activeWorkplaceId = st.wp || null; if(st.wpTab) S.wpTab = st.wpTab;
   restoring = true; render(); restoring = false; window.scrollTo(0,0);

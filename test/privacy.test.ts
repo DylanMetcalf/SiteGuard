@@ -54,3 +54,16 @@ describe('organisation data export', () => {
     assert.equal((await new Agent(app).req('GET', '/api/org/export')).status, 401);
   });
 });
+
+describe('public contact form', () => {
+  it('stores an enquiry, ignores bots, and rejects incomplete ones', async () => {
+    const ok = await app.inject({ method: 'POST', url: '/api/contact', payload: { name: 'Nomsa', email: 'nomsa@example.com', topic: 'sales', message: 'We have six sites near Kathu.' } });
+    assert.equal(ok.statusCode, 200);
+    const bot = await app.inject({ method: 'POST', url: '/api/contact', payload: { name: 'Bot', email: 'bot@example.com', message: 'Buy now buy now', website: 'spam.example' } });
+    assert.equal(bot.statusCode, 200);
+    assert.equal((await app.inject({ method: 'POST', url: '/api/contact', payload: { name: 'X', email: 'not-an-email', message: 'hello there' } })).statusCode, 400);
+    const { pool } = await import('./helpers.js');
+    const rows = (await pool.query(`select name from enquiries`)).rows.map((r: { name: string }) => r.name);
+    assert.deepEqual(rows, ['Nomsa']);
+  });
+});

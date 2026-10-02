@@ -41,6 +41,35 @@ export default async function supportRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  /** Public contact form. Stored for the platform overview, and emailed to SUPPORT_EMAIL when set. */
+  app.post('/api/contact', rl(5), async (req) => {
+    const body = z
+      .object({
+        name: z.string().trim().min(1).max(200),
+        email: z.string().trim().email().max(200),
+        phone: z.string().trim().max(40).default(''),
+        company: z.string().trim().max(200).default(''),
+        topic: z.enum(['general', 'help', 'sales', 'enterprise', 'partnership']).default('general'),
+        message: z.string().trim().min(5).max(4000),
+        // Left empty by people; bots that fill every field are quietly ignored.
+        website: z.string().max(200).default(''),
+      })
+      .parse(req.body);
+    if (body.website) return { ok: true };
+    await withTx(async (db) => {
+      await db.query('insert into enquiries (name, email, phone, company, topic, message) values ($1, $2, $3, $4, $5, $6)', [body.name, body.email, body.phone, body.company, body.topic, body.message]);
+      if (config.SUPPORT_EMAIL) {
+        await queueEmail(db, {
+          to: config.SUPPORT_EMAIL,
+          subject: `SiteGuard enquiry (${body.topic}) from ${clip(body.name, 60)}`,
+          lines: [`From: ${body.name} <${body.email}>${body.phone ? ', ' + body.phone : ''}`, body.company ? `Company: ${body.company}` : '', '', body.message].filter((x, i) => i !== 1 || x),
+        });
+      }
+    });
+    req.log.info({ enquiry: body.topic }, 'contact enquiry received');
+    return { ok: true };
+  });
+
   /** Browser-side errors, so bugs users hit show up in the server log. Nothing is stored. */
   app.post('/api/client-errors', rl(20), async (req) => {
     const body = z

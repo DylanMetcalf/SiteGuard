@@ -10,7 +10,7 @@ import { rulesOf } from '../lib/validity.js';
 import { reminderDaysOf } from '../jobs/reminders.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
-import { features, isPlatformAdmin } from '../config.js';
+import { config, features, isPlatformAdmin } from '../config.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
 import { PLANS, grantActive, hasOwnAccess, planOf, standing } from '../lib/plans.js';
 import { sponsoredSiteIds } from '../lib/sponsorship.js';
@@ -363,7 +363,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
   app.get('/api/bootstrap', async (req, reply) => {
     reply.header('cache-control', 'no-store');
     const ctx = req.ctx;
-    const baseFeatures = { demo: features.demo, billing: features.billing, email: features.email, aiConfigured: features.ai };
+    const baseFeatures = { demo: features.demo, billing: features.billing, email: features.email, aiConfigured: features.ai, contact: { email: config.SUPPORT_EMAIL ?? null, phone: config.CONTACT_PHONE ?? null } };
     if (!ctx) return { authenticated: false, features: baseFeatures };
 
     const orgs = await many(

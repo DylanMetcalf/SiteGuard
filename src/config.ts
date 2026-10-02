@@ -39,6 +39,8 @@ const schema = z.object({
   EMAIL_FROM: z.string().default('SiteGuard <no-reply@siteguard.local>'),
   /** Where "Report a problem" messages are emailed (e.g. your own address). Unset → logged only. */
   SUPPORT_EMAIL: z.string().email().optional(),
+  /** Shown on the public contact page, e.g. +27 82 000 0000. Unset → email and form only. */
+  CONTACT_PHONE: z.string().max(40).optional(),
   /** Comma-separated emails of the people who run this service; they see the platform overview (More → Platform). */
   PLATFORM_ADMIN_EMAILS: z.string().default(''),
 

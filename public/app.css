@@ -703,7 +703,17 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .auth-home{display:inline-block; margin:0 0 10px; font-size:13px;}
 .lp{max-width:1120px; margin:0 auto; padding:0 16px calc(24px + env(safe-area-inset-bottom,0px)); color:var(--ink);}
 .lp-top{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 0;}
-.lp-top .brand-name{font-size:19px;}
+.lp-top .brand-name{font-size:23px;}
+.lp-brand{text-decoration:none; color:inherit;}
+.lp-brand .brand-mark{width:42px; height:42px; border-radius:12px; background-size:26px 26px;}
+.lp-top{flex-wrap:wrap;}
+.lp-nav{flex-wrap:nowrap; overflow-x:auto; max-width:100%; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+.lp-nav::-webkit-scrollbar{display:none;}
+.lp-link{color:var(--ink-soft); text-decoration:none; font-size:14px; font-weight:600; white-space:nowrap; padding:6px 2px;}
+.lp-link:hover, .lp-link.active{color:var(--brand);}
+.lp-link.active{box-shadow:inset 0 -2px 0 var(--sage-strong);}
+.lp-nav .btn{white-space:nowrap;}
+@media (max-width:899px){ .lp-nav{order:3; width:100%; gap:16px; padding:6px 0 2px; border-top:1px solid var(--grey-line);} }
 .lp-nav{display:flex; align-items:center; gap:14px;}
 .lp-nav .linkish{font-weight:600; font-size:14px;}
 .lp-eyebrow{font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--sage-strong); margin:0 0 10px;}
@@ -790,3 +800,39 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .hero-actions .btn svg{width:16px;height:16px;}
 .sfr-docs a{font-size:12px;margin-left:8px;white-space:nowrap;}
 .studio-top{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px;}
+
+/* ---------- public site pages ---------- */
+.lp-page-head{padding:28px 0 8px; max-width:760px;}
+.lp-page-head h1{font-family:var(--font-head); font-size:clamp(28px, 6vw, 44px); line-height:1.1; letter-spacing:-.02em; margin:0 0 14px; text-wrap:balance;}
+.lp-p{font-size:14.5px; line-height:1.6; color:var(--ink-soft); margin:0 0 12px;}
+.lp-sub-links{font-size:14px; margin:14px 0 0; color:var(--grey);}
+.lp-sub-links a, .lp-foot a, .lp-foot-links a{color:var(--brand); text-decoration:none; font-weight:600;}
+.lp-list{list-style:none; padding:0; margin:0 0 16px; display:grid; gap:10px;}
+.lp-list li{display:flex; gap:10px; align-items:flex-start; font-size:14.5px; line-height:1.5; color:var(--ink-soft);}
+.lp-list li svg{color:var(--sage-strong); flex:none; margin-top:3px;}
+.lp-olist{margin:0; padding-left:20px; display:grid; gap:8px; font-size:14.5px; line-height:1.55; color:var(--ink-soft);}
+.lp-note{background:var(--sage-bg); border-radius:var(--radius); padding:22px; margin:12px 0;}
+.lp-note h2{margin-top:0;}
+.lp-note p{font-size:14.5px; line-height:1.6; color:var(--ink-soft); margin:0 0 12px;}
+.lp-steps{grid-template-columns:1fr !important;}
+.lp-prices{display:grid; gap:14px; grid-template-columns:1fr; margin-top:12px;}
+.lp-price{background:var(--paper-raised); border:1px solid var(--grey-line); border-radius:var(--radius); padding:22px; display:flex; flex-direction:column;}
+.lp-price h3{margin:0 0 6px;}
+.lp-price .btn{margin-top:auto;}
+.lp-amount{font-family:var(--font-head); font-size:30px; font-weight:700; margin:4px 0 10px; letter-spacing:-.02em;}
+.lp-amount span{font-size:14px; font-weight:500; color:var(--grey);}
+.lp-foot{flex-direction:column; align-items:flex-start;}
+.lp-foot-links{display:block; line-height:1.9;}
+.hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;}
+@media (min-width:700px){ .lp-prices{grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));} .lp-steps{grid-template-columns:1fr 1fr !important;} }
+/* in the app, the logo goes home */
+.brand-home{background:none; border:none; padding:0; cursor:pointer; color:inherit; text-align:left; font:inherit;}
+.topbar .brand-mark{width:36px; height:36px; background-size:22px 22px;}
+.topbar .brand-name{font-size:18px;}
+.welcome{background:var(--paper-raised); border:1px solid var(--grey-line); border-radius:var(--radius); padding:20px; margin:14px 0;}
+.welcome h2{margin:0 0 4px;}
+.welcome .welcome-opt{width:100%; margin-top:8px;}
+.lp-actions{display:flex; align-items:center; gap:12px;}
+.lp-actions .linkish{font-weight:600; font-size:14px;}
+.lp-actions .btn{min-height:38px; padding:0 14px; font-size:13.5px; white-space:nowrap;}
+@media (min-width:900px){ .lp-top{flex-wrap:nowrap;} .lp-nav{order:2; margin-left:auto; gap:18px;} .lp-actions{order:3;} }

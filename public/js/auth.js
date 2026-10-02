@@ -2,7 +2,7 @@
 
 import { api } from './api.js';
 import { S, on, reload, render, showToast, escapeHtml, val } from './core.js';
-import { renderLanding } from './landing.js';
+import { renderLanding, renderPublic, PUBLIC_PAGES, publicPageFor } from './landing.js';
 
 const brand = '<div class="auth-hero"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div></div></div>'
   +'<p class="auth-tagline">Safety files, contractor compliance and site safety — in one place.</p>'
@@ -38,6 +38,8 @@ export async function handleDeepLink(){
   const url = new URL(location.href);
   const token = url.searchParams.get('token') || '';
   const path = url.pathname;
+  const pub = publicPageFor(path);
+  if(pub){ S.authView = pub; if(pub==='pricing') loadPricing(); return false; }
   if(path === '/reset-password' && token){ S.authView = 'reset'; S.authContext = { token }; return true; }
   if(path === '/verify-email' && token){
     try{ await api.post('/api/auth/verify-email', { token }); S.authContext = { ok:'Email confirmed — thanks.' }; }
@@ -72,6 +74,7 @@ export function renderAuth(){
   const signedIn = S.boot && S.boot.authenticated;
   const features = (S.boot && S.boot.features) || {};
   if(v === 'landing') return renderLanding(features);
+  if(PUBLIC_PAGES[v]) return renderPublic(v, features, S.publicCtx);
 
   if(v === 'invite'){
     const inv = S.authContext.invite;
@@ -210,6 +213,27 @@ export function renderNoOrg(){
 }
 
 /* ============ actions ============ */
+/* ---------- the public site ---------- */
+S.publicCtx = S.publicCtx || {};
+function loadPricing(){
+  if(S.publicCtx.pricing && !S.publicCtx.pricing.error) return;
+  api.get('/api/pricing').then((r)=>{ S.publicCtx.pricing = r; render(); }).catch(()=>{ S.publicCtx.pricing = { error: true }; render(); });
+}
+export function showPublic(page, push){
+  if(page==='pricing') loadPricing();
+  if(page==='contact') S.publicCtx = Object.assign({}, S.publicCtx, { sent: false, error: '' });
+  if(push !== false) history.pushState({ publicPage: page }, '', PUBLIC_PAGES[page] || '/');
+  go(page);
+  window.scrollTo(0, 0);
+}
+on('public-go', (el, e)=>{ if(e && (e.metaKey || e.ctrlKey || e.shiftKey)) return; if(e && e.preventDefault) e.preventDefault(); showPublic(el.dataset.page); });
+on('contact-send', async (el)=>{
+  const body = { name: val('ctName'), email: val('ctEmail'), phone: val('ctPhone'), company: val('ctCompany'), topic: val('ctTopic'), message: (document.getElementById('ctMessage')||{}).value || '', website: val('ctWebsite') };
+  if(!body.name || !body.email || body.message.trim().length < 5){ S.publicCtx.error = 'Add your name, email address and a short message.'; keepTyped(render); return; }
+  el.disabled = true;
+  try{ await api.post('/api/contact', body); S.publicCtx.sent = true; S.publicCtx.error = ''; render(); }
+  catch(e){ S.publicCtx.error = e.message; el.disabled = false; keepTyped(render); }
+});
 on('auth-go', (el)=>{ go(el.dataset.view, el.dataset.kind ? { kind: el.dataset.kind } : undefined); window.scrollTo(0, 0); });
 on('auth-show-signin', (el)=>{ S.authContext.showSignin = el.dataset.show === '1'; S.authContext.error = ''; render(); });
 on('auth-done', ()=>finish());

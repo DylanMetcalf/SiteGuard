@@ -24,7 +24,7 @@ export function topbar(){
   const highCount = computeTasks().filter(t=>t.priority==='high').length;
   const personas = S.boot.personas;
   return '<div class="topbar"><div class="brand-row">'
-    +'<div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard'+(isDemoMode()?' <span class="demo-tag">DEMO</span>':'')+'</div>'
+    +'<div class="brand"><button class="brand-home" data-action="nav" data-nav="dashboard" aria-label="SiteGuard — go to your dashboard" title="Dashboard" style="display:flex;align-items:center;gap:10px;"><div class="brand-mark"></div></button><div class="brand-text"><div class="brand-name">SiteGuard'+(isDemoMode()?' <span class="demo-tag">DEMO</span>':'')+'</div>'
     +'<div class="brand-tag"><span class="live-dot'+(S.live?'':' off')+'" title="'+(S.live?'Live — changes from colleagues appear automatically':'Reconnecting…')+'"></span>'+org().name+'</div></div></div>'
     +'<div class="identity">'
     +'<button class="identity-avatar" data-action="open-assistant" aria-label="Ask the SiteGuard Assistant" title="Ask the SiteGuard Assistant" style="background:var(--brand-bg); color:var(--brand-ink);">'+ICONS.sparkle+'</button>'
@@ -184,18 +184,35 @@ function renderDashboard(){
   const head = '<div class="dash-hero"><div class="flexbetween" style="align-items:flex-start;"><div><p class="hero-eyebrow">'+org().name+'</p><h1>'+greeting()+'</h1>'
     +'<p class="greeting">'+(urgent ? urgent+' urgent item'+(urgent===1?'':'s')+' need'+(urgent===1?'s':'')+' you today.' : findings.length ? findings.length+' item'+(findings.length===1?'':'s')+' to look at — nothing urgent.' : 'Everything is in order across your sites.')+'</p></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn secondary small" data-action="start-tour">Walkthrough</button><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div></div>'
-    +(isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button><button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>' : '')
+    +(isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button><button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>'
+      : isHost() ? '<div class="hero-actions">'+(isOrgAdmin() && !readOnly() ? '<button class="btn primary" data-action="new-site">'+ICONS.plus+' Add site</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="passport">Contractors</button><button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>' : '')
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
   const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
   let start = gettingStarted();
-  // A new contractor's first step is usually a code the site gave them: put it first.
-  if(ctx && !ctx.mySites.length && !ctx.invited.length && isOrgAdmin() && !readOnly())
-    start = '<button class="qa-item join-first" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Got a code from a site?</div><div class="qa-sub">Join the site with it — takes 10 seconds</div></div>'+ICONS.chevron+'</button>'
-      + '<button class="qa-item join-first" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">Working for a client who isn\'t on SiteGuard?</div><div class="qa-sub">Start a project and build their safety file yourself</div></div>'+ICONS.chevron+'</button>' + start;
+  const welcome = welcomeCard();
+  if(welcome) return head + welcome;
   if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
   return head + start + parts.join('');
 }
+
+/** First run: one clear choice instead of the whole platform. Shown until the company has a site or file. */
+function welcomeCard(){
+  if(!isOrgAdmin() || readOnly() || (isDemoMode() && !org().cleanDemo)) return '';
+  if(Object.keys(S.state.sites).length || Object.keys(S.state.workplaces||{}).length) return '';
+  let dismissed = false; try{ dismissed = localStorage.getItem('sg_welcome_done_'+org().id) === '1'; }catch{ /* private mode */ }
+  if(dismissed) return '';
+  const opt = (action, icon, title, sub, extra) => '<button class="qa-item welcome-opt" data-action="'+action+'"'+(extra||'')+'><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
+  return '<div class="welcome"><h2>Welcome to SiteGuard</h2><p class="greeting">What would you like to do first?</p>'
+    + (isContractor()
+      ? opt('sfb-start', ICONS.passport, 'Build my first safety file', 'For a site on SiteGuard or for any client')
+        + opt('join-site', ICONS.link, 'Join a site', 'You have a code from a mine or site')
+      : opt('new-site', ICONS.sites, 'Set up my first site', 'Choose what every contractor\'s safety file must contain'))
+    + opt('goto-more', ICONS.gear, 'Set up my company', 'Company details and logo for your documents', ' data-view="settings"')
+    + opt('start-tour', ICONS.sparkle, 'Explore SiteGuard', 'A two-minute guided tour of every page')
+    + '<button class="linkish" style="margin-top:8px;" data-action="welcome-skip">Skip — show me the dashboard</button></div>';
+}
+on('welcome-skip', ()=>{ try{ localStorage.setItem('sg_welcome_done_'+org().id, '1'); }catch{ /* private mode */ } render(); });
 
 function contractorDashboardContext(){
   const allMySites = Object.values(S.state.sites);
