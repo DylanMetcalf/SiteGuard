@@ -53,3 +53,10 @@ These are **targets to set up and test, not promises**. Check what your hosting 
   settings → Download our data.
 - **Deletion:** there is no self-service deletion yet, because the audit trail is append-only. Handle it
   by hand with legal advice on what must be kept (see `PARKING_LOT.md`).
+
+## Staging (before the first paying customer)
+
+Use Render's *Duplicate* (or a second service from the same repository) with its own database, and point
+it at a branch you deploy to first. Use Stripe test keys there and no real customer data. Test the
+change on staging, then merge to `main` for production. Migrations only add things, so staging and
+production can run the same code.

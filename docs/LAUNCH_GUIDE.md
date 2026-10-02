@@ -173,6 +173,23 @@ full access and no limits, so you can sell your first customers on a simple invo
 switch Stripe on later. Stripe does support South African businesses, but check your company is
 eligible before relying on it. A local option such as Paystack or PayFast is in the parking lot.
 
+**Who pays (once Stripe is on).** Everyone starts with a 14-day trial of the full product. After that:
+contractors pay for their own company (Contractor Starter or Pro); mines and sites pay for theirs, and
+their subscription **sponsors** each contractor's file on their own sites, so a contractor invited by a
+paying mine can finish that mine's safety file without paying. A sponsorship never covers the
+contractor's other clients. Nothing is deleted when a trial ends; it becomes read-only until a plan is chosen.
+
+**Prices on the website.** More → Platform → *Pricing page*. The prices there are only what the public
+pricing page shows; what customers are charged is the Stripe price for each plan
+(`STRIPE_PRICE_CONTRACTOR_STARTER`, `STRIPE_PRICE_CONTRACTOR_PRO`, `STRIPE_PRICE_HOST_STARTER`,
+`STRIPE_PRICE_HOST_PRO`), so keep them in step. The starting prices are a proposal (see `docs/DECISIONS.md`).
+
+**Free access for family, testers or partners.** More → Platform → *Promo codes* → *Create a code*, e.g.
+`FAMILYFREE`, plan Contractor Pro, 100% off, blank "lasts for" (no end date), and "how many
+organisations" = the number of people you'll give it to. They type the code under **More → Plan &
+billing → Have a promo code?**. Switch a code off at any time. For a mining group on an agreed contract,
+use *Give a plan* to set them to Enterprise until a date.
+
 ---
 
 ## What it costs to start
@@ -234,6 +251,8 @@ covers.
 - **Privacy notice and terms.** `/privacy` and `/terms` are drafts that describe what SiteGuard does.
   Before the first paid customer, ask an attorney to finish them. The pages list what is missing:
   your company details, Information Officer, retention periods and governing law.
+- **Enquiries.** The public contact page (`/contact`) saves each enquiry to More → Platform and emails
+  `SUPPORT_EMAIL`. Set `CONTACT_PHONE` in Render if you want a phone number shown there.
 - **Customers' own data.** An organisation's admin can download all of its data under **More →
   Organisation settings → Download our data**. Point customers there if they ask for a copy.
   See `docs/OPERATIONS.md` for backups and recovery.

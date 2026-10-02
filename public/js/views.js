@@ -1034,16 +1034,16 @@ function renderBilling(){
   if(b.coupon) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">Promo code '+escapeHtml(b.coupon)+' will be applied when you subscribe.</div>';
   const current = b.plans.find(p=>p.id===b.plan);
   html += '<div class="card checkpoint"><div class="kv"><span>Current plan</span><span>'+escapeHtml(current?current.name:b.plan)+'</span></div>'
-    +'<div class="kv"><span>Status</span><span>'+escapeHtml(b.status)+(b.status==='trialing'&&b.trialEndsAt?' until '+timeAgo(b.trialEndsAt):'')+'</span></div>'
+    +'<div class="kv"><span>Status</span><span>'+(b.status==='trialing' && b.trialEndsAt ? (new Date(b.trialEndsAt) > new Date() ? 'Trial until '+timeAgo(b.trialEndsAt) : 'Trial ended '+timeAgo(b.trialEndsAt)) : escapeHtml(b.status))+'</span></div>'
     +'<div class="kv"><span>Seats</span><span>'+b.seatsUsed+' used of '+b.seatLimit+'</span></div>'
     +(b.activeSites!==null?'<div class="kv"><span>Active sites</span><span>'+b.activeSites+(current&&current.siteLimit?' of '+current.siteLimit:'')+'</span></div>':'')
     +(b.currentPeriodEnd?'<div class="kv"><span>Renews</span><span>'+timeAgo(b.currentPeriodEnd)+'</span></div>':'')
     +(b.hasCustomer?'<button class="btn secondary block" style="margin-top:10px;" data-action="billing-portal">Payment method &amp; invoices</button>':'')+'</div>';
   html += '<div class="section-title">'+(b.hasSubscription?'Change plan or seats':'Choose a plan')+'</div>';
   html += '<label class="field-label" for="billSeats">Seats</label><input type="number" id="billSeats" min="'+Math.max(1,b.seatsUsed)+'" value="'+Math.max(b.seatLimit, b.seatsUsed)+'">';
-  html += b.plans.map(p=>'<div class="plan-card'+(p.id===b.plan?' current':'')+'"><div class="flexbetween"><div class="site-card-title">'+escapeHtml(p.name)+'</div>'+(p.id===b.plan?'<span class="badge approved">Current</span>':'')+'</div>'
+  html += b.plans.map(p=>'<div class="plan-card'+(p.id===b.plan?' current':'')+'"><div class="flexbetween"><div class="site-card-title">'+escapeHtml(p.name)+'</div>'+(p.id===b.plan && (b.ownAccess || b.status!=='trialing') ?'<span class="badge approved">Current</span>':'')+'</div>'
     +'<div class="site-card-sub">'+escapeHtml(p.blurb)+'</div>'
-    +(p.paid ? (p.purchasable ? '<button class="btn '+(p.id===b.plan?'secondary':'primary')+' small" style="margin-top:8px;" data-action="billing-choose" data-plan="'+p.id+'">'+(b.hasSubscription ? (p.id===b.plan?'Update seats':'Switch to '+escapeHtml(p.name)) : 'Subscribe')+'</button>' : '<div class="site-card-sub" style="margin-top:6px;">Not available yet.</div>') : '<div class="site-card-sub" style="margin-top:6px;">'+(p.id==='contractor_free' ? 'No subscription — covers only the files sites sponsor.' : 'No card needed.')+'</div>')
+    +(p.paid ? (p.purchasable ? '<button class="btn '+(p.id===b.plan?'secondary':'primary')+' small" style="margin-top:8px;" data-action="billing-choose" data-plan="'+p.id+'">'+(b.hasSubscription ? (p.id===b.plan?'Update seats':'Switch to '+escapeHtml(p.name)) : 'Subscribe')+'</button>' : '<div class="site-card-sub" style="margin-top:6px;">Not available yet.</div>') : '<div class="site-card-sub" style="margin-top:6px;">'+(p.id==='contractor_free' ? '' : 'No card needed.')+'</div>')
     +'</div>').join('');
   html += '<div class="site-card-sub" style="margin-top:8px;">Plan changes are prorated. Cancel any time from “Payment method &amp; invoices”; your data stays readable.</div>';
   return html + promo;

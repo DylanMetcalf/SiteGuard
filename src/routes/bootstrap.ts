@@ -53,6 +53,12 @@ export async function visibleSites(db: Db, ctx: OrgCtx): Promise<SiteRow[]> {
   );
 }
 
+/** Billing details kept in settings (a pending Stripe coupon) never go to the browser. */
+function withoutBilling(settings: unknown): Record<string, unknown> {
+  const { checkoutCoupon: _c, checkoutCouponCode: _cc, ...rest } = (settings ?? {}) as Record<string, unknown>;
+  return rest;
+}
+
 export async function buildState(db: Db, ctx: OrgCtx) {
   const host = isHost(ctx);
   const sites = await visibleSites(db, ctx);
@@ -75,7 +81,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     permits: {},
     diary: {},
     settings: host
-      ? { inspectxEnabled: false, inspectxBaseUrl: '', ...(ctx.org.settings as object), reminderDays: reminderDaysOf(ctx.org.settings) }
+      ? { inspectxEnabled: false, inspectxBaseUrl: '', ...withoutBilling(ctx.org.settings), reminderDays: reminderDaysOf(ctx.org.settings) }
       : {
           inspectxEnabled: false, inspectxBaseUrl: '', reminderDays: reminderDaysOf(ctx.org.settings),
           reminderDigest: (ctx.org.settings as Record<string, unknown> | null)?.reminderDigest, weeklySummary: (ctx.org.settings as Record<string, unknown> | null)?.weeklySummary,

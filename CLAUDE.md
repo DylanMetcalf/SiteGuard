@@ -37,6 +37,9 @@ haven't built.
 - Contractor projects (`routes/projects.ts`) are ordinary files for a private client record (`organisations.managed_by_org`);
   `loadSite` sets `site.project`. Never add memberships to a client record; archive projects, never delete them.
 - The Walkthrough (`public/js/tour.js`) only navigates: when a screen changes, check its step's `target` selector still exists.
+- Who pays: `hasOwnAccess` (plan, trial or grant) vs site sponsorship (`lib/sponsorship.ts`). A contractor
+  without own access may only change sponsored files; `loadSite` enforces it for writes. Never hard-code
+  prices: the pricing page reads `plan_settings` (`lib/pricing.ts`); grants come from promo codes or the admin.
 - Plan checks go through `lib/entitlements.ts` (`can` / `requireFeature`), never plan names in routes.
   Readiness counts an optional requirement only once filed (`countsTowardReadiness`, mirrored in `core.js`).
 - The platform overview (`routes/admin.ts`) is read-only, counts only, 404 unless `isPlatformAdmin`.

@@ -5,6 +5,22 @@ Newest first.
 
 ---
 
+**DECISION** Contractors pay for their own company; a mine's subscription sponsors only the contractor's file on that mine's site (`sponsorships`). Without its own plan a contractor can change only sponsored files; its own projects and other clients need a plan. Everyone starts with a 14-day trial of the full product; nothing is deleted when it ends.
+**REASON** "Free for contractors, always" gave away the product the contractor gets most value from. Sponsorship keeps the mine's workflow free for its contractors without making SiteGuard free for every other client.
+**DATE** 2026-10-02
+
+**DECISION** Promo codes and enterprise deals are grants on the organisation (plan + optional end date), not database edits or hidden prices. A 100% code needs no Stripe; a partial one applies its Stripe coupon at checkout.
+**REASON** Family, testers and partners get full access without changing public pricing, and every grant is visible, revocable and audited.
+**DATE** 2026-10-02
+
+**DECISION** Proposed starting prices (editable in Platform): Contractor Starter R399/month, Contractor Pro R899/month, Site Starter R2,499/month, Site Professional R5,999/month, Enterprise by quote.
+**REASON** Online safety-file generators sell single files from about R400–R500 and specialist-compiled files cost roughly R2,000–R10,000 (owner's reference: about R5,000 per traditionally prepared file). A month of a contractor plan should cost less than one prepared file and cover every file. To be validated with pilot customers.
+**DATE** 2026-10-02
+
+**DECISION** Mines archive sites rather than delete them; a site can be deleted only while no contractor has joined it.
+**REASON** Contractors' files and the audit trail are the record, but nobody should be stuck with a site they created by mistake.
+**DATE** 2026-10-02
+
 **DECISION** What each plan includes lives in one list (`lib/entitlements.ts`); routes ask `can()` / `requireFeature()` instead of checking plan names.
 **REASON** Plans and prices will change; one list means the compliance code never does. The web app is told what the organisation has, but the server decides.
 **DATE** 2026-10-01

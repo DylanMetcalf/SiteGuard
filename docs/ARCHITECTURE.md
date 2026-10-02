@@ -111,6 +111,10 @@ refuse.
 | Make a site's or one file's requirement optional / required | ✓ | | | own projects only | |
 | Record toolbox talks, induction, awareness, briefing, meeting or training sessions | ✓ | ✓ | | ✓ | ✓ |
 | Set reminder days; download the organisation's data (JSON) | ✓ | | | ✓ | |
+| End or resume sponsoring a contractor's file on own site | ✓ | | | | |
+| Archive, restore, duplicate a site; delete one nobody joined | ✓ | | | | |
+| Arrange the order of documents in own project file | | | | ✓ | |
+| Redeem a promo code | ✓ | | | ✓ | |
 | Platform overview (More → Platform) | only addresses in `PLATFORM_ADMIN_EMAILS` with a confirmed email; 404 for everyone else | | | | |
 
 More rules the server enforces:
@@ -338,6 +342,43 @@ storage), and routes in `routes/studio.ts`.
 - **Limits**: `projectLimit` on plans (free: 2 active; enforced only when billing is configured).
 - **Timeline**: `GET /api/sites/:id/timeline` returns the file's audit events written by either
   party (latest 200), through `loadSite`.
+
+## Who pays: trials, sponsorships, grants, promo codes, pricing
+
+- **Own access** (`hasOwnAccess` in `lib/plans.ts`): a subscription, a trial in date (14 days for everyone),
+  or a grant (`organisations.grant_plan/grant_until`, from a promo code or the platform admin). Without
+  billing configured everyone has it.
+- **Sponsorships** (`lib/sponsorship.ts`, table `sponsorships`): one row per contractor file on a mine's
+  site, created when the contractor joins (code or invitation). In force while not ended, within its
+  dates, and while the mine itself is in good standing. A contractor without own access keeps writing
+  only to sponsored files: `loadSite` refuses writes (402) on any other file for such a contractor
+  (`ctx.write` marks non-GET requests), and `requireWritable` treats it as lapsed when nothing sponsors it.
+  Reads and downloads always work. Mines end/resume a sponsorship (`POST /api/sites/:id/sponsorship/:action`).
+- **Entitlements** (`lib/entitlements.ts`): a sponsored-only contractor gets `SPONSORED` features;
+  `CONTRACTOR_PROJECTS`, AI and share links need its own plan.
+- **Promo codes** (`lib/promos.ts`, tables `promo_codes`, `promo_redemptions`): created by the platform
+  admin; redeemed by an org admin at `POST /api/billing/redeem` with the code row locked; the same error
+  for every invalid case so codes can't be probed. A 100% code becomes a grant; less needs a Stripe coupon.
+- **Pricing page** (`lib/pricing.ts`, table `plan_settings`): display prices, edited in Platform, served
+  publicly at `GET /api/pricing`. Charges come from Stripe prices only.
+- **Platform admin** also searches organisations and gives or removes a plan (`/api/admin/orgs/:id/grant`);
+  each change is written to that customer's own audit trail as "SiteGuard platform".
+
+## Safety files, sites and the public site
+
+- **Safety files** (contractor nav): Create safety file (`public/js/safetyfiles.js`) → join a site with its
+  code, start a project, or continue a file → the guide (`guide.js`) → the readiness check sheet → preview
+  (`?preview=1`, inline, no revision recorded) / download / share. Project files can be reordered
+  (`POST /api/projects/:id/requirements/order`). Upload document routes a file to a company document or a
+  file's requirement through the existing requirement sheet.
+- **Sites** (mine): archive/restore/delete-while-unused/duplicate (`/api/workplaces/:id/...`, migration 017).
+  Archived sites are closed to joining and don't count toward the site limit.
+- **Sessions** record start time, work type and tools (migration 018); tools add their hazards, checks
+  and PPE to the content. A future-dated session is scheduled and can't be signed before its date.
+- **Risk assessments** take a matrix size (5×5 default, 4×4, 3×3).
+- **Public site** (`public/js/landing.js`): `/`, `/features`, `/safety-file-builder`, `/for-contractors`,
+  `/for-sites`, `/pricing`, `/how-it-works`, `/contact` (SPA routes; the server serves the shell for each).
+  `POST /api/contact` stores `enquiries` (rate-limited, honeypot) and emails `SUPPORT_EMAIL`.
 
 ## Plans, privacy pages, data export, platform overview, offline shell
 
