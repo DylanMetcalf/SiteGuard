@@ -148,7 +148,7 @@ export async function renderPdf(content: DocContent, meta: DocMeta): Promise<Buf
       },
       layout: tableLayout(brand),
     },
-    { text: 'This document is controlled electronically in SiteGuard. Printed copies are uncontrolled.', fontSize: 8, color: MUTED, italics: true, margin: [0, 16, 0, 0], pageBreak: 'after' },
+    { text: 'This document is controlled electronically in COMVERA. Printed copies are uncontrolled.', fontSize: 8, color: MUTED, italics: true, margin: [0, 16, 0, 0], pageBreak: 'after' },
   ];
 
   const body: Node[] = [];
@@ -166,7 +166,7 @@ export async function renderPdf(content: DocContent, meta: DocMeta): Promise<Buf
   const def = {
     pageSize: 'A4',
     pageMargins: [48, 78, 48, 58],
-    info: { title, author: meta.companyName, subject: meta.blueprintName, creator: 'SiteGuard Document Studio' },
+    info: { title, author: meta.companyName, subject: meta.blueprintName, creator: 'COMVERA Document Studio' },
     images: logo ? { logo } : {},
     defaultStyle: { font: 'Helvetica', fontSize: 9.5, lineHeight: 1.3, color: INK },
     background: (page: number, size: { width: number; height: number }) =>

@@ -4,6 +4,7 @@
  * monthly allowance before anything is sent to Anthropic.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { track } from './events.js';
 import type { FastifyBaseLogger } from 'fastify';
 import { config } from '../config.js';
 import { one, pool } from '../db/pool.js';
@@ -34,6 +35,7 @@ export async function reserveAiRequest(orgId: string): Promise<void> {
     await pool.query('update ai_usage set requests = requests - 1 where org_id = $1 and month = $2', [orgId, month()]);
     throw new HttpError(429, 'ai_limit', `Your organisation has used this month's ${config.AI_MONTHLY_REQUEST_LIMIT} AI requests. The allowance resets on the 1st.`);
   }
+  await track(pool, orgId, 'ai_generation');
 }
 
 export async function recordTokens(orgId: string, usage: { input_tokens?: number | null; output_tokens?: number | null } | undefined) {

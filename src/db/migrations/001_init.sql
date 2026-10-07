@@ -1,4 +1,4 @@
--- SiteGuard core schema.
+-- COMVERA core schema.
 --
 -- Tenancy model
 -- -------------

@@ -1,5 +1,5 @@
 -- Contractor projects: a contractor builds a safety file for a client or site that
--- isn't on SiteGuard. The client is a private record owned by the contractor (an
+-- isn't on COMVERA. The client is a private record owned by the contractor (an
 -- organisation nobody can sign in to, marked managed_by_org), and the project is an
 -- ordinary safety file for that client, so every existing screen, export, share
 -- link and permission rule applies unchanged. Deleting the contractor deletes its

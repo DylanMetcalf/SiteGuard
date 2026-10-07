@@ -72,7 +72,7 @@ async function hostFindings(db: Db, orgId: string): Promise<Finding[]> {
             (current_date - coalesce(max(a.audited_on), greatest(s.created_at::date, (select applied_at::date from schema_migrations where name = '011_gate_audits_suspension.sql'))))::int as days
        from sites s join contractors c on c.id = s.contractor_id left join contractor_audits a on a.site_id = s.id
       where s.org_id = $1 and s.status in ('in_progress', 'site_ready')
-      -- Counted from when audits arrived in SiteGuard, so existing sites aren't all flagged on day one.
+      -- Counted from when audits arrived in COMVERA, so existing sites aren't all flagged on day one.
       group by s.id, s.name, c.name
      having (current_date - coalesce(max(a.audited_on), greatest(s.created_at::date, (select applied_at::date from schema_migrations where name = '011_gate_audits_suspension.sql')))) >= 30`,
     [orgId],
@@ -390,17 +390,17 @@ export async function sendWeeklySummaries(now = new Date()): Promise<number> {
     const high = findings.filter((f) => f.severity === 'high').length;
     const lines = findings.length
       ? [
-          `The SiteGuard compliance agent has ${plural(findings.length, 'item')} open for ${org.name}${high ? `, ${high} of them high priority` : ''}:`,
+          `The COMVERA compliance agent has ${plural(findings.length, 'item')} open for ${org.name}${high ? `, ${high} of them high priority` : ''}:`,
           ...findings.slice(0, 10).map((f) => `• [${f.severity}] ${f.title}`),
-          ...(findings.length > 10 ? [`…and ${findings.length - 10} more in SiteGuard.`] : []),
+          ...(findings.length > 10 ? [`…and ${findings.length - 10} more in COMVERA.`] : []),
         ]
       : [`Nothing needs attention at ${org.name} this week. The compliance agent will keep checking every 15 minutes.`];
     await withTx(async (db) => {
       await queueToOrg(db, org.id, ['owner', 'admin'], (to) => ({
         to: to.email,
-        subject: findings.length ? `SiteGuard weekly summary: ${plural(findings.length, 'item')} to action` : 'SiteGuard weekly summary: all clear',
+        subject: findings.length ? `COMVERA weekly summary: ${plural(findings.length, 'item')} to action` : 'COMVERA weekly summary: all clear',
         lines: [`Hi ${to.name},`, ...lines],
-        action: { label: 'Open SiteGuard', url: appUrl('/') },
+        action: { label: 'Open COMVERA', url: appUrl('/') },
         dedupeKey: `weekly:${org.id}:${to.email}:${week}`,
         footer: 'Admins can turn this summary off under More → Organisation settings → Notifications.',
       }));

@@ -31,12 +31,15 @@ function stats(wid){
 
 /** The mine's list of shared sites, for the Sites tab. */
 export function workplaceCards(){
-  const ws = Object.values(W()).filter(w=>matchSearch('sites', w.name, w.location));
-  if(!ws.length) return '';
-  return ws.map(w=>{
+  const all = Object.values(W()).filter(w=>matchSearch('sites', w.name, w.location));
+  const archived = all.filter(w=>w.archivedAt);
+  const ws = S.showArchived ? archived : all.filter(w=>!w.archivedAt);
+  const toggle = archived.length ? '<button class="linkish" style="margin:4px 0 10px;" data-action="wp-show-archived">'+(S.showArchived ? '← Back to active sites' : 'Archived sites ('+archived.length+')')+'</button>' : '';
+  if(!ws.length) return toggle;
+  return toggle + ws.map(w=>{
     const st = stats(w.id);
     return '<div class="card site-card wp-card" data-action="open-workplace" data-id="'+w.id+'" role="button" tabindex="0">'
-      +'<div class="flexbetween" style="align-items:flex-start;"><div><div class="site-card-title">'+w.name+'</div><div class="site-card-sub">'+(w.location||'No location set')+'</div></div>'
+      +'<div class="flexbetween" style="align-items:flex-start;"><div><div class="site-card-title">'+w.name+(w.archivedAt?' <span class="badge">Archived</span>':'')+'</div><div class="site-card-sub">'+(w.location||'No location set')+'</div></div>'
       +(w.code?'<span class="wp-code-pill mono">'+w.code+'</span>':'')+'</div>'
       +'<div class="wp-mini-stats"><span><b>'+st.files.length+'</b> contractor'+(st.files.length===1?'':'s')+'</span>'
       +'<span class="'+(st.review?'hot':'')+'"><b>'+st.review+'</b> to review</span><span><b>'+st.outstanding+'</b> outstanding</span><span><b>'+st.ready+'</b> Site Ready</span></div>'
@@ -52,13 +55,14 @@ export function renderWorkplace(wid){
   const admin = isOrgAdmin() && !readOnly();
   let html = '<div style="margin-bottom:14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><button class="btn secondary small" data-action="back-sites">← Sites</button>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'+(canReview() && !readOnly() && st.files.length?'<button class="btn secondary small" data-action="wp-request-all" data-id="'+wid+'">Request from contractors</button>':'')
-    +(admin?'<button class="btn secondary small" data-action="wp-edit" data-id="'+wid+'">Edit site</button>':'')+'</div></div>'
+    +(admin?'<button class="btn secondary small" data-action="wp-edit" data-id="'+wid+'">Edit site</button><button class="btn secondary small" data-action="wp-manage" data-id="'+wid+'">More</button>':'')+'</div></div>'
+    +(w.archivedAt ? '<div class="notice">Archived '+w.archivedAt.slice(0,10)+'. Closed to new contractors; every file stays on the record.'+(admin?' <button class="linkish" data-action="wp-lifecycle" data-id="'+wid+'" data-do="restore">Restore</button>':'')+'</div>' : '')
     +'<div class="view-head"><h1>'+w.name+'</h1><p>'+[w.location, st.files.length+' contractor'+(st.files.length===1?'':'s')].filter(Boolean).join(' · ')+'</p></div>';
   if(w.code && st.files.length && !S.wpCodeOpen) html += '<div class="card wp-code-line"><span class="hero-eyebrow" style="color:var(--grey);margin:0;">Site code</span><span class="mono wp-code-sm">'+w.code+'</span>'
       +(w.joinOpen?'':'<span class="badge missing">Closed</span>')+'<button class="btn secondary small" data-action="wp-share" data-id="'+wid+'">Share</button><button class="linkish" data-action="wp-code-more">More</button></div>';
   else if(w.code) html += '<div class="card wp-code-card"><div><div class="hero-eyebrow" style="color:var(--grey);">Site code</div>'
       +'<div class="wp-code mono" aria-label="Site code">'+w.code+'</div>'
-      +'<div class="site-card-sub">'+(w.joinOpen ? 'Give this to every contractor working here. They type it in SiteGuard under <strong>Join a site with a code</strong> and their safety file for this site starts straight away.' : '<strong style="color:var(--red);">Closed</strong> — contractors can\'t join with this code until you open it again.')+'</div></div>'
+      +'<div class="site-card-sub">'+(w.joinOpen ? 'Give this to every contractor working here. They type it in COMVERA under <strong>Join a site with a code</strong> and their safety file for this site starts straight away.' : '<strong style="color:var(--red);">Closed</strong> — contractors can\'t join with this code until you open it again.')+'</div></div>'
       +'<div class="row-actions"><button class="btn primary small" data-action="wp-share" data-id="'+wid+'">Share code</button><button class="btn secondary small" data-action="wp-copy" data-id="'+wid+'">Copy</button>'
       +(admin?'<button class="btn secondary small" data-action="wp-open" data-id="'+wid+'" data-open="'+(w.joinOpen?'0':'1')+'">'+(w.joinOpen?'Close to new contractors':'Open to contractors')+'</button><button class="btn secondary small" data-action="wp-newcode" data-id="'+wid+'">New code</button>':'')+'</div></div>';
   html += '<div class="attn-grid" style="margin:12px 0;">'
@@ -109,11 +113,11 @@ function queueHtml(files){
     return { f, c, items };
   }).filter(g=>g.items.length);
   if(!groups.length) return '<div class="empty"><h3>Nothing waiting</h3><p>Documents contractors submit for this site appear here, so you can vet them one after another.</p></div>';
-  return '<div class="site-card-sub" style="margin:4px 2px 10px;">Tap a document to read it and approve it or send it back. Documents written in SiteGuard open section by section, so you can approve each part and highlight what needs changing.</div>'
+  return '<div class="site-card-sub" style="margin:4px 2px 10px;">Tap a document to read it and approve it or send it back. Documents written in COMVERA open section by section, so you can approve each part and highlight what needs changing.</div>'
     + groups.map(({ f, c, items })=>'<div class="section-title">'+c.name+' · '+items.length+'</div><div class="card">'+items.map(r=>{
       const d = S.state.documents[r.id]||{};
       return '<div class="reqrow" data-action="'+(d.studioDocId?'open-review':'open-req')+'" '+(d.studioDocId?'data-id="'+d.studioDocId+'" data-req="'+r.id+'"':'data-req="'+r.id+'"')+' role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main"><div class="reqrow-name">'+r.name+'</div>'
-        +'<div class="reqrow-meta">'+badge('awaiting_review')+'<span class="srctag">'+r.category+'</span>'+(d.version?'<span class="srctag">'+d.version+'</span>':'')+(d.studioDocId?'<span class="srctag">Written in SiteGuard</span>':'')+'</div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
+        +'<div class="reqrow-meta">'+badge('awaiting_review')+'<span class="srctag">'+r.category+'</span>'+(d.version?'<span class="srctag">'+d.version+'</span>':'')+(d.studioDocId?'<span class="srctag">Written in COMVERA</span>':'')+'</div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
     }).join('')+'</div>').join('');
 }
 
@@ -178,7 +182,7 @@ on('open-workplace', (el)=>{ S.nav='sites'; S.activeSiteId=null; S.activeWorkpla
 on('wp-tab', (el)=>{ S.wpTab = el.dataset.tab; render(); });
 on('wp-code-more', ()=>{ S.wpCodeOpen = true; S.keepScroll = true; render(); S.keepScroll = false; });
 on('wp-trade', (el)=>{ S.wpTrade = el.dataset.trade; S.keepScroll = true; render(); S.keepScroll = false; });
-const shareText = (w)=>'Join '+unescapeHtml(w.name)+' on SiteGuard: open '+location.origin+' , sign in as your contractor company and tap "Join a site with a code". Site code: '+w.code;
+const shareText = (w)=>'Join '+unescapeHtml(w.name)+' on COMVERA: open '+location.origin+' , sign in as your contractor company and tap "Join a site with a code". Site code: '+w.code;
 on('wp-copy', async (el)=>{ const w = W()[el.dataset.id]; try{ await navigator.clipboard.writeText(w.code); showToast('Site code copied'); }catch{ showToast('Site code: '+w.code); } });
 on('wp-share', async (el)=>{
   const w = W()[el.dataset.id];
@@ -256,3 +260,29 @@ on('wp-remove-go', async (el)=>{
   }
 });
 on('wp-restore', async (el)=>{ await act(()=>api.post('/api/workplaces/files/'+el.dataset.site+'/restore'), 'Restored to the site', el); });
+
+/* ---------- archive, restore, duplicate, delete ---------- */
+on('wp-show-archived', ()=>{ S.showArchived = !S.showArchived; render(); });
+on('wp-manage', (el)=>{
+  const w = W()[el.dataset.id], files = stats(w.id).files.length;
+  openSheet(sheetHead('Manage site', w.name)
+    +'<div class="card"><div class="site-card-title" style="font-size:14px;">Duplicate</div><div class="site-card-sub" style="margin:4px 0 8px;">Start a new site with the same requirements, location and emergency details. It gets its own code.</div>'
+    +'<label class="field-label" for="dupName">Name of the new site</label><input type="text" id="dupName" maxlength="300" value="'+w.name+' (copy)">'
+    +'<button class="btn secondary block" style="margin-top:8px;" data-action="wp-duplicate" data-id="'+w.id+'">Duplicate site</button></div>'
+    +'<div class="card"><div class="site-card-title" style="font-size:14px;">'+(w.archivedAt?'Restore':'Archive')+'</div><div class="site-card-sub" style="margin:4px 0 8px;">'+(w.archivedAt?'Bring the site back to your list. It stays closed to new contractors until you open it.':'Hide the site and close it to new contractors. Contractors\' files, documents and the audit trail stay as the record, and you can restore it later.')+'</div>'
+    +'<button class="btn secondary block" data-action="wp-lifecycle" data-id="'+w.id+'" data-do="'+(w.archivedAt?'restore':'archive')+'">'+(w.archivedAt?'Restore site':'Archive site')+'</button></div>'
+    +(files ? '' : '<div class="card"><div class="site-card-title" style="font-size:14px;">Delete</div><div class="site-card-sub" style="margin:4px 0 8px;">No contractor has joined this site yet, so it can be deleted completely.</div><button class="btn danger block" data-action="wp-lifecycle" data-id="'+w.id+'" data-do="delete">Delete site</button></div>'));
+});
+on('wp-lifecycle', async (el)=>{
+  const what = el.dataset.do, w = W()[el.dataset.id];
+  if(what==='delete' && !confirm('Delete '+unescapeHtml(w.name)+'? This can\'t be undone.')) return;
+  if(what==='archive' && !confirm('Archive '+unescapeHtml(w.name)+'? It closes to new contractors; nothing is deleted.')) return;
+  const ok = await act(()=>api.post('/api/workplaces/'+encodeURIComponent(w.id)+'/'+what), what==='delete'?'Site deleted':what==='archive'?'Site archived':'Site restored', el);
+  if(ok){ closeSheet(); if(what!=='restore'){ S.activeWorkplaceId = null; S.nav = 'sites'; } render(); }
+});
+on('wp-duplicate', async (el)=>{
+  const name = val('dupName');
+  if(!name){ showToast('Name the new site'); return; }
+  const r = await act(()=>api.post('/api/workplaces/'+encodeURIComponent(el.dataset.id)+'/duplicate', { name }), 'Site duplicated', el);
+  if(r){ closeSheet(); S.activeWorkplaceId = r.id; S.wpTab = 'contractors'; render(); window.scrollTo(0,0); }
+});

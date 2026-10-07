@@ -1,6 +1,6 @@
 /**
  * A clean demo sandbox: an empty mine (host) organisation and an empty contractor
- * organisation, each with one SHE manager persona, so someone can try SiteGuard
+ * organisation, each with one SHE manager persona, so someone can try COMVERA
  * from a true first-time start on both sides without real accounts or email.
  * Rows are flagged is_demo with one demo_group like the sample sandbox, and
  * settings.cleanDemo keeps them for 30 days instead of 3.
@@ -31,7 +31,7 @@ export async function seedCleanDemo(db: Db, input: CleanDemoInput): Promise<{ gr
     const u = (await one<{ id: string }>(
       db,
       `insert into users (email, name, title, is_demo, email_verified_at, last_active_org_id) values ($1, $2, $3, true, now(), $4) returning id`,
-      [`${slug}+${tag}@demo.siteguard.invalid`, input.yourName, title, orgId],
+      [`${slug}+${tag}@demo.comvera.invalid`, input.yourName, title, orgId],
     ))!.id;
     await db.query(`insert into memberships (org_id, user_id, role) values ($1, $2, 'owner')`, [orgId, u]);
     return u;

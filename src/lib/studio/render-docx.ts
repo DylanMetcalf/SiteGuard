@@ -144,7 +144,7 @@ export async function renderDocx(content: DocContent, meta: DocMeta): Promise<Bu
     spacer(),
     p('Revision history', { bold: true, size: 21 }),
     table(['Rev', 'Date', 'Description', 'By'], meta.revisions.map((r) => [String(r.revision), r.date, r.description, r.by]), brand, [1, 1.8, 5, 2.4]),
-    p('This document is controlled electronically in SiteGuard. Printed copies are uncontrolled.', { size: 16, italics: true, color: MUTED }, { spacing: { before: 240 } }),
+    p('This document is controlled electronically in COMVERA. Printed copies are uncontrolled.', { size: 16, italics: true, color: MUTED }, { spacing: { before: 240 } }),
     new Paragraph({ children: [new PageBreak()] }),
   ];
 
@@ -179,7 +179,7 @@ export async function renderDocx(content: DocContent, meta: DocMeta): Promise<Bu
   ] });
 
   const doc = new Document({
-    creator: 'SiteGuard Document Studio',
+    creator: 'COMVERA Document Studio',
     title: content.title,
     description: meta.blueprintName,
     styles: { default: { document: { run: { font: FONT, size: 19, color: INK } } } },

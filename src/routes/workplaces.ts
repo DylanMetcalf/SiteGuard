@@ -8,12 +8,14 @@
  * per contractor exactly as before.
  */
 import { recheckSiteReady } from '../lib/siteready.js';
+import { track } from '../lib/events.js';
 import type { FastifyInstance } from 'fastify';
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { many, one, withTx, type Db } from '../db/pool.js';
 import { canAdminOrg, isUuid, limitsEnforced, requireHostAdmin, requireOrg, requireWritable, type OrgCtx } from '../lib/authz.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
+import { sponsorFile } from '../lib/sponsorship.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { planOf } from '../lib/plans.js';
@@ -48,6 +50,30 @@ async function loadWorkplace(db: Db, ctx: OrgCtx, id: string, lock = false): Pro
   const w = await one<Workplace>(db, `select * from workplaces where id = $1 and org_id = $2${lock ? ' for update' : ''}`, [id, ctx.org.id]);
   if (!w) throw notFound();
   return w;
+}
+
+/** The plan's cap on active sites (archived sites don't count). */
+async function checkSiteLimit(db: Db, ctx: OrgCtx) {
+  await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
+  const limit = planOf(ctx.org).siteLimit;
+  if (!limitsEnforced() || limit === null) return;
+  const n = Number((await one<{ n: number }>(
+    db,
+    `select (select count(*) from sites where org_id = $1 and status <> 'declined' and workplace_id is null) + (select count(*) from workplaces where org_id = $1 and archived_at is null) as n`,
+    [ctx.org.id],
+  ))!.n);
+  if (n >= limit) throw new HttpError(402, 'site_limit', `Your plan includes ${limit} active sites. Archive one, or upgrade under Billing to add more.`);
+}
+
+async function createWorkplace(db: Db, ctx: OrgCtx, w: { name: string; location: string; emergency: unknown; requirements: unknown[] }) {
+  await checkSiteLimit(db, ctx);
+  const code = await uniqueCode(db);
+  const row = (await one<{ id: string }>(
+    db,
+    `insert into workplaces (org_id, name, location, emergency, requirements, join_code, created_by) values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+    [ctx.org.id, w.name, w.location, JSON.stringify(w.emergency ?? {}), JSON.stringify(w.requirements), code, ctx.user.id],
+  ))!;
+  return { id: row.id, code, requirements: w.requirements.length };
 }
 
 /** Contractor files on this site (one `sites` row per contractor). */
@@ -97,26 +123,11 @@ export default async function workplaceRoutes(app: FastifyInstance) {
       })
       .parse(req.body);
     return withTx(async (db) => {
-      await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
-      const limit = planOf(ctx.org).siteLimit;
-      if (limitsEnforced() && limit !== null) {
-        const n = Number((await one<{ n: number }>(
-          db,
-          `select (select count(*) from sites where org_id = $1 and status <> 'declined' and workplace_id is null) + (select count(*) from workplaces where org_id = $1) as n`,
-          [ctx.org.id],
-        ))!.n);
-        if (n >= limit) throw new HttpError(402, 'site_limit', `Your plan includes ${limit} active sites. Upgrade under Billing to add more.`);
-      }
       const items = body.requirements.concat(itemsFromPacks(body.packIds, body.requirements.map((r) => r.name)));
-      const code = await uniqueCode(db);
-      const w = (await one<{ id: string }>(
-        db,
-        `insert into workplaces (org_id, name, location, emergency, requirements, join_code, created_by) values ($1, $2, $3, $4, $5, $6, $7) returning id`,
-        [ctx.org.id, body.name, body.location, JSON.stringify(body.emergency), JSON.stringify(items), code, ctx.user.id],
-      ))!;
+      const w = await createWorkplace(db, ctx, { name: body.name, location: body.location, emergency: body.emergency, requirements: items });
       await audit(db, ctx, 'Created site', `${body.name} — open to contractors with a site code, ${items.length} requirements`);
       await publishChange(db, [ctx.org.id]);
-      return { id: w.id, code, requirements: items.length };
+      return w;
     });
   });
 
@@ -145,6 +156,47 @@ export default async function workplaceRoutes(app: FastifyInstance) {
       await publishChange(db, [ctx.org.id, ...files.map((f) => f.linked_org_id).filter((x): x is string => !!x)]);
     });
     return { ok: true };
+  });
+
+  /**
+   * Mine: archive a site (hidden, closed to new contractors; nothing is deleted), bring it back,
+   * or delete it outright while no contractor has ever joined it.
+   */
+  app.post('/api/workplaces/:id/:action(archive|restore|delete)', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireHostAdmin(ctx);
+    requireWritable(ctx);
+    const { id, action } = req.params as { id: string; action: string };
+    await withTx(async (db) => {
+      const w = await loadWorkplace(db, ctx, id, true);
+      const files = await filesOf(db, w.id);
+      if (action === 'delete') {
+        if (files.length) throw conflict('Contractors have files on this site, so it stays on the record. Archive it instead.');
+        await db.query('delete from workplaces where id = $1', [w.id]);
+        await audit(db, ctx, 'Deleted site', w.name);
+      } else {
+        if (action === 'restore') await checkSiteLimit(db, ctx);
+        await db.query(`update workplaces set archived_at = ${action === 'archive' ? 'now()' : 'null'}${action === 'archive' ? ', join_open = false' : ''} where id = $1`, [w.id]);
+        await audit(db, ctx, action === 'archive' ? 'Archived site' : 'Restored site', w.name);
+      }
+      await publishChange(db, [ctx.org.id, ...files.map((f) => f.linked_org_id).filter((x): x is string => !!x)]);
+    });
+    return { ok: true };
+  });
+
+  /** Mine: start a new site with the same requirements, location and emergency details. */
+  app.post('/api/workplaces/:id/duplicate', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireHostAdmin(ctx);
+    requireWritable(ctx);
+    const { name } = z.object({ name: text(300).min(1) }).parse(req.body);
+    return withTx(async (db) => {
+      const w = await loadWorkplace(db, ctx, (req.params as { id: string }).id, true);
+      const fresh = await createWorkplace(db, ctx, { name, location: w.location, emergency: w.emergency, requirements: w.requirements });
+      await audit(db, ctx, 'Duplicated site', `${w.name} → ${name}`);
+      await publishChange(db, [ctx.org.id]);
+      return fresh;
+    });
   });
 
   /** Mine: add requirements to the site; they are added to every contractor's file too. */
@@ -310,6 +362,8 @@ export async function joinWorkplaceByCode(db: Db, ctx: OrgCtx, code: string): Pr
   for (const [i, r] of w.requirements.entries()) {
     await db.query(`insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`, [site.id, r.category, r.name, r.source, r.why, i, !!r.optional]);
   }
+  await sponsorFile(db, site.id);
+  await track(db, ctx.org.id, 'site_joined');
   await audit(db, ctx, 'Joined site with site code', `${w.name} — ${w.requirements.length} requirements`, site.id);
   await notifyOrg(db, w.org_id, [...REVIEWERS], { kind: 'accepted', title: `${ctx.org.name} joined ${w.name}`, body: `${ctx.org.trade ? ctx.org.trade + ' · ' : ''}They can now see the site's requirements and start their safety file.`, link: { kind: 'site', siteId: site.id } });
   await publishChange(db, [w.org_id, ctx.org.id]);

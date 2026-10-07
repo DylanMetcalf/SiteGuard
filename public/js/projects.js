@@ -1,8 +1,8 @@
 // Contractor projects: safety files a contractor builds for clients that aren't on
-// SiteGuard. A project works like any other file (guide, Document Studio, builder,
+// COMVERA. A project works like any other file (guide, Document Studio, builder,
 // workers, the bound PDF, revisions, share links); these are the parts that differ:
 // starting one, editing it, shaping its requirement list, sending it to the client,
-// and archiving it. Nobody reviews a project inside SiteGuard, so a filed document
+// and archiving it. Nobody reviews a project inside COMVERA, so a filed document
 // counts straight away and the file shows "Ready to send" rather than "Site Ready".
 
 import { api } from './api.js';
@@ -27,7 +27,7 @@ export function projectBar(siteId){
     +'<div class="site-card-title">For '+s.hostName+'</div>'
     +(s.clientContact?'<div class="site-card-sub">'+s.clientContact+'</div>':'')+'</div>'
     +'<span class="badge '+(ready?'complete':'grey')+'">'+(ready?ICONS.check+'Ready to send':outstanding+' to go')+'</span></div>'
-    +'<div class="site-card-sub" style="margin-top:8px;">You manage this file yourself. Documents you file count straight away. When it\'s ready, send the client the PDF or a secure link. The client doesn\'t need a SiteGuard account.</div>'
+    +'<div class="site-card-sub" style="margin-top:8px;">You manage this file yourself. Documents you file count straight away. When it\'s ready, send the client the PDF or a secure link. The client doesn\'t need a COMVERA account.</div>'
     +'<div class="row-actions">'
     +'<button class="btn primary small" data-action="project-send" data-site="'+siteId+'">Send to client</button>'
     +'<button class="btn secondary small" data-action="export-bundle" data-site="'+siteId+'">Download PDF</button>'
@@ -40,7 +40,7 @@ export function projectsSection(match){
   const list = projects().filter(match);
   let html = '<div class="section-title flexbetween"><span>My projects · '+list.length+'</span>'+(canManage()?'<button class="linkish" data-action="new-project">+ New project</button>':'')+'</div>';
   if(!list.length) return html + '<div class="card project-empty"><div class="site-card-title" style="font-size:14px;">Build a safety file for any client</div>'
-    +'<div class="site-card-sub" style="margin-top:4px;">Working for a client or at a site that isn\'t on SiteGuard? Start a project, pick the documents they need, file them once, and send a professional PDF or a secure link.</div>'
+    +'<div class="site-card-sub" style="margin-top:4px;">Working for a client or at a site that isn\'t on COMVERA? Start a project, pick the documents they need, file them once, and send a professional PDF or a secure link.</div>'
     +(canManage()?'<button class="btn primary small" style="margin-top:10px;" data-action="new-project">Start a project</button>':'')+'</div>';
   return html;
 }
@@ -49,7 +49,7 @@ export function projectsSection(match){
 on('project-send', (el)=>{
   const siteId = el.dataset.site;
   // Secure links are a Contractor Pro feature once billing is on; the PDF always works.
-  if(S.boot.features.billing && org().plan === 'contractor_free'){
+  if(S.boot.features.billing && !(org().entitlements||{}).SHARE_LINKS){
     openSheet(sheetHead('Send to '+S.state.sites[siteId].hostName, S.state.sites[siteId].name)
       +'<div class="card"><div class="site-card-title" style="font-size:14px;">Email the PDF</div><div class="site-card-sub" style="margin:4px 0 10px;">Download the bound safety file and attach it to an email to your client.</div>'
       +'<button class="btn primary block" data-action="export-bundle" data-site="'+siteId+'">Check and download the PDF</button></div>'
@@ -67,7 +67,7 @@ on('new-project', async ()=>{
   let packs;
   try{ packs = await loadPacks(); }catch(e){ showToast(e.message); return; }
   const mine = Object.values(S.state.sites).filter(s=>(S.state.requirements[s.id]||[]).length);
-  openSheet(sheetHead('New project', 'A safety file for a client who isn\'t on SiteGuard')
+  openSheet(sheetHead('New project', 'A safety file for a client who isn\'t on COMVERA')
     +'<label class="field-label" for="pjClient">Client</label><input type="text" id="pjClient" maxlength="200" placeholder="e.g. Acme Construction" list="pjClients">'
     +'<datalist id="pjClients">'+[...new Set(projects().map(p=>p.hostName))].map(n=>'<option value="'+n+'">').join('')+'</datalist>'
     +'<label class="field-label" for="pjContact">Client contact (optional)</label><input type="text" id="pjContact" maxlength="300" placeholder="e.g. Jane Dube, SHE manager, jane@acme.co.za">'
@@ -90,6 +90,7 @@ on('new-project-go', async (el)=>{
   if(r){
     closeSheet();
     S.nav = 'sites'; S.activeSiteId = r.id; S.siteTab = 'compliance'; render(); window.scrollTo(0,0);
+    setTimeout(()=>import('./guide.js').then(m=>m.openGuide(r.id, false)), 300);
     showToast('Project created with '+r.requirements+' document'+(r.requirements===1?'':'s')+' to gather');
   }
 });

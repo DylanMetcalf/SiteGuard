@@ -10,9 +10,10 @@ import { rulesOf } from '../lib/validity.js';
 import { reminderDaysOf } from '../jobs/reminders.js';
 import type { FastifyInstance } from 'fastify';
 import { many, pool, type Db } from '../db/pool.js';
-import { features, isPlatformAdmin } from '../config.js';
+import { config, features, isPlatformAdmin } from '../config.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
-import { planOf, standing } from '../lib/plans.js';
+import { PLANS, grantActive, hasOwnAccess, planOf, standing } from '../lib/plans.js';
+import { sponsoredSiteIds } from '../lib/sponsorship.js';
 import { openFindings } from '../lib/agent.js';
 import { blueprintForRequirement } from '../lib/studio/blueprints.js';
 import { brandingOf } from '../lib/studio/generate.js';
@@ -52,6 +53,12 @@ export async function visibleSites(db: Db, ctx: OrgCtx): Promise<SiteRow[]> {
   );
 }
 
+/** Billing details kept in settings (a pending Stripe coupon) never go to the browser. */
+function withoutBilling(settings: unknown): Record<string, unknown> {
+  const { checkoutCoupon: _c, checkoutCouponCode: _cc, ...rest } = (settings ?? {}) as Record<string, unknown>;
+  return rest;
+}
+
 export async function buildState(db: Db, ctx: OrgCtx) {
   const host = isHost(ctx);
   const sites = await visibleSites(db, ctx);
@@ -74,7 +81,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     permits: {},
     diary: {},
     settings: host
-      ? { inspectxEnabled: false, inspectxBaseUrl: '', ...(ctx.org.settings as object), reminderDays: reminderDaysOf(ctx.org.settings) }
+      ? { inspectxEnabled: false, inspectxBaseUrl: '', ...withoutBilling(ctx.org.settings), reminderDays: reminderDaysOf(ctx.org.settings) }
       : {
           inspectxEnabled: false, inspectxBaseUrl: '', reminderDays: reminderDaysOf(ctx.org.settings),
           reminderDigest: (ctx.org.settings as Record<string, unknown> | null)?.reminderDigest, weeklySummary: (ctx.org.settings as Record<string, unknown> | null)?.weeklySummary,
@@ -88,7 +95,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     for (const w of await many<any>(db, 'select * from workplaces where org_id = $1 order by created_at', [ctx.org.id])) {
       state.workplaces[w.id] = {
         id: w.id, name: w.name, location: w.location, code: canAdminOrg(ctx) ? w.join_code : null, joinOpen: w.join_open,
-        requirements: w.requirements, emergency: { musterPoint: '', contact: '', hospital: '', ...w.emergency }, createdAt: d(w.created_at)?.slice(0, 10),
+        requirements: w.requirements, emergency: { musterPoint: '', contact: '', hospital: '', ...w.emergency }, createdAt: d(w.created_at)?.slice(0, 10), archivedAt: d(w.archived_at),
       };
     }
   }
@@ -131,8 +138,11 @@ export async function buildState(db: Db, ctx: OrgCtx) {
   }
 
   // ---- sites ----
+  // Which files a mine sponsors right now (the contractor works on them without its own plan).
+  const sponsored = await sponsoredSiteIds(db, sites.filter((s) => !s.project).map((s) => s.id));
   for (const s of sites) {
     state.sites[s.id] = {
+      sponsored: sponsored.has(s.id),
       suspended: null,
       id: s.id, name: s.name, location: s.location,
       // On the contractor side every site belongs to "me".
@@ -140,7 +150,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
       hostName: s.host_name, status: s.status, createdAt: d(s.created_at)?.slice(0, 10),
       emergency: { musterPoint: '', contact: '', hospital: '', ...s.emergency },
       workplaceId: s.workplace_id ?? null,
-      // The contractor's own project: hostName is the client, nobody reviews it in SiteGuard.
+      // The contractor's own project: hostName is the client, nobody reviews it in COMVERA.
       project: !!s.project, clientContact: s.project ? s.client_contact : '',
     };
     state.requirements[s.id] = [];
@@ -359,7 +369,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
   app.get('/api/bootstrap', async (req, reply) => {
     reply.header('cache-control', 'no-store');
     const ctx = req.ctx;
-    const baseFeatures = { demo: features.demo, billing: features.billing, email: features.email, aiConfigured: features.ai };
+    const baseFeatures = { demo: features.demo, billing: features.billing, payments: features.payments, email: features.email, aiConfigured: features.ai, contact: { email: config.SUPPORT_EMAIL ?? null, phone: config.CONTACT_PHONE ?? null } };
     if (!ctx) return { authenticated: false, features: baseFeatures };
 
     const orgs = await many(
@@ -390,6 +400,10 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         plan: plan.id, planName: plan.name, subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
         currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, validityRules: rulesOf(c.org.settings), cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
         siteLimit: plan.siteLimit,
+        // Own access = subscription, trial in date or a promo/enterprise grant. Without it a
+        // contractor works only on sponsored files.
+        ownAccess: hasOwnAccess(c.org), sponsored: !!c.org.sponsored,
+        grant: grantActive(c.org) ? { plan: c.org.grant_plan, planName: PLANS[c.org.grant_plan!]?.name, until: d(c.org.grant_until), source: c.org.grant_source } : null,
         branding: brandingOf(c),
         entitlements: entitlementsFor(c.org),
       },

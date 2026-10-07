@@ -142,7 +142,7 @@ const PURPOSE = {
   safetyfile: (id)=>{ S.activeSiteId=id; S.nav='sites'; S.siteTab='compliance'; render(); },
   upload: (id)=>{ S.activeSiteId=id; S.nav='sites'; S.siteTab='compliance'; render(); showToast('Tap a requirement to attach a file'); },
   diary: (id)=>openSheet(renderNewDiarySheet(id)),
-  toolbox: (id)=>openSheet(renderNewToolboxSheet(id)),
+  toolbox: (id)=>{ openSheet(renderNewToolboxSheet(id)); fillTools(); },
   incident: (id)=>openSheet(renderReportIncidentSheet(id)),
   inspection: (id)=>openSheet(renderNewInspectionSheet(id)),
   request: (id)=>openSheet(renderRequestSheet(id)),
@@ -237,6 +237,7 @@ function renderReqSheet(reqId){
         +'<label class="field-label" for="submitNote">Notes (optional)</label><textarea id="submitNote" placeholder="Add any context for the reviewer…"></textarea>'
         +'<button class="btn primary block" style="margin-top:10px;" data-action="submit-req" data-req="'+reqId+'"'+(doc.pendingFileId?'':' disabled')+' id="submitReqBtn">'+(reqId.startsWith('lib:')?'Save to library':eff==='missing'?'Submit for review':'Resubmit for review')+'</button>';
       if(reqId.startsWith('lib:') && doc.assetUrl) body += '<button class="btn danger block" style="margin-top:8px;" data-action="withdraw-doc" data-req="'+reqId+'">Remove from library</button>';
+      if(!reqId.startsWith('lib:') && eff!=='complete') body += '<button class="btn ghost block" style="margin-top:6px;" data-action="req-skip">Skip for now</button>';
     }
   } else if(canReview() && !ro){
     if((eff==='awaiting_review' || eff==='correction_required') && doc.assetUrl){
@@ -407,7 +408,7 @@ function renderReportIncidentSheet(siteId){
     +'<label class="field-label" for="incDescription">What happened?</label><textarea id="incDescription" placeholder="Describe what happened, where, and how it was discovered"></textarea>'
     +'<label class="field-label" for="incActions">Immediate actions taken</label><textarea id="incActions" placeholder="First aid given, area isolated, work stopped, etc."></textarea>'
     +'<button class="btn danger block" style="margin-top:12px;" data-action="save-incident" data-site="'+siteId+'">Report incident</button>'
-    +'<div class="notice" style="margin-top:10px;">Serious incidents (lost time injury, fatality) may carry statutory reporting obligations (e.g. Section 11/24 under the MHSA) outside of SiteGuard — this logs your internal record and alerts the site team, it doesn\'t submit anything to a regulator.</div>';
+    +'<div class="notice" style="margin-top:10px;">Serious incidents (lost time injury, fatality) may carry statutory reporting obligations (e.g. Section 11/24 under the MHSA) outside of COMVERA — this logs your internal record and alerts the site team, it doesn\'t submit anything to a regulator.</div>';
 }
 on('report-incident', (el)=>openSheet(renderReportIncidentSheet(el.dataset.site)));
 on('save-incident', async (el)=>{
@@ -525,8 +526,8 @@ on('close-permit', async (el)=>{
 /* ============ AI DRAFTING (via the server proxy) ============ */
 const DRAFT_TYPES = ['Site-specific risk assessment','Method statement','Toolbox talk record','Emergency response plan','Daily site diary template'];
 function draftModeNote(){
-  if(S.boot.features.ai) return 'Your company details from Organisation settings go into the header. Drafting runs on SiteGuard\'s server — no API key in your browser.';
-  return 'Template mode: SiteGuard builds a structured draft from your description, with hazards and controls for the work you describe. '
+  if(S.boot.features.ai) return 'Your company details from Organisation settings go into the header. Drafting runs on COMVERA\'s server — no API key in your browser.';
+  return 'Template mode: COMVERA builds a structured draft from your description, with hazards and controls for the work you describe. '
     +(S.boot.features.aiConfigured
       ? 'AI-written drafts are included in '+(isContractor()?'Contractor Pro':'Site Professional')+'.'
       : 'AI-written drafts switch on once your administrator adds an AI key.');
@@ -784,7 +785,7 @@ on('save-reassign', async (el)=>{
 });
 on('edit-contractor', (el)=>{
   const c = S.state.contractors[el.dataset.id];
-  openSheet(sheetHead('Contractor details', c.linked?'This company is on SiteGuard':'Not yet joined')
+  openSheet(sheetHead('Contractor details', c.linked?'This company is on COMVERA':'Not yet joined')
     +'<label class="field-label" for="ecName">Company name</label><input type="text" id="ecName" value="'+c.name+'">'
     +'<label class="field-label" for="ecTrade">Trade</label><input type="text" id="ecTrade" value="'+(c.trade||'')+'">'
     +'<label class="field-label" for="ecContact">Contact person</label><input type="text" id="ecContact" value="'+(c.contact||'')+'">'
@@ -865,7 +866,7 @@ function workerForm(w){
     +'<label class="field-label" for="wOcc">Occupation</label><input type="text" id="wOcc" value="'+(w.occupation||'')+'" placeholder="e.g. Electrician, Rigger, Safety officer">'
     +'<label class="field-label" for="wEmp">Employee number (optional)</label><input type="text" id="wEmp" value="'+(w.employeeNo||'')+'">'
     +'<label class="field-label" for="wId">Last 4 characters of ID / passport (optional)</label><input type="text" id="wId" maxlength="4" value="'+(w.idLast4||'')+'" inputmode="text">'
-    +'<div class="site-card-sub" style="margin-top:4px;">SiteGuard deliberately doesn\'t store full ID numbers (POPIA) — the last 4 are enough to match someone at the gate.</div>'
+    +'<div class="site-card-sub" style="margin-top:4px;">COMVERA deliberately doesn\'t store full ID numbers (POPIA) — the last 4 are enough to match someone at the gate.</div>'
     +'<label class="field-label" for="wPhone">Phone (optional)</label><input type="tel" id="wPhone" value="'+(w.phone||'')+'">';
 }
 const readWorker = () => ({ fullName: (val('wName')), occupation: (val('wOcc')), employeeNo: (val('wEmp')), idLast4: val('wId'), phone: val('wPhone') });
@@ -953,13 +954,24 @@ function renderNewToolboxSheet(siteId, kind){
     +'<label class="field-label" for="ttKind">Type</label><select id="ttKind" class="field" data-action-change="tt-kind">'+SESSION_KINDS.map(([k,l])=>'<option value="'+k+'"'+(k===(kind||'toolbox')?' selected':'')+'>'+l+'</option>').join('')+'</select>'
     +'<div class="site-card-sub" id="ttKindHelp" style="margin-top:4px;">'+(kind==='induction'?'Each worker who signs is recorded as inducted for this site on this date, which counts at the gate.':'Everyone attending signs on this device afterwards.')+'</div>'
     +'<label class="field-label" for="ttTopic">Topic</label><input type="text" id="ttTopic" placeholder="e.g. Isolation and lock-out before work on the drive station">'
-    +'<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;"><label class="field-label" for="ttDuration">Minutes</label><input type="number" id="ttDuration" min="1" max="1440" inputmode="numeric" placeholder="15"></div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;"><div style="flex:1;min-width:130px;"><label class="field-label" for="ttDate">Date</label><input type="date" id="ttDate" value="'+todayStr()+'"></div><div style="flex:1;min-width:90px;"><label class="field-label" for="ttTime">Time</label><input type="time" id="ttTime"></div><div style="flex:1;min-width:80px;"><label class="field-label" for="ttDuration">Minutes</label><input type="number" id="ttDuration" min="1" max="1440" inputmode="numeric" placeholder="15"></div></div>'
+    +'<div class="site-card-sub" style="margin-top:4px;">A future date schedules the session; people sign on the day.</div>'
+    +'<label class="field-label" for="ttWork">Work being done (optional)</label><input type="text" id="ttWork" maxlength="200" placeholder="e.g. Electrical work on the conveyor drive">'
+    +'<details class="sfr-pick" id="ttToolsBox"><summary>Tools and equipment in use</summary><div class="site-card-sub" style="margin:6px 0;">Each tool you tick adds its hazards, controls, pre-use checks and PPE to the talk.</div><div id="ttTools" class="check-grid"><span class="site-card-sub">Loading…</span></div></details>'
     +'<label class="field-label" for="ttPresenter">Presented by</label><input type="text" id="ttPresenter" value="'+myName()+'">'
     +'<label class="field-label" for="ttContent">Content / key points</label><textarea id="ttContent" style="min-height:110px;" placeholder="What was covered"></textarea>'
     +'<button class="btn secondary small" style="margin-top:6px;" data-action="draft-toolbox">'+ICONS.sparkle+(S.boot.features.ai?' Draft content with AI':' Draft talk from topic')+'</button>'
     +'<button class="btn primary block" style="margin-top:12px;" data-action="save-toolbox" data-site="'+siteId+'">Save and collect signatures</button>';
 }
-on('new-toolbox-talk', (el)=>openSheet(renderNewToolboxSheet(el.dataset.site, el.dataset.kind)));
+let toolList = null;
+async function fillTools(){
+  try{ toolList = toolList || (await api.get('/api/tools')).tools; }catch{ return; }
+  const box = document.getElementById('ttTools');
+  if(!box) return;
+  const cats = [...new Set(toolList.map(t=>t.category))];
+  box.innerHTML = cats.map(c=>'<div class="site-card-sub" style="width:100%;margin-top:6px;font-weight:600;">'+escapeHtml(c)+'</div>'+toolList.filter(t=>t.category===c).map(t=>'<label class="check-chip"><input type="checkbox" class="tt-tool" value="'+escapeHtml(t.label)+'"> '+escapeHtml(t.label)+'</label>').join('')).join('');
+}
+on('new-toolbox-talk', (el)=>{ openSheet(renderNewToolboxSheet(el.dataset.site, el.dataset.kind)); fillTools(); });
 on('tt-kind', (el)=>{ const h = document.getElementById('ttKindHelp'); if(h) h.textContent = el.value==='induction' ? 'Each worker who signs is recorded as inducted for this site on this date, which counts at the gate.' : 'Everyone attending signs on this device afterwards.'; });
 on('draft-toolbox', async (el)=>{
   const topic = (val('ttTopic'));
@@ -974,7 +986,9 @@ on('save-toolbox', async (el)=>{
   const topic = (val('ttTopic'));
   if(!topic){ document.getElementById('ttTopic').focus(); return; }
   const kind = val('ttKind') || 'toolbox', mins = parseInt(val('ttDuration'), 10);
-  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/toolbox-talks', { topic, kind, durationMinutes: mins > 0 ? mins : undefined, heldOn: val('ttDate'), presenter: (val('ttPresenter')), content: document.getElementById('ttContent').value }), sessionLabel(kind)+' saved', el);
+  const tools = [...document.querySelectorAll('.tt-tool:checked')].map(x=>unescapeHtml(x.value));
+  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/toolbox-talks', { topic, kind, durationMinutes: mins > 0 ? mins : undefined, heldOn: val('ttDate'), startTime: val('ttTime') || undefined,
+    workType: val('ttWork'), tools, presenter: (val('ttPresenter')), content: document.getElementById('ttContent').value }), sessionLabel(kind)+(val('ttDate') > todayStr() ? ' scheduled' : ' saved'), el);
   if(r) openToolbox(el.dataset.site, r.id);
 });
 function renderToolboxSheet(siteId, talkId){
@@ -982,7 +996,7 @@ function renderToolboxSheet(siteId, talkId){
   if(!t) return sheetHead('Not found');
   const workers = ((S.state.siteWorkers||{})[siteId]||[]).map(id=>S.state.workers[id]).filter(Boolean);
   const signed = new Set(t.attendance.map(a=>a.workerId).filter(Boolean));
-  let body = sheetHead(t.topic, sessionLabel(t.kind)+' · '+timeAgo(t.heldOn)+(t.durationMinutes?' · '+t.durationMinutes+' min':'')+' · presented by '+t.presenter+' · '+t.orgName);
+  let body = sheetHead(t.topic, sessionLabel(t.kind)+(t.heldOn > todayStr() ? ' · scheduled for '+t.heldOn : ' · '+timeAgo(t.heldOn))+(t.startTime?' at '+t.startTime:'')+(t.durationMinutes?' · '+t.durationMinutes+' min':'')+(t.workType?' · '+t.workType:'')+' · presented by '+t.presenter+' · '+t.orgName);
   if(t.kind==='induction') body += '<div class="notice">Workers chosen from the list who sign here are recorded as inducted for this site from '+t.heldOn+'. Gate clearance counts it'+(isHost()?' under your induction validity rule':'')+'.</div>';
   if(t.content) body += '<details><summary style="font-size:12.5px;color:var(--grey);cursor:pointer;">Talk content</summary><div class="ai-output">'+t.content+'</div></details>';
   body += '<div class="section-title">Attendance ('+t.attendance.length+')</div>';
@@ -1148,7 +1162,7 @@ on('send-feedback', async (el)=>{
   const message = val('fbMessage');
   if(message.length < 3){ document.getElementById('fbMessage').focus(); return; }
   const view = [S.nav, S.moreView, S.siteTab].filter(Boolean).join('/');
-  if(await act(()=>api.post('/api/feedback', { kind: val('fbKind'), message, context: { view, userAgent: navigator.userAgent.slice(0,400) } }), 'Thanks — sent to the SiteGuard team', el)) closeSheet();
+  if(await act(()=>api.post('/api/feedback', { kind: val('fbKind'), message, context: { view, userAgent: navigator.userAgent.slice(0,400) } }), 'Thanks — sent to the COMVERA team', el)) closeSheet();
 });
 
 /* ============ JOIN CODES ============ */
@@ -1158,7 +1172,7 @@ on('join-code', async (el)=>{
     const r = await api.post('/api/sites/'+el.dataset.site+'/join-code');
     openSheet(sheetHead('Join code', escapeHtml(r.siteName))
       +'<div class="join-code" aria-label="Join code">'+escapeHtml(r.code)+'</div>'
-      +'<p class="site-card-sub" style="text-align:center;">Give this to the contractor. In SiteGuard they tap <strong>Join a site with a code</strong> and type it in — they\'re connected straight away. It works for '+r.expiresInDays+' days, and making a new code cancels this one.</p>'
+      +'<p class="site-card-sub" style="text-align:center;">Give this to the contractor. In COMVERA they tap <strong>Join a site with a code</strong> and type it in — they\'re connected straight away. It works for '+r.expiresInDays+' days, and making a new code cancels this one.</p>'
       +'<button class="btn secondary block" style="margin-top:12px;" data-action="copy-join-code" data-code="'+escapeHtml(r.code)+'">Copy code</button>');
   }catch(e){ showToast(e.message); }
   el.disabled = false;
@@ -1179,3 +1193,4 @@ on('join-go', async (el)=>{
   // Straight into the guided safety file for the new site.
   setTimeout(()=>import('./guide.js').then(m=>m.openGuide(r.siteId, true)), 300);
 });
+on('req-skip', ()=>{ closeSheet(); showToast('Skipped for now — it stays on your list of outstanding documents'); });

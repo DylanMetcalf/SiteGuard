@@ -54,3 +54,22 @@ describe('sessions and site inductions', () => {
     assert.ok(g.reasons.some((r: string) => /Induction expired/.test(r)), JSON.stringify(g.reasons));
   });
 });
+
+describe('session detail: time, work, tools, scheduling', () => {
+  it('adds the hazards of the tools in use, and a scheduled session is signed on the day', async () => {
+    const { agent: c } = await signup(app, { orgName: 'Lambda Electrical', orgKind: 'contractor' });
+    const p = (await c.post('/api/projects', { clientName: 'Mu Retail', name: 'Shop wiring' })).body.id;
+    const bad = await c.post(`/api/sites/${p}/toolbox-talks`, { topic: 'Grinding', tools: ['Lightsaber'] });
+    assert.equal(bad.status, 400);
+    const r = await c.post(`/api/sites/${p}/toolbox-talks`, { topic: 'Cutting conduit', startTime: '07:30', workType: 'Electrical work', tools: ['Angle grinder'] });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const talk = ((await c.state()).state.toolboxTalks[p] as { id: string; content: string; startTime: string; tools: string[] }[]).find((t) => t.id === r.body.id)!;
+    assert.equal(talk.startTime, '07:30');
+    assert.deepEqual(talk.tools, ['Angle grinder']);
+    assert.match(talk.content, /Disc shattering/);
+    const later = await c.post(`/api/sites/${p}/toolbox-talks`, { topic: 'Site induction', kind: 'induction', heldOn: '2099-01-01' });
+    const sig = 'data:image/png;base64,iVBORw0KGgo=';
+    const signEarly = await c.post(`/api/toolbox-talks/${later.body.id}/attendance`, { attendeeName: 'Thabo', signature: sig });
+    assert.equal(signEarly.status, 409);
+  });
+});

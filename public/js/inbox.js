@@ -1,7 +1,8 @@
 // In-app inbox: notifications for review requests, feedback, approvals and
-// corrections, so everything can be handled without leaving SiteGuard.
+// corrections, so everything can be handled without leaving COMVERA.
 
 import { api } from './api.js';
+import { openExchange } from './exchanges.js';
 import { S, ICONS, on, actions, openSheet, closeSheet, sheetHead, render, timeAgo } from './core.js';
 import { openReview } from './review.js';
 import { openReqSheet, computeTasks } from './sheets.js';
@@ -51,4 +52,5 @@ on('inbox-go', (el)=>{
   if(link.kind==='site' && link.siteId && S.state.sites[link.siteId]){ S.nav='sites'; S.activeSiteId=link.siteId; render(); return; }
   if(link.kind==='studio'){ S.nav='more'; S.moreView='studio'; render(); return; }
   if(link.kind==='requests'){ actions['open-tasks']({ dataset:{ filter:'all' } }); return; }
+  if(link.kind==='exchange' && link.id){ openExchange(link.id); return; }
 });

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Synthetic check of a deployed SiteGuard: the app loads, the database is
+ * Synthetic check of a deployed COMVERA: the app loads, the database is
  * reachable, the API answers, and protected endpoints stay protected.
- * Usage: SITEGUARD_URL=https://app.example.co.za node scripts/smoke.mjs
+ * Usage: COMVERA_URL=https://app.example.co.za node scripts/smoke.mjs
  * Set SMOKE_DEMO=1 to also create a demo sandbox and load its dashboard data.
  */
-const base = (process.env.SITEGUARD_URL || '').replace(/\/$/, '');
+const base = (process.env.COMVERA_URL || process.env.SITEGUARD_URL || '').replace(/\/$/, '');
 if (!base) {
-  console.error('Set SITEGUARD_URL');
+  console.error('Set COMVERA_URL');
   process.exit(2);
 }
 
@@ -34,7 +34,7 @@ await check('health (app + database)', async () => {
 await check('web app loads', async () => {
   const r = await get('/');
   assert(r.status === 200, `status ${r.status}`);
-  assert((await r.text()).includes('SiteGuard'), 'page does not mention SiteGuard');
+  assert((await r.text()).includes('COMVERA'), 'page does not mention COMVERA');
 });
 await check('scripts and styles served', async () => {
   for (const p of ['/js/app.js', '/app.css']) {

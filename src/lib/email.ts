@@ -25,19 +25,19 @@ const esc = (s: string) =>
 
 export function renderEmail(e: OutgoingEmail): { text: string; html: string } {
   const footer =
-    e.footer ?? 'You are receiving this because you have a SiteGuard account or were invited to one.';
+    e.footer ?? 'You are receiving this because you have a COMVERA account or were invited to one.';
   const text = [
     ...e.lines,
     ...(e.action ? ['', `${e.action.label}: ${e.action.url}`] : []),
     '',
     '—',
-    'SiteGuard · Contractor compliance & site safety',
+    'COMVERA · Contractor compliance & site safety',
     footer,
   ].join('\n');
   const html = `<!doctype html><html><body style="margin:0;background:#F3F6F4;font-family:Helvetica,Arial,sans-serif;color:#0E1A2B;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border:1px solid #E2E7E4;border-radius:14px;overflow:hidden;">
-<tr><td style="padding:16px 20px;background:#16325C;color:#FFFFFF;font-weight:700;font-size:16px;letter-spacing:-.01em;"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#6E9C80;margin-right:8px;"></span>SiteGuard</td></tr>
+<tr><td style="padding:16px 20px;background:#0E1E36;color:#FFFFFF;font-weight:700;font-size:16px;letter-spacing:.14em;"><span style="display:inline-block;width:12px;height:12px;border:3px solid #6E9C80;border-right-color:transparent;border-radius:50%;margin-right:4px;vertical-align:-2px;"></span><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#FFFFFF;margin-right:10px;vertical-align:1px;"></span>COMVERA</td></tr>
 <tr><td style="padding:18px 20px;font-size:14px;line-height:1.55;">
 ${e.lines.map((l) => `<p style="margin:0 0 12px;">${esc(l)}</p>`).join('')}
 ${

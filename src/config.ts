@@ -10,7 +10,7 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default('0.0.0.0'),
-  /** Public base URL, used in emails and share links, e.g. https://app.siteguard.co.za */
+  /** Public base URL, used in emails and share links, e.g. https://app.comvera.co.za */
   // On Render, the service's own URL is used until a custom domain is set.
   APP_URL: z.string().url().default(process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'),
   DATABASE_URL: z.string().default('postgres://siteguard:siteguard@localhost:5432/siteguard'),
@@ -36,9 +36,11 @@ const schema = z.object({
   // Email: SMTP connection URL, e.g. smtps://user:pass@smtp.postmarkapp.com:465.
   // Unset → emails are written to the log (and still recorded in the outbox).
   SMTP_URL: z.string().optional(),
-  EMAIL_FROM: z.string().default('SiteGuard <no-reply@siteguard.local>'),
+  EMAIL_FROM: z.string().default('COMVERA <no-reply@comvera.local>'),
   /** Where "Report a problem" messages are emailed (e.g. your own address). Unset → logged only. */
   SUPPORT_EMAIL: z.string().email().optional(),
+  /** Shown on the public contact page, e.g. +27 82 000 0000. Unset → email and form only. */
+  CONTACT_PHONE: z.string().max(40).optional(),
   /** Comma-separated emails of the people who run this service; they see the platform overview (More → Platform). */
   PLATFORM_ADMIN_EMAILS: z.string().default(''),
 
@@ -51,11 +53,18 @@ const schema = z.object({
   AI_WEB_SEARCH: bool(true),
 
   // Billing. Unset → billing is disabled and every organisation is treated as in good standing.
+  /**
+   * Turn on trials, plans, promo codes and sponsorship limits without a payment provider
+   * (e.g. for a beta). Card payments still need STRIPE_SECRET_KEY; until then customers on a
+   * paid plan are invoiced by hand or given a plan in Platform.
+   */
+  ENFORCE_PLANS: bool(false),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_HOST_STARTER: z.string().optional(),
   STRIPE_PRICE_HOST_PRO: z.string().optional(),
   STRIPE_PRICE_CONTRACTOR_PRO: z.string().optional(),
+  STRIPE_PRICE_CONTRACTOR_STARTER: z.string().optional(),
 
   /** Allow creating throwaway demo sandboxes from the sign-in page. */
   DEMO_SANDBOX_ENABLED: bool(true),
@@ -95,7 +104,10 @@ if (isProd) {
 }
 export const features = {
   ai: !!config.ANTHROPIC_API_KEY,
-  billing: !!config.STRIPE_SECRET_KEY,
+  /** Plans, trials and limits are enforced. */
+  billing: !!config.STRIPE_SECRET_KEY || config.ENFORCE_PLANS,
+  /** Card payments through Stripe are available. */
+  payments: !!config.STRIPE_SECRET_KEY,
   email: !!config.SMTP_URL,
   demo: config.DEMO_SANDBOX_ENABLED,
   devRoleSwitcher: config.DEV_ROLE_SWITCHER && !isProd,

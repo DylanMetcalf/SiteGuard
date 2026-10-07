@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { deliverPendingEmail } from '../lib/email.js';
 import { cleanupExpired, runReminders } from './reminders.js';
+import { runTrialNotices } from './trials.js';
 import { purgeOldDemos } from '../routes/demo.js';
 import { pool, withTx } from '../db/pool.js';
 import { recheckAllSiteReady } from '../lib/siteready.js';
@@ -32,6 +33,8 @@ export function startJobs(log: (msg: string) => void = console.log): () => void 
     try {
       const sent = await runReminders();
       if (sent) log(`reminders: queued ${sent} digest email(s)`);
+      const trials = await runTrialNotices();
+      if (trials) log(`trials: sent ${trials} trial notice(s)`);
       await sendWeeklySummaries();
       await cleanupExpired();
       const purged = await purgeOldDemos();

@@ -1,11 +1,11 @@
 /**
  * Contractor projects: a contractor builds a safety file for a client or site
- * that isn't on SiteGuard (yet). The client is a private record the contractor
+ * that isn't on COMVERA (yet). The client is a private record the contractor
  * owns (an organisation with managed_by_org set, which nobody can sign in to),
  * and the project is an ordinary safety file for that client. Everything else
  * (the guide, Document Studio, the builder, workers, the bound PDF, revisions
  * and share links) works on it unchanged. Nobody reviews a project file inside
- * SiteGuard, so submissions are filed as they are and the file never shows
+ * COMVERA, so submissions are filed as they are and the file never shows
  * "Site Ready"; the contractor sends it to the client as a PDF or a share link.
  */
 import type { FastifyInstance } from 'fastify';
@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { many, one, withTx, type Db } from '../db/pool.js';
 import { canAdminOrg, isContractor, isUuid, limitsEnforced, loadSite, requireOrg, requireWritable, type OrgCtx } from '../lib/authz.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
+import { requireFeature } from '../lib/entitlements.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { itemsFromPacks } from '../lib/templates.js';
@@ -73,12 +74,14 @@ export default async function projectRoutes(app: FastifyInstance) {
         emergency: emergencySchema.optional(),
       })
       .parse(req.body);
+    // A site's sponsorship never covers a contractor's own projects.
+    requireFeature(ctx, 'CONTRACTOR_PROJECTS');
     return withTx(async (db) => {
       await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
       const limit = planOf(ctx.org).projectLimit;
       if (limitsEnforced() && limit !== null) {
         const n = Number((await one<{ n: number }>(db, `select count(*)::int as n from sites s join organisations o on o.id = s.org_id where o.managed_by_org = $1 and s.status <> 'declined'`, [ctx.org.id]))!.n);
-        if (n >= limit) throw new HttpError(402, 'project_limit', `Your plan includes ${limit} project${limit === 1 ? '' : 's'}. Upgrade to Contractor Pro under Plan & billing for unlimited projects.`);
+        if (n >= limit) throw new HttpError(402, 'project_limit', `Your plan includes ${limit} project${limit === 1 ? '' : 's'}. Upgrade to Contractor Pro under Plan & billing for unlimited safety files.`);
       }
       const clientId = await clientRecord(db, ctx, body.clientName);
       const contractor = { id: await myEntryAt(db, ctx, clientId) };
@@ -180,6 +183,25 @@ export default async function projectRoutes(app: FastifyInstance) {
       if (hasHistory) throw conflict('A document has already been filed against this requirement, so it stays on the record.');
       await db.query('delete from requirements where id = $1', [reqId]);
       await audit(db, ctx, 'Removed project requirement', r.name, site.id);
+      await publishChange(db, [ctx.org.id]);
+      return { ok: true };
+    });
+  });
+
+  /** The order documents appear in the project's safety file PDF (the contractor's own file). */
+  app.post('/api/projects/:id/requirements/order', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireContractorAdmin(ctx);
+    requireWritable(ctx);
+    const { id } = req.params as { id: string };
+    const { ids } = z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(req.body);
+    return withTx(async (db) => {
+      const { site } = await loadProject(db, ctx, id);
+      const mine = await many<{ id: string }>(db, 'select id from requirements where site_id = $1', [site.id]);
+      const known = new Set(mine.map((r) => r.id));
+      if (ids.length !== known.size || new Set(ids).size !== ids.length || ids.some((x) => !known.has(x))) throw badRequest('List every document in the file exactly once.');
+      for (const [i, rid] of ids.entries()) await db.query('update requirements set position = $2 where id = $1', [rid, i]);
+      await audit(db, ctx, 'Rearranged project documents', `${ids.length} documents`, site.id);
       await publishChange(db, [ctx.org.id]);
       return { ok: true };
     });

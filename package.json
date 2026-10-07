@@ -1,8 +1,8 @@
 {
-  "name": "siteguard",
+  "name": "comvera",
   "version": "0.1.0",
   "private": true,
-  "description": "SiteGuard — multi-tenant contractor compliance and site safety platform",
+  "description": "COMVERA — multi-tenant contractor compliance and site safety platform",
   "type": "module",
   "engines": {
     "node": ">=20"

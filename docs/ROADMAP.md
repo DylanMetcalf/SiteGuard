@@ -1,6 +1,6 @@
-# SiteGuard 2.0: audit and implementation plan
+# COMVERA 2.0: audit and implementation plan
 
-This responds to the owner's 96-point "SiteGuard 2.0" brief (30 Sep 2026). The brief asks for an
+This responds to the owner's 96-point "COMVERA 2.0" brief (30 Sep 2026). The brief asks for an
 audit of what exists before anything is built. This page is that audit, and the plan built from it.
 It complements `SPEC_COVERAGE.md` (the earlier 117-point spec) and `PARKING_LOT.md` (what we
 deliberately haven't built).
@@ -26,7 +26,7 @@ deliberately haven't built).
 
 | Brief | State before this round | This round |
 |---|---|---|
-| 4–5, 8 Safety File Builder, site-specific files, guided creation | ✅ Every site has its own file. There is a six-step guide per file (company documents, people, documents SiteGuard writes, certificates, extras, check and download). *Build my safety file* writes every missing document. | Keep. Make "Build safety file" more obvious (dashboard and file page). |
+| 4–5, 8 Safety File Builder, site-specific files, guided creation | ✅ Every site has its own file. There is a six-step guide per file (company documents, people, documents COMVERA writes, certificates, extras, check and download). *Build my safety file* writes every missing document. | Keep. Make "Build safety file" more obvious (dashboard and file page). |
 | 6 Individual documents, required vs optional | 🟡 Documents can be picked individually from starter lists, but every requirement is mandatory. | 🆕 Optional requirements. Missing optional items don't block readiness or Site Ready. |
 | 7 Document states | 🟡 Missing, awaiting review, complete, expiring, expired and correction required. There is no *optional* or *not applicable*. | 🆕 Optional. Not applicable is handled by making an item optional or removing it (a site decision). |
 | 9 Studio returns to the file | ✅ "Create it in Document Studio" → attach → submit, in one flow. | — |
@@ -46,7 +46,7 @@ deliberately haven't built).
 | 31 Compliance access card | ✅ Worker QR gate cards and a public gate page with no personal details; Site Ready verification codes. | — |
 | 32 Letter of Good Standing | ✅ A company document with expiry, a validity rule, reminders and gate/readiness effects. | — |
 | 33–34 Compliance dashboard; "why?" | ✅ Readiness with "Why 78%?", the agent's findings and gate reasons. | — |
-| 35, 67–68 POPIA, legal pages, footer | 🟡 Privacy by design (last 4 ID digits, tenant isolation, append-only audit, scoped links), but no privacy/terms pages and no data export. | 🆕 Privacy and terms pages describing what SiteGuard actually does, marked for legal review; footer links; an organisation data export. |
+| 35, 67–68 POPIA, legal pages, footer | 🟡 Privacy by design (last 4 ID digits, tenant isolation, append-only audit, scoped links), but no privacy/terms pages and no data export. | 🆕 Privacy and terms pages describing what COMVERA actually does, marked for legal review; footer links; an organisation data export. |
 | 36 Security | ✅ Tested tenant isolation, CSRF, rate limits, magic-byte uploads and a CSP. Two independent reviews per round. | Review again. |
 | 37–38 Multi-tenant, roles | ✅ Owner, admin, reviewer and staff roles on each side, with multi-organisation users. | — |
 | 39–43 Self-service billing, entitlements | 🟡 Stripe works, but plan checks are scattered through the code. | 🆕 One central list of what each plan includes. |
@@ -84,3 +84,22 @@ and ships as its own commit.
 so it needed no change. The security review of this round was a read-through of the new routes
 (export, platform overview, legal pages, entitlements, service worker); it led to a rate limit on
 the export and a more exact HTTPS statement on the privacy page.
+
+
+## 5. Production evolution round (2 Oct 2026)
+
+The second brief (contractor-owned Safety File engine, correct commercial model, public website) was
+built in seven phases on top of the above, each with tests:
+
+1. **Who pays** — 14-day trial for everyone; site sponsorship of one contractor file; promo codes and
+   platform grants; editable pricing; Contractor Starter and Enterprise plans.
+2. **Safety files first** — Safety files tab, Create safety file, Upload document, readiness check with
+   preview, per-document downloads, share/send, arranging project files, Skip for now, Studio My documents first.
+3. **Sites** — duplicate, archive, restore, delete-while-unused; the mine picks contractor documents to
+   open one by one or merge.
+4. **On site** — sessions with time, work type and tools; scheduled sessions; hand tools; risk matrix choice.
+5. **Public site** — eight pages, contact form, who-pays wording, bigger logo, first-run welcome.
+6. **Audit** — persona walk-through with billing on, security read-through, fixes, docs.
+
+Still parked, with reasons, in `PARKING_LOT.md`: an admin-editable tool library, per-file purchases,
+malware scanning, AI research of specific sites, emailed induction invitations, a separate staging service.

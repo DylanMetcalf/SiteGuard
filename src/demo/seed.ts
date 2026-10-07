@@ -43,7 +43,7 @@ export async function seedDemo(db: Db): Promise<{ group: string; entryUserId: st
     const u = (await one<{ id: string }>(
       db,
       `insert into users (email, name, title, is_demo, email_verified_at, last_active_org_id) values ($1, $2, $3, true, now(), $4) returning id`,
-      [`${slug}+${tag}@demo.siteguard.invalid`, name, title, orgId],
+      [`${slug}+${tag}@demo.comvera.invalid`, name, title, orgId],
     ))!.id;
     await db.query('insert into memberships (org_id, user_id, role) values ($1, $2, $3)', [orgId, u, role]);
     return u;
@@ -138,7 +138,7 @@ export async function seedDemo(db: Db): Promise<{ group: string; entryUserId: st
 
   // Placeholder files so "View" works in the demo.
   const sample = async (orgId: string, name: string, by: string) => {
-    const body = Buffer.from(`SAMPLE DOCUMENT — SiteGuard demo data\n\n${name}\n\nThis placeholder stands in for the real certificate or plan a contractor would upload.\n`);
+    const body = Buffer.from(`SAMPLE DOCUMENT — COMVERA demo data\n\n${name}\n\nThis placeholder stands in for the real certificate or plan a contractor would upload.\n`);
     const key = `demo/${group}/${randomUUID()}.txt`;
     await storage.put(key, body, 'text/plain');
     return (await one<{ id: string }>(
@@ -295,7 +295,7 @@ export async function seedDemo(db: Db): Promise<{ group: string; entryUserId: st
     await db.query(`insert into toolbox_attendance (talk_id, worker_id, attendee_name, signature) values ($1, $2, $3, $4)`, [talk, w, workers[i][0], sig]);
   }
 
-  // ABC Electrical's own project for a client that isn't on SiteGuard (a private client record).
+  // ABC Electrical's own project for a client that isn't on COMVERA (a private client record).
   const kestrel = (await one<{ id: string }>(
     db,
     `insert into organisations (name, kind, plan, subscription_status, seat_limit, managed_by_org, is_demo, demo_group) values ('Kestrel Property Group', 'host', 'host_starter', 'free', 1, $1, true, $2) returning id`,

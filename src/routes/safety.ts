@@ -59,7 +59,7 @@ export default async function safetyRoutes(app: FastifyInstance) {
           `${ctx.user.name} (${ctx.org.name}) reported a ${label.toLowerCase()} on ${site.name}.`,
           clip(body.description, 400),
           ...(body.type === 'lost_time' || body.type === 'fatality'
-            ? ['The site cannot be marked Site Ready until this investigation is closed. Statutory reporting obligations under the MHSA may apply outside SiteGuard.']
+            ? ['The site cannot be marked Site Ready until this investigation is closed. Statutory reporting obligations under the MHSA may apply outside COMVERA.']
             : []),
         ];
         const mail = (to: { email: string }) => ({ to: to.email, subject: `${label} reported: ${site.name}`, lines, action: { label: 'Open incident', url: appUrl('/') } });
@@ -78,7 +78,7 @@ export default async function safetyRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     return withTx(async (db) => {
       const { row, side, parties, site } = await loadChild(db, ctx, 'incidents', id);
-      // The site investigates; on a contractor's own project there is no site in SiteGuard, so the contractor's admins do.
+      // The site investigates; on a contractor's own project there is no site in COMVERA, so the contractor's admins do.
       if (site.project && side === 'contractor') {
         if (!canAdminOrg(ctx)) throw forbidden('Only your company\'s owners and admins can close out incidents on a project.');
       } else {
@@ -263,7 +263,7 @@ export default async function safetyRoutes(app: FastifyInstance) {
           to: to.email,
           subject: `High-severity defect on ${site.name}`,
           lines: [`${ctx.user.name} logged a high-severity defect during "${row.title}":`, clip(body.description, 400)],
-          action: { label: 'Open SiteGuard', url: appUrl('/') },
+          action: { label: 'Open COMVERA', url: appUrl('/') },
         }));
       }
       await publishChange(db, parties);

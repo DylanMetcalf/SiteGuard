@@ -232,6 +232,8 @@ export interface FileSelection {
   only?: string[];
   appointments?: boolean;
   certificates?: boolean;
+  /** A look before downloading: nothing is recorded, and the copy is stamped as a preview. */
+  preview?: boolean;
 }
 
 export async function buildSafetyFile(_db: Db, siteId: string, generatedBy: string, selection: FileSelection = {}): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean; partial: boolean }> {
@@ -245,8 +247,9 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, se
   const all = await safetyFileItems(db, siteId);
   const { site, reqs, workers } = all;
   const partial = !!selection.only || selection.appointments === false || selection.certificates === false;
-  // A full compile is a revision; a copy with documents left out is labelled as a selection and records nothing.
-  const revision = partial
+  const preview = !!selection.preview;
+  // A full compile is a revision; a copy with documents left out (or a preview) is labelled and records nothing.
+  const revision = partial || preview
     ? { number: Number((await one<{ n: number }>(db, 'select coalesce(max(number), 0)::int as n from safety_file_versions where site_id = $1', [siteId]))!.n), created: false }
     : await recordRevision(db, siteId, toLines(all.items), generatedBy);
   const keep = selection.only ? new Set(selection.only) : null;
@@ -273,14 +276,16 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, se
     coverRows: [
       ['Contractor', site.contractor_name],
       ...(site.project
-        ? ([['Client', [site.host_name, site.client_contact].filter(Boolean).join(' — ')], ['Status', 'Prepared by the contractor for the client; not reviewed by the client in SiteGuard']] as [string, string][])
+        ? ([['Client', [site.host_name, site.client_contact].filter(Boolean).join(' — ')], ['Status', 'Prepared by the contractor for the client; not reviewed by the client in COMVERA']] as [string, string][])
         : ([['Client (host)', site.host_name], ['Site status', ready ? `Site ready — approved ${fmt(site.approved_on)} by ${site.approver_name}` : 'Not yet approved']] as [string, string][])),
       ...(ready ? ([['Verification code', site.verification_id]] as [string, string][]) : []),
       ['Requirements', site.project
         ? `${n('complete', 'expiring')} of ${reqStatuses.length} in the file · ${n('missing', 'expired')} outstanding`
         : `${n('complete', 'expiring')} approved · ${n('awaiting_review')} awaiting review · ${n('missing', 'expired', 'correction_required')} outstanding`],
       ['Workforce', `${workers.length} worker${workers.length === 1 ? '' : 's'} assigned`],
-      ['Revision', partial
+      ['Revision', preview
+        ? `Preview — not a recorded revision${revision.number ? ` (latest full revision: Rev ${revision.number})` : ''}`
+        : partial
         ? `Selected documents only — not a full revision${revision.number ? ` (latest full revision: Rev ${revision.number})` : ''}`
         : `Rev ${revision.number}${revision.created ? '' : ' (unchanged since it was compiled)'}`],
       ['Compiled', `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC by ${generatedBy}`],
@@ -288,10 +293,10 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, se
     items,
     registers,
     contentsNote: 'Only documents that have been submitted to the site are included. Missing, expired and returned documents are listed so the gaps are visible.',
-    stamp: `Safety file · ${site.name} · ${site.contractor_name} · ${partial ? 'Selection' : `Rev ${revision.number}`}`,
+    stamp: `Safety file · ${site.name} · ${site.contractor_name} · ${preview ? 'Preview' : partial ? 'Selection' : `Rev ${revision.number}`}`,
   });
   return {
-    pdf, filename: `Safety-file-${safeName(site.name)}-${partial ? 'selection' : `rev${revision.number}`}.pdf`,
+    pdf, filename: `Safety-file-${safeName(site.name)}-${preview ? 'preview' : partial ? 'selection' : `rev${revision.number}`}.pdf`,
     revision: revision.number, created: revision.created, partial,
   };
 }
@@ -375,8 +380,8 @@ async function renderBundle(_db: Db, spec: BundleSpec): Promise<Buffer> {
     if (!it.file) { docs.push(null); continue; }
     let buf: Buffer | null = null;
     try { buf = await storage.read(it.file.storage_key); } catch { /* reported below */ }
-    if (!buf) { docs.push(await notice(it, 'The file could not be read from storage. Open it in SiteGuard.')); continue; }
-    if (total + buf.length > MAX_TOTAL_BYTES) { docs.push(await notice(it, 'This file is too large to include here. Open it in SiteGuard.')); continue; }
+    if (!buf) { docs.push(await notice(it, 'The file could not be read from storage. Open it in COMVERA.')); continue; }
+    if (total + buf.length > MAX_TOTAL_BYTES) { docs.push(await notice(it, 'This file is too large to include here. Open it in COMVERA.')); continue; }
     total += buf.length;
     docs.push(await asPdf(it, buf));
   }
@@ -427,7 +432,7 @@ async function renderBundle(_db: Db, spec: BundleSpec): Promise<Buffer> {
         table: { widths: ['32%', '*'], body: spec.coverRows.map(([k, v]) => [{ text: t(k), bold: true, fillColor: tint(brand, 0.92) }, t(v)]) },
         layout: { hLineWidth: () => 0.5, vLineWidth: () => 0, hLineColor: () => '#D5DBE3', paddingTop: () => 6, paddingBottom: () => 6, paddingLeft: () => 8 },
       },
-      { text: 'Compiled from the digital record in SiteGuard. The platform record is the source of truth; printed copies are uncontrolled.', fontSize: 8, color: MUTED, italics: true, margin: [0, 18, 0, 0], pageBreak: 'after' },
+      { text: 'Compiled from the digital record in COMVERA. The platform record is the source of truth; printed copies are uncontrolled.', fontSize: 8, color: MUTED, italics: true, margin: [0, 18, 0, 0], pageBreak: 'after' },
       ...contents(pages, regPage),
     ], true);
 
@@ -440,7 +445,7 @@ async function renderBundle(_db: Db, spec: BundleSpec): Promise<Buffer> {
   for (const d of docs) if (d) { starts.push(next); next += d.getPageCount(); }
   const out = await PDFDocument.load(await pdfFromDefinition(front(starts, regPage)));
   out.setTitle(latin(`${spec.eyebrow === 'SAFETY FILE' ? 'Safety file' : 'Document pack'} — ${spec.title}`));
-  out.setCreator('SiteGuard');
+  out.setCreator('COMVERA');
   for (const d of [regPdf, ...docs]) {
     if (!d) continue;
     for (const pg of await out.copyPages(d, d.getPageIndices())) out.addPage(pg);
@@ -465,7 +470,7 @@ function base(spec: BundleSpec, content: unknown[], cover = false) {
   return {
     pageSize: 'A4',
     pageMargins: [48, 60, 48, 58],
-    info: { title: t(spec.title), author: t(spec.author), creator: 'SiteGuard' },
+    info: { title: t(spec.title), author: t(spec.author), creator: 'COMVERA' },
     images: spec.logo ? { logo: spec.logo } : {},
     defaultStyle: { font: 'Helvetica', fontSize: 9.5, lineHeight: 1.3, color: INK },
     background: (page: number, size: { width: number; height: number }) =>
@@ -492,9 +497,9 @@ async function asPdf(it: BundleItem, buf: Buffer): Promise<PDFDocument> {
       return doc;
     }
   } catch {
-    return notice(it, 'This PDF is password-protected or damaged, so it could not be merged. Open it in SiteGuard.');
+    return notice(it, 'This PDF is password-protected or damaged, so it could not be merged. Open it in COMVERA.');
   }
-  return notice(it, `This is a ${it.file?.filename?.split('.').pop()?.toUpperCase() ?? 'non-PDF'} file, so it is not merged here. Open or download it in SiteGuard.`);
+  return notice(it, `This is a ${it.file?.filename?.split('.').pop()?.toUpperCase() ?? 'non-PDF'} file, so it is not merged here. Open or download it in COMVERA.`);
 }
 
 async function notice(it: BundleItem, message: string): Promise<PDFDocument> {

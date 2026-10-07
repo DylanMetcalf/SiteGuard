@@ -179,9 +179,9 @@ export async function runReminders(): Promise<number> {
       await queueEmail(db, {
         orgId,
         to: email,
-        subject: `SiteGuard: ${list.length} item${list.length === 1 ? '' : 's'} need${list.length === 1 ? 's' : ''} attention`,
+        subject: `COMVERA: ${list.length} item${list.length === 1 ? '' : 's'} need${list.length === 1 ? 's' : ''} attention`,
         lines: [`Hi ${name},`, 'These need attention:', ...list.map((l) => `• ${l}`)],
-        action: { label: 'Open SiteGuard', url: appUrl('/') },
+        action: { label: 'Open COMVERA', url: appUrl('/') },
         dedupeKey: `digest:${email}:${stamp}`,
         footer: 'Admins can turn these digests off under Admin → Notifications.',
       });
@@ -194,4 +194,6 @@ export async function cleanupExpired(): Promise<void> {
   await pool.query(`delete from sessions where expires_at < now()`);
   await pool.query(`delete from email_tokens where expires_at < now() - interval '7 days'`);
   await pool.query(`delete from reminder_log where sent_at < now() - interval '180 days'`);
+  await pool.query(`delete from exchange_sessions where expires_at < now()`);
+  await pool.query(`delete from exchange_codes where expires_at < now() - interval '1 day'`);
 }

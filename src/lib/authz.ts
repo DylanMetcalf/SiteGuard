@@ -10,7 +10,8 @@ import type { Db } from '../db/pool.js';
 import { one } from '../db/pool.js';
 import { features } from '../config.js';
 import { forbidden, notFound, paymentRequired, unauthorized } from './errors.js';
-import { standing, type OrgKind } from './plans.js';
+import { hasOwnAccess, standing, type OrgKind } from './plans.js';
+import { siteSponsorship } from './sponsorship.js';
 
 export type Role = 'owner' | 'admin' | 'reviewer' | 'member';
 
@@ -34,6 +35,11 @@ export interface OrgRow {
   is_demo: boolean;
   demo_group: string | null;
   created_at: Date;
+  grant_plan: string | null;
+  grant_until: Date | null;
+  grant_source: string | null;
+  /** Contractors only, computed per request: a site currently sponsors this company. */
+  sponsored?: boolean;
 }
 
 export interface UserRow {
@@ -54,6 +60,8 @@ export interface Ctx {
   role: Role | null;
   /** Set when the session's expiry was extended on this request, so the cookie is re-issued. */
   renewedUntil?: Date;
+  /** The request changes something (anything but GET/HEAD/OPTIONS). */
+  write?: boolean;
 }
 
 export interface OrgCtx extends Ctx {
@@ -75,8 +83,9 @@ export function requireOrg(ctx: Ctx | null): OrgCtx {
 /** Blocks writes for organisations whose trial/subscription has lapsed. */
 export function requireWritable(ctx: OrgCtx): void {
   if (standing(ctx.org) === 'lapsed') {
-    throw paymentRequired(
-      "Your organisation's trial or subscription has ended. Everything is still readable; choose a plan under Billing to keep making changes.",
+    throw paymentRequired(ctx.org.kind === 'contractor'
+      ? "Your trial or subscription has ended and no site is sponsoring you right now. Everything is still readable; choose a contractor plan under Plan & billing to keep making changes."
+      : "Your organisation's trial or subscription has ended. Everything is still readable; choose a plan under Billing to keep making changes.",
     );
   }
 }
@@ -174,6 +183,15 @@ export async function loadSite(
   if (side === 'contractor') {
     if (site.status === 'declined') throw notFound();
     if (site.status === 'invited' && !opts.allowInvited) throw notFound();
+  }
+  // A contractor without its own plan may only change files a site sponsors.
+  if (side === 'contractor' && ctx.write && !hasOwnAccess(ctx.org)) {
+    const sp = site.project ? null : await siteSponsorship(db, site.id);
+    if (!sp?.active) {
+      throw paymentRequired(site.project
+        ? 'Your own projects need a contractor plan. Choose one under Plan & billing to keep working on this file.'
+        : `${site.host_name} isn't sponsoring this safety file at the moment. Choose a contractor plan under Plan & billing to keep working on it.`);
+    }
   }
   const parties = [site.org_id, ...(site.linked_org_id ? [site.linked_org_id] : [])];
   return { site, side, parties };

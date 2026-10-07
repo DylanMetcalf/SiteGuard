@@ -1,4 +1,4 @@
-# SiteGuard — notes for Claude sessions
+# COMVERA — notes for Claude sessions
 
 Multi-tenant contractor compliance and site-safety SaaS for South African mines. Read
 `README.md`, `docs/ARCHITECTURE.md` (tenancy, permission matrix, security) and
@@ -11,7 +11,7 @@ haven't built.
 - `npm test` — integration tests against real Postgres (`siteguard_test`, schema is dropped and recreated)
 - `npm run typecheck`, `for f in public/js/*.js; do node --check "$f"; done` — what CI runs besides tests and build
 - `npm run test:e2e` — two-browser Playwright flow against a running server (`BASE_URL`, `PLAYWRIGHT_CHROMIUM_PATH`)
-- `SITEGUARD_URL=… npm run smoke` — synthetic check of a deployed app
+- `COMVERA_URL=… npm run smoke` — synthetic check of a deployed app
 
 ## Rules that matter here
 
@@ -37,11 +37,22 @@ haven't built.
 - Contractor projects (`routes/projects.ts`) are ordinary files for a private client record (`organisations.managed_by_org`);
   `loadSite` sets `site.project`. Never add memberships to a client record; archive projects, never delete them.
 - The Walkthrough (`public/js/tour.js`) only navigates: when a screen changes, check its step's `target` selector still exists.
+- Who pays: `hasOwnAccess` (plan, trial or grant) vs site sponsorship (`lib/sponsorship.ts`). A contractor
+  without own access may only change sponsored files; `loadSite` enforces it for writes. Never hard-code
+  prices: the pricing page reads `plan_settings` (`lib/pricing.ts`); grants come from promo codes or the admin.
 - Plan checks go through `lib/entitlements.ts` (`can` / `requireFeature`), never plan names in routes.
   Readiness counts an optional requirement only once filed (`countsTowardReadiness`, mirrored in `core.js`).
 - The platform overview (`routes/admin.ts`) is read-only, counts only, 404 unless `isPlatformAdmin`.
   The service worker (`public/sw.js`) must never cache `/api`. `/privacy` and `/terms` are drafts:
   describe real behaviour, never invent legal commitments.
+- The product name is COMVERA (internal DB/channel names still say siteguard: leave them). Plan
+  enforcement is `features.billing` (`ENFORCE_PLANS` or Stripe); card payments are `features.payments`.
+  Product statistics go through `track()` in `lib/events.ts` (no personal data).
+- Exchanges (`routes/exchange.ts`, portal `routes/exchangePortal.ts`, `lib/exchange.ts`): a relationship or contact is
+  never a permission; the portal (`/x/:token`, `/api/x/*`, cookie `cx`, header `x-exchange-csrf`) never creates users,
+  organisations or trials and sees one exchange only. Requested uploads are the requester's own files; shares point at
+  the sender's file (revoke never changes it). Claiming needs a verified email, an admin and explicit confirmation;
+  never auto-link or merge. Log every step with `exchangeAudit`; never block a recipient's submission over billing.
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and

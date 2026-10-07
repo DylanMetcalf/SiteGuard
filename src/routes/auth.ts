@@ -9,6 +9,9 @@ import { createSession, destroySession, SESSION_COOKIE } from '../lib/sessions.j
 import { requireUser, requireOrg, canAdminOrg, type Role, type OrgCtx } from '../lib/authz.js';
 import { appUrl, queueEmail } from '../lib/email.js';
 import { defaultPlanFor, type OrgKind } from '../lib/plans.js';
+import { sponsorFile } from '../lib/sponsorship.js';
+import { track } from '../lib/events.js';
+import { redeemPromo } from '../lib/promos.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 
@@ -38,8 +41,8 @@ async function sendVerification(db: Db, userId: string, to: string, userName: st
   );
   await queueEmail(db, {
     to,
-    subject: 'Confirm your email for SiteGuard',
-    lines: [`Hi ${userName},`, 'Confirm your email address to finish setting up your SiteGuard account. This link expires in 3 days.'],
+    subject: 'Confirm your email for COMVERA',
+    lines: [`Hi ${userName},`, 'Confirm your email address to finish setting up your COMVERA account. This link expires in 3 days.'],
     action: { label: 'Confirm email', url: appUrl(`/verify-email?token=${token}`) },
   });
 }
@@ -75,10 +78,20 @@ export async function acceptSiteInvitation(db: Db, ctx: OrgCtx, invitationId: st
   }
   await db.query(`update site_invitations set status = 'accepted', responded_at = now(), responded_by = $2 where id = $1`, [inv.id, ctx.user.id]);
   await db.query(`update sites set status = 'in_progress' where id = $1 and status = 'invited'`, [inv.site_id]);
+  await sponsorFile(db, inv.site_id);
   await audit(db, ctx, 'Accepted invitation', inv.site_name, inv.site_id);
   await notifyOrg(db, inv.org_id, ['owner', 'admin', 'reviewer'], { kind: 'accepted', title: `${ctx.org.name} joined ${inv.site_name}`, body: 'They can now see the site\'s requirements and start submitting documents.', link: { kind: 'site', siteId: inv.site_id } });
   await publishChange(db, [inv.org_id, ctx.org.id]);
   return { siteId: inv.site_id, hostOrgId: inv.org_id };
+}
+
+/** Sign-in and sign-out go into the organisation's audit trail (who, when, from which address). */
+async function signInEvent(orgId: string, userId: string, action: string, ip: string) {
+  await pool.query(
+    `insert into audit_events (org_id, actor_id, actor_name, actor_role, action, detail)
+     select $1, u.id, u.name, coalesce(m.role, ''), $3, $4 from users u left join memberships m on m.user_id = u.id and m.org_id = $1 where u.id = $2`,
+    [orgId, userId, action, `from ${ip}`],
+  );
 }
 
 export default async function authRoutes(app: FastifyInstance) {
@@ -92,6 +105,8 @@ export default async function authRoutes(app: FastifyInstance) {
         orgKind: z.enum(['host', 'contractor']).optional(),
         inviteToken: z.string().max(100).optional(),
         siteInviteToken: z.string().max(100).optional(),
+        /** A promo code from the platform owner (e.g. lifetime access); redeemed for the new organisation. */
+        promoCode: z.string().trim().max(40).optional(),
       })
       .parse(req.body);
     const problem = passwordProblem(body.password);
@@ -148,6 +163,16 @@ export default async function authRoutes(app: FastifyInstance) {
       const org = (await one(db, 'select * from organisations where id = $1', [orgId]))!;
       const ctx = { user: { id: user.id, email: body.email, name: body.name, title: '', phone: '', email_verified_at: null, is_demo: false }, sessionId: '', csrfToken: '', org, role } as OrgCtx;
       await audit(db, ctx, body.inviteToken ? 'Joined organisation' : 'Organisation created', org.name);
+      if (!body.inviteToken) {
+        await track(db, orgId, 'signup');
+        await track(db, orgId, 'trial_started');
+        // A code typed at sign-up is redeemed for the new company; a bad code stops sign-up with a clear message.
+        if (body.promoCode) {
+          const r = await redeemPromo(db, ctx, body.promoCode);
+          await audit(db, ctx, 'Redeemed promo code', `${body.promoCode.toUpperCase()} at sign-up — ${r.kind === 'grant' ? r.plan + (r.until ? ' until ' + r.until.toISOString().slice(0, 10) : ', no end date') : r.percentOff + '% off ' + r.plan + ' at checkout'}`);
+          await track(db, orgId, 'promo_redeemed');
+        }
+      }
       if (siteInvitationId) await acceptSiteInvitation(db, ctx, siteInvitationId);
       await publishChange(db, [orgId]);
       await createSession(db, reply, req, user.id, orgId);
@@ -186,10 +211,12 @@ export default async function authRoutes(app: FastifyInstance) {
         [user.id, user.last_active_org_id],
       ))?.org_id ?? null;
     await createSession(pool, reply, req, user.id, orgId);
+    if (orgId) await signInEvent(orgId, user.id, 'Signed in', req.ip);
     return { ok: true };
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
+    if (req.ctx?.org) await signInEvent(req.ctx.org.id, req.ctx.user.id, 'Signed out', req.ip);
     if (req.ctx) await destroySession(pool, reply, req.ctx.sessionId);
     else reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { ok: true };
@@ -207,10 +234,10 @@ export default async function authRoutes(app: FastifyInstance) {
         );
         await queueEmail(db, {
           to: body.email,
-          subject: 'Reset your SiteGuard password',
+          subject: 'Reset your COMVERA password',
           lines: [
             `Hi ${user.name},`,
-            'Someone asked to reset the password for this SiteGuard account. If that was you, use the link below — it expires in 1 hour and works once.',
+            'Someone asked to reset the password for this COMVERA account. If that was you, use the link below — it expires in 1 hour and works once.',
             "If it wasn't you, ignore this email; your password hasn't changed.",
           ],
           action: { label: 'Choose a new password', url: appUrl(`/reset-password?token=${token}`) },

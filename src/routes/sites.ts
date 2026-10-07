@@ -1,5 +1,6 @@
 import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
+import { track } from '../lib/events.js';
 import { z } from 'zod';
 import { many, one, pool, withTx, type Db } from '../db/pool.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
@@ -70,23 +71,24 @@ async function inviteContractor(
     [site.id, ctx.org.id, contractor.id, contractor.contact_email, sha256(token)],
   );
   const lines = [
-    `${ctx.org.name} has invited ${contractor.name} to work on "${site.name}" and submit a safety file through SiteGuard.`,
-    'Accepting shows you exactly which documents the site needs and tracks your readiness as you upload them. SiteGuard is free for contractors.',
+    `${ctx.org.name} has invited ${contractor.name} to work on "${site.name}" and submit a safety file through COMVERA.`,
+    'Accepting shows you exactly which documents the site needs and tracks your readiness as you upload them. Working on this site\'s safety file is sponsored by the site.',
   ];
   const action = { label: 'View invitation', url: appUrl(`/site-invite?token=${token}`) };
   if (contractor.contact_email) {
-    await queueEmail(db, { orgId: ctx.org.id, to: contractor.contact_email, subject: `${ctx.org.name} invited you to a site on SiteGuard`, lines, action });
+    await queueEmail(db, { orgId: ctx.org.id, to: contractor.contact_email, subject: `${ctx.org.name} invited you to a site on COMVERA`, lines, action });
   }
   if (contractor.linked_org_id) {
-    // Already on SiteGuard: tell their admins too; they can also accept in-app.
+    // Already on COMVERA: tell their admins too; they can also accept in-app.
     await queueToOrg(db, contractor.linked_org_id, ['owner', 'admin'], (to) => ({
       to: to.email,
       subject: `New site invitation from ${ctx.org.name}`,
       lines,
-      action: { label: 'Open SiteGuard', url: appUrl('/') },
+      action: { label: 'Open COMVERA', url: appUrl('/') },
     }));
   }
   await audit(db, ctx, 'Invited contractor', `${contractor.name} to ${site.name}`, site.id);
+  await track(db, ctx.org.id, 'invitation_sent');
 }
 
 export async function declineSiteInvitation(db: Db, ctx: OrgCtx, invitationId: string, viaToken = false) {
@@ -377,7 +379,7 @@ export default async function siteRoutes(app: FastifyInstance) {
     await withTx(async (db) => {
       const linked = await one<{ linked_org_id: string | null }>(db, 'select linked_org_id from contractors where id = $1 and org_id = $2 for update', [id, ctx.org.id]);
       if (!linked) throw notFound();
-      if (linked.linked_org_id) throw conflict('This contractor keeps its own company details up to date in SiteGuard, so they can\'t be changed here. Ask them to update their organisation settings.');
+      if (linked.linked_org_id) throw conflict('This contractor keeps its own company details up to date in COMVERA, so they can\'t be changed here. Ask them to update their organisation settings.');
       const c = await one<{ name: string }>(
         db,
         `update contractors set name = coalesce($3, name), trade = coalesce($4, trade), contact_name = coalesce($5, contact_name),

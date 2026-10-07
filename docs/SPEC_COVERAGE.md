@@ -1,8 +1,8 @@
-# Spec coverage: the Master Evolution Specification against SiteGuard
+# Spec coverage: the Master Evolution Specification against COMVERA
 
 The owner's *Master Evolution, Compliance & Product Upgrade Specification* (117 points, 30 Sep 2026)
-asks for an audit of what exists before anything is built, and for SiteGuard to be extended, not
-rebuilt. This page is that map. It says, point by point, what SiteGuard already does, what update 2
+asks for an audit of what exists before anything is built, and for COMVERA to be extended, not
+rebuilt. This page is that map. It says, point by point, what COMVERA already does, what update 2
 added, and what is deliberately parked (with the reason in `PARKING_LOT.md`).
 
 **Key:** ✅ in place before update 2 · 🆕 added in update 2 · 🟡 partly in place · ⏸ parked
@@ -34,7 +34,7 @@ added, and what is deliberately parked (with the reason in `PARKING_LOT.md`).
 | 18 Expiry management | ✅ | Expiring (30 days) and expired statuses everywhere; 🆕 mine-set **validity rules** make expiry a site rule rather than whatever date is typed. |
 | 19 Configurable reminder stages | 🟡 | Reminders at 30 days, 7 days and expiry, once each (no spam). Per-organisation timing is parked. |
 | 20–21 Compliance dashboard and contractor status | ✅ | Counts with the evidence behind them ("Why 78%?"); Site Ready only when every requirement is approved and nothing serious is open. |
-| 22–23 Compliance card with QR, verification page | 🆕 / ✅ | 🆕 per-worker **QR gate cards** and a public gate page; ✅ Site Ready verification page per company. Both say they show status held in SiteGuard, not proof of legal compliance. A company-branded card is parked. |
+| 22–23 Compliance card with QR, verification page | 🆕 / ✅ | 🆕 per-worker **QR gate cards** and a public gate page; ✅ Site Ready verification page per company. Both say they show status held in COMVERA, not proof of legal compliance. A company-branded card is parked. |
 | 24 Induction management | ✅ / 🆕 | Inductions are worker certificates with issue and expiry dates; 🆕 the mine's rule ("valid 12 months from the induction") drives gate clearance. |
 | 25 Shared-device (iPad) field mode | 🟡 | Toolbox talks already pass one device round for signatures. A locked big-button kiosk mode is parked. |
 | 26–27 Attendance registers and toolbox talks | ✅ | Topic, date, presenter, attendees, signatures, printed in the safety file's registers. |
@@ -58,7 +58,7 @@ added, and what is deliberately parked (with the reason in `PARKING_LOT.md`).
 | 38 Multi-tenant SaaS, roles | ✅ | Mines and contractors are separate tenants; owner, admin, reviewer and staff roles; every route enforces them. |
 | 39 Either side can subscribe | ✅ | Plans in `lib/plans.ts`, Stripe billing; workflows don't hard-code prices. |
 | 40 One master profile, many site files | ✅ | Exactly how files work. |
-| 41–42 Standalone contractor mode (own projects) | 🆕 (update 3) | *My projects*: a contractor builds a safety file for any client that isn't on SiteGuard. It uses a starter list, a copy of another file's list or its own items, files documents from its library or Document Studio, and sends a PDF or a secure link. The client needs no account. |
+| 41–42 Standalone contractor mode (own projects) | 🆕 (update 3) | *My projects*: a contractor builds a safety file for any client that isn't on COMVERA. It uses a starter list, a copy of another file's list or its own items, files documents from its library or Document Studio, and sends a PDF or a secure link. The client needs no account. |
 | 43–46 Export engine, index, numbering, completeness | ✅ / 🆕 | Contents generated from the file; Studio numbering uses the company's own prefix; the cover states approved / awaiting / outstanding counts. 🆕 A *safety file check* before every download shows required, in the file, missing and expired items, with names, and says the PDF lists every gap. |
 | 47, 87, 89 Change impact and rebuild | 🆕 | "Revisions and what changed" on every file, and a to-do item when a file has changed since its last revision. |
 | 48 "What needs my attention?" | ✅ | Dashboard, To-do list and agent findings. |
@@ -71,7 +71,7 @@ added, and what is deliberately parked (with the reason in `PARKING_LOT.md`).
 
 ## The evolution loop (spec 58–98)
 
-SiteGuard doesn't change itself. The spec asks for a controlled loop, and this is how it runs today:
+COMVERA doesn't change itself. The spec asks for a controlled loop, and this is how it runs today:
 
 1. **Observe.** In-app *Report a problem or suggest an idea* (stored in `feedback`), client error
    reports (`/api/client-errors`), and the compliance agent's findings across tenants.

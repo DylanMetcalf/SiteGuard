@@ -1,6 +1,6 @@
 # Deployment
 
-SiteGuard is one stateless Docker image plus four managed services: Postgres, S3-compatible
+COMVERA is one stateless Docker image plus four managed services: Postgres, S3-compatible
 storage, an SMTP provider, and Stripe. Migrations run automatically on start, guarded by an advisory
 lock, so rolling deploys with several replicas are safe.
 
@@ -44,13 +44,13 @@ DATABASE_URL=postgres://...
 DATABASE_SSL=true
 TRUST_PROXY=true                 # behind Fly/Render/ALB, so rate limits see real client IPs
 STORAGE_DRIVER=s3
-S3_BUCKET=siteguard-documents
+S3_BUCKET=comvera-documents
 S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com   # omit for AWS S3
 S3_REGION=auto                   # or af-south-1
 S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 SMTP_URL=smtps://USER:PASS@smtp.postmarkapp.com:465
-EMAIL_FROM=SiteGuard <no-reply@yourdomain.co.za>
+EMAIL_FROM=COMVERA <no-reply@yourdomain.co.za>
 ANTHROPIC_API_KEY=...            # optional; enables AI drafting and expiry detection
 STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... STRIPE_PRICE_*=...   # optional; enables billing
 ```
@@ -63,12 +63,12 @@ STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... STRIPE_PRICE_*=...   # optional;
    - **Contractor Pro**: AI, share links, more seats.
 
    Put their price IDs in `STRIPE_PRICE_HOST_STARTER`, `STRIPE_PRICE_HOST_PRO` and
-   `STRIPE_PRICE_CONTRACTOR_PRO`. Plan limits live in `src/lib/plans.ts`.
+   `STRIPE_PRICE_CONTRACTOR_PRO`, `STRIPE_PRICE_CONTRACTOR_STARTER`. Plan limits live in `src/lib/plans.ts`; what each plan includes in `src/lib/entitlements.ts`.
 2. Add a webhook endpoint at `https://<APP_URL>/api/billing/webhook` for
    `checkout.session.completed` and `customer.subscription.created`, `.updated` and `.deleted`. Put
    its signing secret in `STRIPE_WEBHOOK_SECRET`.
 3. Configure the **Customer Portal**. Allow payment-method updates, invoices and cancellation.
-   Plan and seat changes happen inside SiteGuard (`POST /api/billing/change`), which checks that
+   Plan and seat changes happen inside COMVERA (`POST /api/billing/change`), which checks that
    the new plan fits the organisation's current seats and sites.
 
 Without Stripe keys, billing is off: no trial countdown, and no seat or site limits. That is handy
@@ -76,7 +76,7 @@ for pilots.
 
 ## Storage
 
-Create a private bucket with no public access. SiteGuard never exposes bucket URLs. For R2, create
+Create a private bucket with no public access. COMVERA never exposes bucket URLs. For R2, create
 an API token scoped to the one bucket. Object keys are `<orgId>/<yyyy-mm>/<uuid>.<ext>`. Turn on
 bucket versioning or lifecycle backups if your retention policy requires them.
 
@@ -101,7 +101,7 @@ bucket versioning or lifecycle backups if your retention policy requires them.
 docker compose up -d                    # Postgres, MinIO (+ bucket), Mailpit
 cat >> .env <<'EOF'
 STORAGE_DRIVER=s3
-S3_BUCKET=siteguard-documents
+S3_BUCKET=comvera-documents
 S3_ENDPOINT=http://localhost:9000
 S3_REGION=us-east-1
 S3_FORCE_PATH_STYLE=true

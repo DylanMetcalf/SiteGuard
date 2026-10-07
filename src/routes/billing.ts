@@ -5,13 +5,17 @@
  * Stripe is the source of truth; the webhook mirrors it onto the organisation.
  */
 import type { FastifyInstance } from 'fastify';
+import { trackFirst } from '../lib/events.js';
 import Stripe from 'stripe';
 import { z } from 'zod';
 import { one, pool, withTx } from '../db/pool.js';
 import { config, features } from '../config.js';
 import { badRequest, conflict, unavailable } from '../lib/errors.js';
 import { requireAdmin, requireOrg, type OrgCtx } from '../lib/authz.js';
-import { PLANS, planOf, plansFor, standing } from '../lib/plans.js';
+import { PLANS, TRIAL_DAYS, grantActive, hasOwnAccess, planOf, plansFor, standing } from '../lib/plans.js';
+import { redeemPromo } from '../lib/promos.js';
+import { pricingTable } from '../lib/pricing.js';
+import { rl } from './auth.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { appUrl } from '../lib/email.js';
@@ -19,7 +23,7 @@ import { seatsUsed } from './org.js';
 
 let stripe: Stripe | null = null;
 function getStripe(): Stripe {
-  if (!features.billing) throw unavailable('Billing is not configured on this server.');
+  if (!features.payments) throw unavailable('Online card payments aren\'t switched on yet. Contact us to subscribe, or use a promo code.');
   stripe ??= new Stripe(config.STRIPE_SECRET_KEY!);
   return stripe;
 }
@@ -88,16 +92,25 @@ async function syncSubscription(sub: Stripe.Subscription) {
         periodEnd ? new Date(periodEnd * 1000) : null,
       ],
     );
+    if (!deleted && status === 'active') await trackFirst(db, org.id, 'subscription_started');
     await publishChange(db, [org.id]);
   });
 }
 
 export default async function billingRoutes(app: FastifyInstance) {
+  /** Public: what the pricing page shows (set by the platform admin; display only). */
+  app.get('/api/pricing', async (_req, reply) => {
+    reply.header('cache-control', 'public, max-age=60');
+    const plans = (await pricingTable(pool)).filter((p) => p.visible).map(({ defaultBlurb, ...p }) => ({ ...p, blurb: p.blurb || defaultBlurb }));
+    return { trialDays: TRIAL_DAYS, plans };
+  });
+
   app.get('/api/billing', async (req) => {
     const ctx = requireOrg(req.ctx);
     const plan = planOf(ctx.org);
     return {
       enabled: features.billing,
+      payments: features.payments,
       plan: plan.id,
       status: ctx.org.subscription_status,
       standing: standing(ctx.org),
@@ -107,10 +120,14 @@ export default async function billingRoutes(app: FastifyInstance) {
       seatsUsed: await seatsUsed(pool, ctx.org.id),
       activeSites: ctx.org.kind === 'host' ? await activeSites(ctx.org.id) : null,
       hasSubscription: !!ctx.org.stripe_subscription_id,
+      ownAccess: hasOwnAccess(ctx.org),
+      sponsored: !!ctx.org.sponsored,
+      grant: grantActive(ctx.org) ? { plan: PLANS[ctx.org.grant_plan!].name, until: ctx.org.grant_until, source: ctx.org.grant_source } : null,
+      coupon: (ctx.org.settings as Record<string, unknown>)?.checkoutCouponCode ?? null,
       hasCustomer: !!ctx.org.stripe_customer_id,
       plans: plansFor(ctx.org.kind).map((p) => ({
         id: p.id, name: p.name, blurb: p.blurb, siteLimit: p.siteLimit, maxSeats: p.maxSeats, ai: p.ai, paid: p.paid,
-        purchasable: !p.paid || !!p.stripePrice,
+        purchasable: !p.paid || (features.payments && !!p.stripePrice),
       })),
     };
   });
@@ -118,6 +135,7 @@ export default async function billingRoutes(app: FastifyInstance) {
   app.post('/api/billing/checkout', async (req) => {
     const ctx = requireOrg(req.ctx);
     requireAdmin(ctx);
+    getStripe(); // explains clearly when online payment isn't switched on
     const b = z.object({ plan: z.string(), seats: z.coerce.number().int().min(1).max(500) }).parse(req.body);
     const plan = PLANS[b.plan];
     if (!plan || plan.kind !== ctx.org.kind || !plan.paid || !plan.stripePrice) throw badRequest('That plan is not available.');
@@ -126,13 +144,15 @@ export default async function billingRoutes(app: FastifyInstance) {
     const used = await seatsUsed(pool, ctx.org.id);
     if (b.seats < used) throw badRequest(`You have ${used} people (including pending invitations). Choose at least ${used} seats.`);
     const customer = await ensureCustomer(ctx);
+    const coupon = (ctx.org.settings as Record<string, unknown>)?.checkoutCoupon as string | undefined;
     const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       customer,
       client_reference_id: ctx.org.id,
       line_items: [{ price: plan.stripePrice, quantity: b.seats }],
       subscription_data: { metadata: { org_id: ctx.org.id } },
-      allow_promotion_codes: true,
+      // A redeemed COMVERA promo code applies its Stripe coupon; otherwise customers may type a Stripe promotion code.
+      ...(coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
       success_url: appUrl('/?billing=success'),
       cancel_url: appUrl('/?billing=cancelled'),
     });
@@ -165,6 +185,19 @@ export default async function billingRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  /** Redeem a COMVERA promo code (works on a lapsed account too: that is often why it's used). */
+  app.post('/api/billing/redeem', rl(10), async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireAdmin(ctx);
+    const { code } = z.object({ code: z.string().trim().min(1).max(40) }).parse(req.body);
+    return withTx(async (db) => {
+      const r = await redeemPromo(db, ctx, code);
+      await audit(db, ctx, 'Redeemed promo code', `${code.toUpperCase()} — ${r.kind === 'grant' ? r.plan + (r.until ? ' until ' + r.until.toISOString().slice(0, 10) : ', no end date') : r.percentOff + '% off ' + r.plan + ' at checkout'}`);
+      await publishChange(db, [ctx.org.id]);
+      return r;
+    });
+  });
+
   app.post('/api/billing/portal', async (req) => {
     const ctx = requireOrg(req.ctx);
     requireAdmin(ctx);
@@ -177,7 +210,7 @@ export default async function billingRoutes(app: FastifyInstance) {
   await app.register(async (scope) => {
     scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => done(null, body));
     scope.post('/api/billing/webhook', async (req, reply) => {
-      if (!features.billing || !config.STRIPE_WEBHOOK_SECRET) return reply.status(404).send();
+      if (!features.payments || !config.STRIPE_WEBHOOK_SECRET) return reply.status(404).send();
       let event: Stripe.Event;
       try {
         event = getStripe().webhooks.constructEvent(req.body as Buffer, String(req.headers['stripe-signature'] ?? ''), config.STRIPE_WEBHOOK_SECRET);

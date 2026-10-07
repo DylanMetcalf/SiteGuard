@@ -1,4 +1,4 @@
-// Thin client for the SiteGuard API. Every request carries the session cookie
+// Thin client for the COMVERA API. Every request carries the session cookie
 // (same origin) and, for writes, the per-session CSRF token.
 
 let csrfToken = '';
@@ -34,7 +34,7 @@ export async function request(method, url, body) {
   try {
     res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin' });
   } catch {
-    throw new ApiError(0, 'network', "Can't reach SiteGuard — check your connection and try again.");
+    throw new ApiError(0, 'network', "Can't reach COMVERA — check your connection and try again.");
   }
   const out = await handle(res);
   // A site's validity rule shortened an expiry date: tell the person (core.js shows it).
@@ -55,7 +55,7 @@ export const api = {
     try {
       res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(body || {}), credentials: 'same-origin' });
     } catch {
-      throw new ApiError(0, 'network', "Can't reach SiteGuard — check your connection and try again.");
+      throw new ApiError(0, 'network', "Can't reach COMVERA — check your connection and try again.");
     }
     if (!res.ok) return handle(res);
     const blob = await res.blob();

@@ -1,20 +1,20 @@
 # Launch guide: from this repository to a live app you can sell
 
-This guide is written for a founder, not a developer. It takes you from nothing to SiteGuard
+This guide is written for a founder, not a developer. It takes you from nothing to COMVERA
 running on your own web address, sending real emails, and (optionally) using AI, in about an
 afternoon. You never need to edit code.
 
-**The big picture.** SiteGuard needs four things around it:
+**The big picture.** COMVERA needs four things around it:
 
 | # | What | Plain-language job | Who we use | Cost to start |
 |---|---|---|---|---|
 | 1 | Hosting | The computer in a data centre that runs the app and stores its data | **Render** | ≈ R260/month |
 | 2 | Email | Sends invitations, password resets and reminders so they don't land in spam | **Resend** | Free to start |
-| 3 | Domain | Your address, e.g. `siteguard.co.za` | **domains.co.za** | ≈ R99/year |
+| 3 | Domain | Your address, e.g. `comvera.co.za` | **domains.co.za** | ≈ R99/year |
 | 4 | Cloudflare | Extra protection and cheaper file storage later | **Cloudflare** | Optional — skip at launch |
 | + | AI key | Makes the assistant and drafting "think" rather than use built-in rules | **Anthropic (Claude)** | Pay as you go, start with ≈ R200–R400 |
 
-Everything works **without** the AI key: the assistant answers from SiteGuard's built-in rules and
+Everything works **without** the AI key: the assistant answers from COMVERA's built-in rules and
 starter packs, and document drafting uses templates tailored to the work described. Adding the key
 upgrades both, with no other change.
 
@@ -25,12 +25,12 @@ The domain comes before email because email providers need to check you own the 
 
 ## Free try-out first (optional, ≈ 15 minutes, R0)
 
-To click through SiteGuard before paying for anything, deploy the free demo version:
+To click through COMVERA before paying for anything, deploy the free demo version:
 
 1. Sign up at **render.com** with your GitHub account.
-2. Click **New → Blueprint** and choose the `SiteGuard` repository.
+2. Click **New → Blueprint** and choose your COMVERA repository on GitHub (it is still called `SiteGuard` there unless you rename it).
 3. In **Blueprint Path**, type `render.free.yaml`. There is nothing else to fill in.
-4. Click **Apply** and wait 5–10 minutes. Open the `https://siteguard-demo-xxxx.onrender.com` link.
+4. Click **Apply** and wait 5–10 minutes. Open the `https://comvera-demo-xxxx.onrender.com` link.
 5. Choose how to try it:
    - **Explore the demo**: a sample mine with contractors and documents already in it.
    - **Or start fresh with no sample data**: type your mine's name, a contractor's name and your
@@ -55,38 +55,38 @@ exactly what to create.
 1. Go to **render.com** and sign up with your **GitHub** account (the one that owns this repository).
 2. Add a payment card under **Billing**. The blueprint uses small paid plans because the free plans
    sleep when idle and delete the database after 30 days.
-3. Click **New → Blueprint**, choose the `SiteGuard` repository, and click **Apply**.
+3. Click **New → Blueprint**, choose your COMVERA repository on GitHub (it is still called `SiteGuard` there unless you rename it), and click **Apply**.
 4. Render asks for a few values. **Leave them all blank for now** and continue. You'll fill them in
    during steps 2, 3 and the AI step.
 5. Wait for the first deploy to finish (5–10 minutes). Render shows a link like
-   `https://siteguard-xxxx.onrender.com`. Open it: you should see the SiteGuard sign-in page. Click
+   `https://comvera-xxxx.onrender.com`. Open it: you should see the COMVERA sign-in page. Click
    **Explore the demo** to check everything works.
 
 What Render created:
 
-- **siteguard** (web service): the app. Its region is Frankfurt, Render's closest region to South
+- **comvera** (web service): the app. Its region is Frankfurt, Render's closest region to South
   Africa (pages load in a blink; uploads take a moment longer than they would from Johannesburg).
-- **siteguard-db** (Postgres database): all your customers' records. Render backs it up.
+- **comvera-db** (Postgres database): all your customers' records. Render backs it up.
 - **uploads** (a 5 GB disk attached to the app): uploaded documents. Render snapshots it daily.
   You can grow it later with one click, but never shrink it.
 
-> Where to change settings later: open the **siteguard** service → **Environment**. Every change
+> Where to change settings later: open the **comvera** service → **Environment**. Every change
 > there restarts the app with the new value (about a minute).
 
 ## Step 3 — Domain from domains.co.za (≈ 15 minutes + waiting)
 
-1. On **domains.co.za**, search for your name (e.g. `siteguard.co.za`) and buy it. A `.co.za` is
+1. On **domains.co.za**, search for your name (e.g. `comvera.co.za`) and buy it. A `.co.za` is
    about R99 a year. (The registry fee increases slightly from 1 October 2026, so the price may
    rise a little.) You don't need their web hosting — Render is your hosting.
 2. Decide the app's address. We recommend **`app.yourdomain.co.za`**, which leaves the main address
    free for a marketing website later.
-3. In Render: **siteguard → Settings → Custom Domains → Add**, type `app.yourdomain.co.za`. Render
-   shows a **CNAME** record, e.g. `app` → `siteguard-xxxx.onrender.com`.
+3. In Render: **comvera → Settings → Custom Domains → Add**, type `app.yourdomain.co.za`. Render
+   shows a **CNAME** record, e.g. `app` → `comvera-xxxx.onrender.com`.
 4. In domains.co.za: log in → **My Domains → your domain → DNS / Manage DNS**. Add a record:
    - Type: `CNAME`, Name/Host: `app`, Value/Target: the `…onrender.com` address Render showed you.
 5. Back in Render, click **Verify**. It can take from a few minutes to a few hours for the new
    record to spread. Render then issues the padlock (HTTPS certificate) automatically.
-6. In Render: **siteguard → Environment**, set `APP_URL` to `https://app.yourdomain.co.za` and save.
+6. In Render: **comvera → Environment**, set `APP_URL` to `https://app.yourdomain.co.za` and save.
    This makes the links in emails point to your address.
 
 ## Step 2 — Email with Resend (≈ 20 minutes + waiting)
@@ -104,14 +104,14 @@ the next plan is about $20/month for 50,000.
    Name `_dmarc`, Value `v=DMARC1; p=none; rua=mailto:you@yourdomain.co.za`.
 5. In Resend: **API Keys → Create API key** (permission: *Sending access*). Copy it — it starts
    with `re_`.
-6. In Render: **siteguard → Environment**, set:
+6. In Render: **comvera → Environment**, set:
    - `SMTP_URL` = `smtps://resend:re_YOUR_KEY_HERE@smtp.resend.com:465`
-   - `EMAIL_FROM` = `SiteGuard <no-reply@yourdomain.co.za>`
+   - `EMAIL_FROM` = `COMVERA <no-reply@yourdomain.co.za>`
    - `SUPPORT_EMAIL` = your own address. When a user taps **More → Report a problem**, it lands here.
 7. Test: create a real account on your site. The confirmation email should arrive within a minute.
    (Check spam the first time and mark it "not spam".)
 
-Until `SMTP_URL` is set, emails aren't sent: they are written to Render's log (**siteguard →
+Until `SMTP_URL` is set, emails aren't sent: they are written to Render's log (**comvera →
 Logs**), which is handy for testing but not for customers.
 
 **Your own mailbox** (e.g. `you@yourdomain.co.za` to receive replies) is separate from Resend,
@@ -127,8 +127,8 @@ records don't clash with them.
 3. So the assistant can research a specific mine's published requirements: in the console, make sure
    **web search** is allowed for your organisation (under the organisation's settings/privacy
    controls). Without it, the assistant still works; it just relies on built-in knowledge.
-4. **API Keys → Create Key**, name it `siteguard-production`, and copy it (starts with `sk-ant-`).
-5. In Render: **siteguard → Environment**, set `ANTHROPIC_API_KEY` to that key and save.
+4. **API Keys → Create Key**, name it `comvera-production`, and copy it (starts with `sk-ant-`).
+5. In Render: **comvera → Environment**, set `ANTHROPIC_API_KEY` to that key and save.
 6. Check: open **More → Organisation settings**; the AI section says *AI drafting and expiry-date
    detection are on*. The assistant's header now shows an **AI** badge instead of *Built-in rules*.
 
@@ -173,6 +173,23 @@ full access and no limits, so you can sell your first customers on a simple invo
 switch Stripe on later. Stripe does support South African businesses, but check your company is
 eligible before relying on it. A local option such as Paystack or PayFast is in the parking lot.
 
+**Who pays (once Stripe is on).** Everyone starts with a 14-day trial of the full product. After that:
+contractors pay for their own company (Contractor Starter or Pro); mines and sites pay for theirs, and
+their subscription **sponsors** each contractor's file on their own sites, so a contractor invited by a
+paying mine can finish that mine's safety file without paying. A sponsorship never covers the
+contractor's other clients. Nothing is deleted when a trial ends; it becomes read-only until a plan is chosen.
+
+**Prices on the website.** More → Platform → *Pricing page*. The prices there are only what the public
+pricing page shows; what customers are charged is the Stripe price for each plan
+(`STRIPE_PRICE_CONTRACTOR_STARTER`, `STRIPE_PRICE_CONTRACTOR_PRO`, `STRIPE_PRICE_HOST_STARTER`,
+`STRIPE_PRICE_HOST_PRO`), so keep them in step. The starting prices are a proposal (see `docs/DECISIONS.md`).
+
+**Free access for family, testers or partners.** More → Platform → *Promo codes* → *Create a code*, e.g.
+`FAMILYFREE`, plan Contractor Pro, 100% off, blank "lasts for" (no end date), and "how many
+organisations" = the number of people you'll give it to. They type the code under **More → Plan &
+billing → Have a promo code?**. Switch a code off at any time. For a mining group on an agreed contract,
+use *Give a plan* to set them to Enterprise until a date.
+
 ---
 
 ## What it costs to start
@@ -202,7 +219,7 @@ covers.
 **Business costs outside the app** (not required to switch it on, but before you take money):
 
 - Company registration with CIPC, if you haven't already (about R175 online).
-- **Terms of service and a privacy policy (POPIA)** reviewed by an attorney. SiteGuard holds personal
+- **Terms of service and a privacy policy (POPIA)** reviewed by an attorney. COMVERA holds personal
   information (worker names, medical fitness, contact details), so you are a *responsible party*
   under POPIA. Register your Information Officer with the Information Regulator (free).
 - Your data is hosted in Germany (EU). POPIA allows this where the other country has adequate
@@ -215,9 +232,9 @@ covers.
 ## Keeping an eye on it
 
 - **Uptime check.** In GitHub: **Settings → Secrets and variables → Actions → Variables → New
-  repository variable**, name `SITEGUARD_URL`, value `https://app.yourdomain.co.za`. GitHub then
+  repository variable**, name `COMVERA_URL`, value `https://app.yourdomain.co.za`. GitHub then
   checks the site every 30 minutes and emails you if it's down.
-- **Logs.** Render → **siteguard → Logs** shows what the app is doing, including any emails
+- **Logs.** Render → **comvera → Logs** shows what the app is doing, including any emails
   written to the log while email isn't set up.
 - **Compliance agent.** Runs inside the app every 15 minutes on every customer's sites, and emails
   each customer's admins a summary on Monday mornings. Nothing to set up.
@@ -228,23 +245,25 @@ covers.
 - **Backups.** Render backs up the paid database and snapshots the disk daily. Once a month, try a
   restore of the database into a new one to prove it works.
 
-- **Your platform overview.** In Render → **siteguard → Environment**, set `PLATFORM_ADMIN_EMAILS` to
+- **Your platform overview.** In Render → **comvera → Environment**, set `PLATFORM_ADMIN_EMAILS` to
   your own email address. Sign up with that address and confirm it from the email. **More → Platform**
   then shows sign-ups, plans, usage, failed emails and the latest feedback. Nobody else can see it.
-- **Privacy notice and terms.** `/privacy` and `/terms` are drafts that describe what SiteGuard does.
+- **Privacy notice and terms.** `/privacy` and `/terms` are drafts that describe what COMVERA does.
   Before the first paid customer, ask an attorney to finish them. The pages list what is missing:
   your company details, Information Officer, retention periods and governing law.
+- **Enquiries.** The public contact page (`/contact`) saves each enquiry to More → Platform and emails
+  `SUPPORT_EMAIL`. Set `CONTACT_PHONE` in Render if you want a phone number shown there.
 - **Customers' own data.** An organisation's admin can download all of its data under **More →
   Organisation settings → Download our data**. Point customers there if they ask for a copy.
   See `docs/OPERATIONS.md` for backups and recovery.
 
-## Sharing SiteGuard with testers
+## Sharing COMVERA with testers
 
-Send people your app's address (for example `https://siteguard.onrender.com`). They land on a page
-that explains SiteGuard, with three ways in:
+Send people your app's address (for example `https://comvera.onrender.com`). They land on a page
+that explains COMVERA, with three ways in:
 
 - **Create a free account**: they choose "We run a site or mine" or "We're a contractor", then
-  confirm their email address from the link SiteGuard sends. Email needs Step 2 (Resend) to be
+  confirm their email address from the link COMVERA sends. Email needs Step 2 (Resend) to be
   set up; until then, confirmation links only appear in Render's log.
 - **Watch the 2-minute tour**: a private demo with sample data that plays the walkthrough by
   itself. Nothing they do there touches real accounts, and it is deleted after three days.
@@ -253,14 +272,14 @@ that explains SiteGuard, with three ways in:
 Tips for a test round:
 - Ask one tester to be a mine and one to be a contractor, so they can try the site code, reviews
   and Site Ready together.
-- Contractors who work for clients outside SiteGuard can try **Sites → + Project**.
+- Contractors who work for clients outside COMVERA can try **Sites → + Project**.
 - Testers send feedback from **More → Report a problem or suggest an idea**; it is emailed to the
   `SUPPORT_EMAIL` address you set in Step 2.
 - Until you switch on payments, everything is free and no limits apply.
 
 ## Your 10-minute demo on site
 
-**Hands-free option:** open SiteGuard, then **Walkthrough** on the dashboard (or More →
+**Hands-free option:** open COMVERA, then **Walkthrough** on the dashboard (or More →
 Walkthrough) and tap **Auto-play**. It moves through every page by itself, about 7 seconds per
 step, and you can talk over it. Back and Next take over at any point. Sending someone a link that
 ends in `?tour=1` starts the walkthrough as soon as they sign in.
@@ -273,7 +292,7 @@ mine and three contractors, deleted automatically after three days.
 2. **Dashboard (1 min).** Show the **Compliance agent**: it has already found an expired
    document, a worker with an expired medical, and a review that's been waiting. "This checks
    every site every 15 minutes, so nothing expires unnoticed."
-3. **Ask SiteGuard (2 min).** Type the prospect's real job, e.g. *"Safety file for electrical work
+3. **Ask COMVERA (2 min).** Type the prospect's real job, e.g. *"Safety file for electrical work
    and welding on the conveyor at [their mine]"*. It lists the requirements, permits and hazards,
    and offers **Start this site**. Tap it: the site is ready with the right document list.
 4. **The contractor's side (3 min).** Switch persona (top bar) to Sipho, a contractor. Open the
@@ -282,7 +301,7 @@ mine and three contractors, deleted automatically after three days.
    assessment with a risk register and sign-off blocks. Tap **Attach and submit for review**. (Upload
    a logo under More → Organisation settings first to show the company's own branding.)
    Even faster: on the contractor's site page tap **Continue my safety file** (the safety file
-   guide), then **Write them now**: answer the questions once, watch SiteGuard write every missing
+   guide), then **Write them now**: answer the questions once, watch COMVERA write every missing
    document it can, then **Submit all for review**.
 5. **Review and Site Ready (2 min).** Switch back to the mine persona and open the bell: the new
    submissions are there. Open one, approve a section, highlight a sentence and tap **Needs
@@ -291,7 +310,7 @@ mine and three contractors, deleted automatically after three days.
    Finish with **Download the safety file** (one PDF with cover and contents), the Site Ready
    verification and a share link a safety auditor can open without an account.
 6. **Close (2 min).** "Contractors use it free. You pay per user after a 14-day trial. Can we set up
-   your first site together now?" Create a real account on the spot and use **Ask SiteGuard** to
+   your first site together now?" Create a real account on the spot and use **Ask COMVERA** to
    start their first site.
 
 ### Show the mine's oversight tools (2 minutes, add to either demo)
@@ -322,7 +341,7 @@ Tap **Or start fresh with no sample data**, name the prospect's mine and two of 
 
 ## Updates and maintenance
 
-- **Nobody reinstalls anything.** SiteGuard is a website. When a change is merged on GitHub, Render
+- **Nobody reinstalls anything.** COMVERA is a website. When a change is merged on GitHub, Render
   rebuilds and redeploys it automatically (a minute or two of downtime at most), and every user
   gets the new version the next time the page loads. Database changes (migrations) apply
   themselves on start-up.
@@ -331,7 +350,7 @@ Tap **Or start fresh with no sample data**, name the prospect's mine and two of 
   summary, and merging it deploys it.
 - **Safety net:** CI runs the tests on every pull request, so a change that breaks something is
   flagged before you merge it. Render marks a deploy as failed if the app doesn't pass its health
-  check, and **siteguard → Events → Rollback** returns to the previous version with one click.
+  check, and **comvera → Events → Rollback** returns to the previous version with one click.
 
 ## Branding your documents
 
@@ -349,6 +368,19 @@ WhatsApp or print for the site office. The contractor taps **Join a site with a 
 Either way the contractor then sees the site's document list, and the mine is notified when they
 join.
 
+## Getting documents from someone who isn't on COMVERA (Exchanges)
+
+Not every contractor will sign up. For them, open the contractor (**Contractors →** the company)
+and choose **Request documents**, or go to **More → Exchanges → Bulk request** to search across
+your contractors' records (for example "Working at Heights") and ask everyone at once. They get an
+email with a secure link, confirm their email with a 6-digit code and upload: no account or
+password. You review each document under **More → Exchanges**; anything you send back emails them
+a new link with your reason. Contractors can **Share securely** from their **Documents** page in
+the same way, with an expiry date, a view-only option and **Revoke access** at any time. The links
+only work for the person's own email address, expire, and every open, upload and download is in
+the audit trail. If that person later creates a COMVERA account, they can link those earlier
+exchanges under **More → Exchanges** after confirming they belong to their company.
+
 ## When something goes wrong
 
 | Symptom | Likely cause | Fix |
@@ -357,7 +389,7 @@ join.
 | Email links point to `localhost` or `onrender.com` | `APP_URL` not set to your domain | Set `APP_URL` in Render |
 | "AI drafting isn't configured" / *Built-in rules* badge | `ANTHROPIC_API_KEY` missing | Add it in Render → Environment |
 | Assistant says the AI service is busy | Anthropic rate limit or outage | It falls back to built-in rules automatically; try again later |
-| Site shows an error page | Deploy failed | Render → siteguard → Events shows the failed deploy and its log |
+| Site shows an error page | Deploy failed | Render → comvera → Events shows the failed deploy and its log |
 | Custom domain stuck on *Verifying* | DNS still spreading, or a typo in the CNAME | Re-check the record in domains.co.za; wait a few hours |
 | "That code isn't valid or has expired" | Code older than 14 days, a newer code was made, or the contractor already joined | Tap **Get a join code** again on the site and give them the new one |
-| A document in the bound safety file shows "not merged" | It's a Word file or a password-protected PDF | Upload a PDF version, or open the original in SiteGuard |
+| A document in the bound safety file shows "not merged" | It's a Word file or a password-protected PDF | Upload a PDF version, or open the original in COMVERA |

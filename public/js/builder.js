@@ -1,6 +1,6 @@
 // Safety File Builder: writes every document a site still needs in one go.
 // The contractor picks the documents, answers the shared questions once, and
-// SiteGuard creates each one (numbered and branded), then submits them all.
+// COMVERA creates each one (numbered and branded), then submits them all.
 // Each document is created independently, so one failure never loses the rest.
 
 import { api } from './api.js';
@@ -29,7 +29,7 @@ export function builderCard(siteId){
   if(!out.length && !fromLibrary.length) return '';
   const total = out.length + manual.length + fromLibrary.length;
   return '<div class="card builder-card"><div class="chat-card-title">'+ICONS.sparkle+' Safety File Builder</div>'
-    +'<div class="site-card-title">'+(out.length ? 'SiteGuard can write '+out.length+(fromLibrary.length ? ' and fill '+fromLibrary.length+' from your company documents —' : ' of the')+' '+total+' documents this site still needs' : fromLibrary.length+' of the '+total+' documents this site needs are already in your company documents')+'</div>'
+    +'<div class="site-card-title">'+(out.length ? 'COMVERA can write '+out.length+(fromLibrary.length ? ' and fill '+fromLibrary.length+' from your company documents —' : ' of the')+' '+total+' documents this site still needs' : fromLibrary.length+' of the '+total+' documents this site needs are already in your company documents')+'</div>'
     +'<div class="site-card-sub">Answer a few questions once and get a complete, branded document for each — then submit them all for review.</div>'
     +'<button class="btn primary" style="margin-top:12px;" data-action="builder-open" data-site="'+siteId+'">Build my safety file</button></div>';
 }

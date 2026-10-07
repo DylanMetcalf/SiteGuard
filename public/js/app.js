@@ -1,4 +1,4 @@
-// SiteGuard web app entry point: boot, render, event delegation and live sync.
+// COMVERA web app entry point: boot, render, event delegation and live sync.
 
 import { api } from './api.js';
 import { S, ICONS, actions, on, reload, setRender, showToast, closeSheet, consumeSkippedPop, afterPendingBack } from './core.js';
@@ -7,10 +7,12 @@ import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
 import './assistant.js';
 import { refreshStudio } from './studio.js';
+import { refreshExchanges } from './exchanges.js';
 import { refreshGuide } from './guide.js';
 import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
 import './inbox.js';
 import './builder.js';
+import './safetyfiles.js';
 import { maybeOfferTour } from './tour.js';
 
 const app = document.getElementById('app');
@@ -32,6 +34,7 @@ window.addEventListener('popstate', (e)=>{
   if(consumeSkippedPop()) return;
   if(document.querySelector('.overlay:not(.tutorial)')){ closeSheet(true); return; }
   const st = e.state;
+  if(S.boot && !S.boot.authenticated && (!st || st.publicPage || !st.nav)){ S.authView = (st && st.publicPage) || 'landing'; render(); window.scrollTo(0,0); return; }
   if(!st || !st.nav || st.sheet || !S.boot || !S.boot.authenticated || sameNav(st, navOf())) return;
   S.nav = st.nav; S.moreView = st.moreView; S.activeSiteId = st.activeSiteId; if(st.siteTab) S.siteTab = st.siteTab; S.activeWorkplaceId = st.wp || null; if(st.wpTab) S.wpTab = st.wpTab;
   restoring = true; render(); restoring = false; window.scrollTo(0,0);
@@ -58,7 +61,7 @@ function render(){
   if(!b){ app.innerHTML = '<div class="empty"><p>Loading…</p></div>'; return; }
   if(S.guestReviewToken){
     // Someone opening a review link: no account needed, just the document.
-    app.innerHTML = '<div class="guest-top"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div><div class="brand-tag" style="display:block;">Document review</div></div></div></div><main class="view">'+renderReview()+'</main>';
+    app.innerHTML = '<div class="guest-top"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">COMVERA</div><div class="brand-tag" style="display:block;">Document review</div></div></div></div><main class="view">'+renderReview()+'</main>';
     return;
   }
   if(!b.authenticated || S.authView){
@@ -137,7 +140,7 @@ function startLive(){
   es.addEventListener('open', ()=>{ if(!S.live){ S.live = true; updateLiveDot(); } });
   es.addEventListener('change', ()=>{
     clearTimeout(refetchTimer);
-    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>{ refreshReview(); refreshStudio(); refreshGuide(); }).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
+    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>{ refreshReview(); refreshStudio(); refreshGuide(); refreshExchanges(); }).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
   });
   es.addEventListener('error', ()=>{
     S.live = false; updateLiveDot();
@@ -165,7 +168,7 @@ if('serviceWorker' in navigator && location.protocol !== 'file:'){
     await reload();
     if(S.pendingToast){ showToast(S.pendingToast); S.pendingToast = null; }
   }catch(e){
-    app.innerHTML = '<div class="empty"><h3>Can\'t reach SiteGuard</h3><p>'+(e.message||'')+'</p><p>Refresh the page to try again.</p></div>';
+    app.innerHTML = '<div class="empty"><h3>Can\'t reach COMVERA</h3><p>'+(e.message||'')+'</p><p>Refresh the page to try again.</p></div>';
   }
 })();
 

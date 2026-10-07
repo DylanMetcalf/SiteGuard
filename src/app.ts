@@ -39,6 +39,8 @@ import adminRoutes from './routes/admin.js';
 import eventRoutes from './routes/events.js';
 import demoRoutes from './routes/demo.js';
 import workforceRoutes from './routes/workforce.js';
+import exchangeRoutes from './routes/exchange.js';
+import exchangePortalRoutes from './routes/exchangePortal.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -51,6 +53,8 @@ const publicDir = path.resolve(here, '../public');
 
 /** Paths that authenticate some other way (e.g. Stripe signature) and skip CSRF checks. */
 const CSRF_EXEMPT = new Set(['/api/billing/webhook']);
+/** The Exchange portal has its own short sessions and CSRF header (routes/exchangePortal.ts). */
+const isPortal = (p: string) => p.startsWith('/api/x/');
 
 const FIELD_LABELS: Record<string, string> = {
   email: 'Email address', password: 'Password', name: 'Name', orgName: 'Organisation name', orgKind: 'Organisation type',
@@ -113,8 +117,9 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     if (req.ctx?.renewedUntil) renewCookie(reply, req.cookies[SESSION_COOKIE]!, req.ctx.renewedUntil);
 
     const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    if (req.ctx) req.ctx.write = mutating;
     const pathOnly = req.url.split('?')[0];
-    if (!mutating || CSRF_EXEMPT.has(pathOnly)) return;
+    if (!mutating || CSRF_EXEMPT.has(pathOnly) || isPortal(pathOnly)) return;
     if (req.ctx) {
       // Double-submit token bound to the session.
       const header = req.headers['x-csrf-token'];
@@ -185,6 +190,8 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(eventRoutes);
   await app.register(demoRoutes);
   await app.register(workforceRoutes);
+  await app.register(exchangeRoutes);
+  await app.register(exchangePortalRoutes);
 
   await app.register(fastifyStatic, { root: publicDir, index: false, wildcard: false });
 

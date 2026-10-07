@@ -5,6 +5,50 @@ Newest first.
 
 ---
 
+**DECISION** COMVERA Exchange: documents are requested or shared through a scoped, time-limited exchange reached by an emailed link plus a one-time code, not through accounts or attachments. Relationships and contacts are records, never permissions; the recipient gets no user, organisation, password or trial.
+**REASON** Most contractors (and many clients) have no COMVERA workspace and won't create one just to send a certificate. Email attachments can't be tracked, revoked or kept as a clean compliance record.
+**DATE** 2026-10-07
+
+**DECISION** A requested upload is stored as the requester's own file (its compliance copy); a share points at the sender's file and revoking only ends access.
+**REASON** The mine must keep what it relied on even if the contractor later changes or deletes its copy; the contractor's library must never become visible to the mine.
+**DATE** 2026-10-07
+
+**DECISION** Exchange history is linked to a new workspace only when a verified-email owner/admin explicitly claims it (with a second confirmation if the company name differs). Nothing is merged and nothing is linked automatically.
+**REASON** An email address can be shared, forwarded or belong to someone who has since moved company; matching on it alone could hand one company's records to another.
+**DATE** 2026-10-07
+
+**DECISION** Sending exchanges is a workspace action (blocked like any other write when an account lapses); answering one never depends on anyone's plan, and exchanges have no plan gate of their own yet.
+**REASON** Never block a recipient's submission to push a subscription; pricing for heavy exchange use can be decided with customer evidence.
+**DATE** 2026-10-07
+
+**DECISION** The product is renamed COMVERA. Customer-facing names, the logo, icons, emails, PDFs and Render service names change; internal names (database, Postgres channel and settings, test database) stay, so existing data and deployments keep working.
+**REASON** The platform will grow beyond safety files; the name and mark (an open ring closed by one node: a record completed and verified) are not tied to one product. The navy and sage palette is kept.
+**DATE** 2026-10-07
+
+**DECISION** Plan enforcement is separate from card payments: `ENFORCE_PLANS=true` turns on trials, plans, promo codes and sponsorship limits; Stripe only adds online checkout.
+**REASON** The beta needs real 14-day trials and lifetime codes for family before a payment provider is chosen.
+**DATE** 2026-10-07
+
+**DECISION** Product statistics are milestone counts per organisation (`product_events`): no user, page, IP or content, no cookies, no third-party analytics.
+**REASON** The owner needs to see what people reach (first safety file, first upload) without collecting personal information (POPIA data minimisation).
+**DATE** 2026-10-07
+
+**DECISION** Contractors pay for their own company; a mine's subscription sponsors only the contractor's file on that mine's site (`sponsorships`). Without its own plan a contractor can change only sponsored files; its own projects and other clients need a plan. Everyone starts with a 14-day trial of the full product; nothing is deleted when it ends.
+**REASON** "Free for contractors, always" gave away the product the contractor gets most value from. Sponsorship keeps the mine's workflow free for its contractors without making COMVERA free for every other client.
+**DATE** 2026-10-02
+
+**DECISION** Promo codes and enterprise deals are grants on the organisation (plan + optional end date), not database edits or hidden prices. A 100% code needs no Stripe; a partial one applies its Stripe coupon at checkout.
+**REASON** Family, testers and partners get full access without changing public pricing, and every grant is visible, revocable and audited.
+**DATE** 2026-10-02
+
+**DECISION** Proposed starting prices (editable in Platform): Contractor Starter R399/month, Contractor Pro R899/month, Site Starter R2,499/month, Site Professional R5,999/month, Enterprise by quote.
+**REASON** Online safety-file generators sell single files from about R400–R500 and specialist-compiled files cost roughly R2,000–R10,000 (owner's reference: about R5,000 per traditionally prepared file). A month of a contractor plan should cost less than one prepared file and cover every file. To be validated with pilot customers.
+**DATE** 2026-10-02
+
+**DECISION** Mines archive sites rather than delete them; a site can be deleted only while no contractor has joined it.
+**REASON** Contractors' files and the audit trail are the record, but nobody should be stuck with a site they created by mistake.
+**DATE** 2026-10-02
+
 **DECISION** What each plan includes lives in one list (`lib/entitlements.ts`); routes ask `can()` / `requireFeature()` instead of checking plan names.
 **REASON** Plans and prices will change; one list means the compliance code never does. The web app is told what the organisation has, but the server decides.
 **DATE** 2026-10-01
@@ -26,18 +70,18 @@ Newest first.
 **DATE** 2026-09-30
 
 **DECISION** Documents filed to a project count straight away, and a project never shows "Site Ready"; the PDF cover and share page say it was prepared by the contractor and not reviewed by the client.
-**REASON** Nobody reviews a project inside SiteGuard, so a review status would be invented. The wording avoids overstating compliance.
+**REASON** Nobody reviews a project inside COMVERA, so a review status would be invented. The wording avoids overstating compliance.
 **DATE** 2026-09-30
 
 **DECISION** Projects are archived, not deleted.
 **REASON** The audit trail is append-only, and what was prepared and sent to a client is a record worth keeping.
 **DATE** 2026-09-30
 
-**DECISION** Free contractors get 2 active projects when billing is on; Contractor Pro is unlimited. Work for sites on SiteGuard stays free.
+**DECISION** Free contractors get 2 active projects when billing is on; Contractor Pro is unlimited. Work for sites on COMVERA stays free.
 **REASON** Projects are value the contractor gets for itself, so it's the natural upgrade; answering a mine's requirements must never cost the contractor.
 **DATE** 2026-09-30
 
-**DECISION** People who aren't signed in see a landing page (what SiteGuard is, for whom, how it works) with sign-up, sign-in, and a demo that opens straight into the auto-playing walkthrough.
+**DECISION** People who aren't signed in see a landing page (what COMVERA is, for whom, how it works) with sign-up, sign-in, and a demo that opens straight into the auto-playing walkthrough.
 **REASON** The owner is sharing the link with testers; the first screen has to explain the product and invite sign-up, not ask for a password.
 **DATE** 2026-09-30
 
@@ -177,6 +221,6 @@ Newest first.
 **REASON** One contractor company serves many mines and must see only its own sites at each.
 **DATE** 2026-09-23
 
-**DECISION** Contractors use SiteGuard free; mines pay per seat after a 14-day trial.
+**DECISION** Contractors use COMVERA free; mines pay per seat after a 14-day trial.
 **REASON** Contractor adoption is what makes the product useful to the paying mine. (Pricing to be validated in the pilot.)
 **DATE** 2026-09-23

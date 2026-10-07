@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Secure exchange · COMVERA</title>
+<meta name="theme-color" content="#0E1E36">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/app.css">
+<style>
+  body{background:var(--paper);}
+  .xp{max-width:720px; margin:0 auto; padding:calc(16px + env(safe-area-inset-top,0px)) 16px 40px;}
+  .xp-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px;}
+  .xp-brand{display:flex; align-items:center; gap:10px; font-family:var(--font-head); font-weight:700; letter-spacing:.12em; font-size:16px; color:var(--ink);}
+  .xp-brand img{width:30px; height:30px; border-radius:8px;}
+  .xp-lock{font-size:12px; color:var(--grey); display:flex; align-items:center; gap:6px;}
+  .xp h1{font-size:22px; font-weight:700; letter-spacing:-.02em; margin:0 0 6px;}
+  .xp-sub{color:var(--grey); font-size:13.5px;}
+  .xp-item{display:flex; gap:12px; align-items:flex-start; padding:14px 0; border-bottom:1px solid var(--grey-line);}
+  .xp-item:last-child{border-bottom:none;}
+  .xp-item-main{flex:1; min-width:0;}
+  .xp-item-name{font-weight:600; font-size:14.5px;}
+  .xp-item-meta{font-size:12.5px; color:var(--grey); margin-top:4px;}
+  .xp-item-actions{display:flex; gap:8px; flex-wrap:wrap; flex:none;}
+  .xp-review{background:var(--red-bg); color:var(--red); font-size:13px; padding:8px 10px; border-radius:var(--radius-xs); margin-top:8px;}
+  .xp-file{position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;}
+  .xp-code{font-family:var(--font-mono); font-size:22px; letter-spacing:.3em; text-align:center;}
+  .xp-upgrade{border-style:dashed; background:transparent; box-shadow:none;}
+  .xp-foot{font-size:12px; color:var(--grey); margin-top:22px; line-height:1.6;}
+  .xp-foot a{color:var(--grey);}
+  .xp-row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px;}
+  .xp-consent{display:flex; gap:10px; align-items:flex-start; font-size:13px; color:var(--ink-soft); margin-top:12px;}
+  @media (max-width:520px){ .xp-item{flex-wrap:wrap;} .xp-item-actions{width:100%;} }
+</style>
+</head>
+<body>
+<main class="xp" id="xp" aria-live="polite"><div class="empty"><p>Loading…</p></div></main>
+<script type="module" src="/js/exchange.js"></script>
+</body>
+</html>

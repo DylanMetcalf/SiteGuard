@@ -1,4 +1,4 @@
-// SiteGuard Assistant: a chat sheet over POST /api/assistant. The conversation
+// COMVERA Assistant: a chat sheet over POST /api/assistant. The conversation
 // lives only in this tab. Replies can carry cards (start a site, a checklist,
 // a draft, open a site) that hand off to the normal, permission-checked flows.
 
@@ -104,7 +104,7 @@ function modeLabel(){
 }
 
 export function openAssistant(question){
-  openSheet('<div class="sheet-head"><div><h3>SiteGuard Assistant '+modeLabel()+'</h3><div class="site-card-sub">Guidance, not legal advice. Nothing changes until you confirm.</div></div>'
+  openSheet('<div class="sheet-head"><div><h3>COMVERA Assistant '+modeLabel()+'</h3><div class="site-card-sub">Guidance, not legal advice. Nothing changes until you confirm.</div></div>'
     +'<div style="display:flex;gap:6px;align-items:center;">'+(chat().items.length?'<button class="btn secondary small" data-action="chat-reset">New chat</button>':'')
     +'<button class="sheet-close" data-action="close-sheet" aria-label="Close">'+ICONS.cross+'</button></div></div>'
     +'<div id="chatLog" class="chat-log"></div>'

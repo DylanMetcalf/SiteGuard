@@ -1,4 +1,4 @@
-# SiteGuard
+# COMVERA
 
 Contractor compliance, safety files and site operations for mining and industrial sites, as a
 multi-tenant SaaS.
@@ -32,14 +32,14 @@ Onboarding: a new site owner gets a short **Getting started** checklist. Sites a
 confined space, and civil & plant add-ons, defined in `src/lib/templates.ts`. Every item stays
 editable per site.
 
-**SiteGuard Assistant**: a chat that answers "what does the safety file need for this site or
+**COMVERA Assistant**: a chat that answers "what does the safety file need for this site or
 job?", checks how your sites are doing, and offers to **start the site** with the right starter
 packs (or gives contractors a checklist and drafts). With an AI key it uses Claude with read-only
 tools over your own data plus web search for site-specific research; without one it answers from
 built-in rules. It never changes anything itself: you confirm every action.
 
 **Document Studio**: professional, branded safety documents as **PDF and editable Word**. Pick a
-document type, answer a few questions, and SiteGuard writes the full document with the company's
+document type, answer a few questions, and COMVERA writes the full document with the company's
 logo, colour, document number, revision history, review date, page numbers and sign-off blocks.
 Fourteen types in seven categories: Health & Safety policy, contractor SHE plan, site-specific risk
 assessment (HIRA, 5×5 matrix), method statement, hot work, confined space, lock-out/isolation and
@@ -49,6 +49,18 @@ tailors each document to the job and can research the site's published requireme
 requirement that a blueprint can produce shows **Create it in Document Studio**, and the result is
 attached and submitted for review in one step. Documents due for review are flagged by the
 compliance agent. See `src/lib/studio/`.
+
+**COMVERA Exchange**: request or share specific documents with anyone, even people without a
+COMVERA account. A mine opens a contractor and chooses **Request documents** (or **Bulk request**
+to search its records, e.g. every "Working at Heights" certificate, and send one request per
+company). The contact gets an email with a secure link, confirms their email with a one-time code,
+and uploads straight to the mine: no password, no account, no attachment. The mine reviews each
+document, sends back what needs replacing (they get a new link with the reasons), and keeps its
+own copy. Contractors use **Share securely** to send their own documents with an expiry, a
+view-only option and revoke at any time, and see when they were opened and downloaded. Every
+step is in the audit trail. Contacts are remembered per company. Someone who later signs up can
+link exchanges sent to their verified email, after confirming they belong to their company.
+See **More → Exchanges** and `docs/ARCHITECTURE.md`.
 
 **One site, many contractors**: a mine creates a **site** once (name, location, emergency
 details) and ticks what every contractor's safety file must contain, starting from a researched
@@ -60,18 +72,18 @@ and the site's requirements; a new requirement reaches every contractor's file a
 asks whether you run a site or are a contractor. (Inviting one contractor by email for a single
 job still works.)
 
-**Landing page**: someone opening the link without an account sees what SiteGuard is, who it's
+**Landing page**: someone opening the link without an account sees what COMVERA is, who it's
 for and how it works, with *Create a free account*, *Sign in*, and *Watch the 2-minute tour* (a
 private demo that opens straight into the auto-playing walkthrough).
 
 **Contractor projects**: a contractor can build a safety file for any client or site that isn't on
-SiteGuard (*Sites → + Project*). It picks the client, starts from a starter list (or copies another
+COMVERA (*Sites → + Project*). It picks the client, starts from a starter list (or copies another
 file's list), adds its own items, files documents from its library or Document Studio, and sends
 the client the bound PDF or a secure link. The client needs no account. Filed documents count
 straight away, and the PDF says the file was prepared by the contractor and not reviewed by the
 client. Free contractors get 2 active projects (when billing is on); Contractor Pro is unlimited.
 
-**Safety file check**: before the PDF downloads, SiteGuard shows what is required, what is in the
+**Safety file check**: before the PDF downloads, COMVERA shows what is required, what is in the
 file, what is missing or expired (by name), and which workers lack a valid medical. The PDF lists
 every gap rather than presenting the file as complete.
 
@@ -108,7 +120,7 @@ The earlier of the rule and the document's own date applies; the contractor is t
 shortened an expiry.
 
 **Safety file revisions**: each time the safety file PDF is compiled with different contents,
-SiteGuard records a new revision (Rev 1, Rev 2…) with what was in it. *Revisions and what changed*
+COMVERA records a new revision (Rev 1, Rev 2…) with what was in it. *Revisions and what changed*
 on the file shows the history and exactly what has changed since the last revision, and the
 contractor's to-do list says when a file needs rebuilding. Downloading again with nothing changed
 does not create a revision.
@@ -124,7 +136,7 @@ contractor's competent person to check and sign.
 
 **Safety file guide**: straight after joining, the contractor gets a six-step guide for that
 site: company documents (submitted in one tap if already held), people and medicals, documents
-SiteGuard writes, certificates to upload, anything else they want to add (typed in; Document
+COMVERA writes, certificates to upload, anything else they want to add (typed in; Document
 Studio offers to write it where it can), then check and download the safety file PDF.
 
 **Safety File Builder**: on a contractor's site page, *Build my safety file* writes every
@@ -229,7 +241,7 @@ Without `SMTP_URL`, emails (confirmation links, invites) are printed to the serv
 | `npm run typecheck` | TypeScript |
 | `npm run build && npm start` | Production build and server |
 | `npm run migrate` / `migrate:prod` | Apply migrations manually (they also run on start) |
-| `npm run smoke` | Synthetic check of a deployed app (`SITEGUARD_URL=… npm run smoke`); also runs every 30 min in GitHub Actions |
+| `npm run smoke` | Synthetic check of a deployed app (`COMVERA_URL=… npm run smoke`); also runs every 30 min in GitHub Actions |
 | `npm run worker:prod` | Email + reminder jobs as a separate process (optional; `RUN_JOBS_IN_WEB=false`) |
 
 ## Layout
@@ -259,9 +271,15 @@ docs/                      Architecture and deployment guides
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): tenancy model, permission matrix, how the UI gets its
   data, security measures, and known limits.
+- **[docs/GO_LIVE.md](docs/GO_LIVE.md): start here to put COMVERA online** — the step-by-step checklist,
+  costs, accounts, keys, and the first test with family and friends.
+- [docs/walkthrough/COMVERA-Walkthrough.pdf](docs/walkthrough/COMVERA-Walkthrough.pdf) (and
+  `docs/walkthrough/index.html`): an illustrated walkthrough of the real app, rebuilt with
+  `node scripts/walkthrough.mjs`.
+- [docs/DESKTOP.md](docs/DESKTOP.md): installing COMVERA on Windows and macOS today, and packaging it later.
 - [docs/LAUNCH_GUIDE.md](docs/LAUNCH_GUIDE.md): plain-language launch steps, costs and demo script.
 - [docs/OPERATIONS.md](docs/OPERATIONS.md): backups, recovery targets and what to do when something breaks.
-- [docs/ROADMAP.md](docs/ROADMAP.md): the SiteGuard 2.0 audit and build plan, and what was built.
+- [docs/ROADMAP.md](docs/ROADMAP.md): the COMVERA 2.0 audit and build plan, and what was built.
 - [docs/SPEC_COVERAGE.md](docs/SPEC_COVERAGE.md): the owner's 117-point evolution spec, point by point:
   what exists, what update 2 added, and what is parked and why.
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): recommended hosting, Stripe/email/storage setup, and a

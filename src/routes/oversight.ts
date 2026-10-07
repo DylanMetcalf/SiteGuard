@@ -17,10 +17,11 @@ import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 import { recheckSiteReady } from '../lib/siteready.js';
 import { RULE_KEYS, saToday } from '../lib/validity.js';
 import { auditFor } from './org.js';
+import { sponsorFile } from '../lib/sponsorship.js';
 
 /** The standard monthly audit checklist; the auditor can add items of their own. */
 export const AUDIT_ITEMS = [
-  'Safety file is on site, current and matches SiteGuard',
+  'Safety file is on site, current and matches COMVERA',
   'Every worker on site is cleared at the gate (medical and induction)',
   'Toolbox talk held today and signed',
   'Risk assessment and method statement available and followed',
@@ -40,6 +41,38 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const addDays = (n: number) => new Date(Date.parse(saToday() + 'T00:00:00Z') + n * 86400e3).toISOString().slice(0, 10);
 
 export default async function oversightRoutes(app: FastifyInstance) {
+  /**
+   * Mine: end or resume sponsoring one contractor's file on its site. Ending it
+   * means the contractor needs its own plan to keep changing that file; its
+   * records stay readable to both sides.
+   */
+  app.post('/api/sites/:id/sponsorship/:action', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireHostAdmin(ctx);
+    requireWritable(ctx);
+    const { id, action } = req.params as { id: string; action: string };
+    if (!['end', 'resume'].includes(action)) throw notFound();
+    return withTx(async (db) => {
+      const { site, side } = await loadSite(db, ctx, id);
+      if (side !== 'host' || !site.linked_org_id) throw notFound();
+      const sp = await one<{ id: string; ended_at: Date | null }>(db, 'select id, ended_at from sponsorships where site_id = $1 for update', [site.id]);
+      if (action === 'end') {
+        if (!sp || sp.ended_at) throw conflict('This file is not sponsored.');
+        const reason = z.object({ reason: z.string().trim().max(300).default('') }).parse(req.body ?? {}).reason;
+        await db.query('update sponsorships set ended_at = now(), ended_reason = $2 where id = $1', [sp.id, reason]);
+        await audit(db, ctx, 'Ended sponsorship', `${site.contractor_name}${reason ? ' — ' + reason : ''}`, site.id);
+        await notifyOrg(db, site.linked_org_id, null, { kind: 'site', title: `${ctx.org.name} no longer sponsors your ${site.name} file`, body: 'Your records stay readable. To keep changing this file, choose a contractor plan under Plan & billing.', link: { kind: 'site', siteId: site.id } });
+      } else {
+        if (sp && !sp.ended_at) throw conflict('This file is already sponsored.');
+        await sponsorFile(db, site.id);
+        await audit(db, ctx, 'Resumed sponsorship', site.contractor_name, site.id);
+        await notifyOrg(db, site.linked_org_id, null, { kind: 'site', title: `${ctx.org.name} sponsors your ${site.name} file again`, body: 'You can keep working on this safety file without your own plan.', link: { kind: 'site', siteId: site.id } });
+      }
+      await publishChange(db, [ctx.org.id, site.linked_org_id]);
+      return { ok: true };
+    });
+  });
+
   // ---- Suspension -------------------------------------------------------------------------
   app.post('/api/contractors/:id/:action', async (req) => {
     const ctx = requireOrg(req.ctx);

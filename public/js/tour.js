@@ -1,4 +1,4 @@
-// The Walkthrough: a guided tour of SiteGuard for demos and new users.
+// The Walkthrough: a guided tour of COMVERA for demos and new users.
 // It moves through the real screens, highlights the part being explained and
 // says what it is for, with Back / Next, auto-play and a progress bar. It only
 // reads and navigates — it never changes data. Start it from More → Walkthrough,
@@ -20,14 +20,14 @@ function hostSteps(){
   const wp = first(S.state.workplaces);
   const file = firstFile();
   const out = [
-    { title: 'Welcome to SiteGuard', body: 'SiteGuard is where a mine and its contractors keep every contractor\'s safety file in one place: what the site requires, what has been submitted, what is approved, what is expiring, and who is cleared to enter. This walkthrough takes about two minutes.', go: go({ nav: 'dashboard', activeSiteId: null, activeWorkplaceId: null, moreView: null }) },
+    { title: 'Welcome to COMVERA', body: 'COMVERA is where a mine and its contractors keep every contractor\'s safety file in one place: what the site requires, what has been submitted, what is approved, what is expiring, and who is cleared to enter. This walkthrough takes about two minutes.', go: go({ nav: 'dashboard', activeSiteId: null, activeWorkplaceId: null, moreView: null }) },
     { title: 'What needs your attention', body: 'The dashboard answers the first question every morning: what is OK, what needs attention, and what happens next. The compliance agent checks every site in the background and lists anything that needs you.', target: '.hero, .dash-hero, .view-head' },
     { title: 'Your sites', body: 'Each site has its own safety file requirements and a site code. Contractors type the code and get their own safety file for that site, so one site can have many contractors.', go: go({ nav: 'sites', activeSiteId: null, activeWorkplaceId: null }), target: '.wp-card, [data-action="new-site"], .view-head' },
   ];
   if(wp){
     out.push(
       { title: wp.name + ' at a glance', body: 'How many contractors are on the site, how many documents are waiting for you, what is outstanding, and who is Site Ready — tap any number to go straight there.', go: go({ nav: 'sites', activeSiteId: null, activeWorkplaceId: wp.id, wpTab: 'contractors' }), target: '.attn-grid' },
-      { title: 'One review queue', body: 'Every document contractors submit for this site lands here. Open it, read it, and approve it or send it back with a note. Documents written in SiteGuard can be approved section by section.', go: go({ wpTab: 'queue' }), target: '[data-action="wp-tab"][data-tab="queue"]' },
+      { title: 'One review queue', body: 'Every document contractors submit for this site lands here. Open it, read it, and approve it or send it back with a note. Documents written in COMVERA can be approved section by section.', go: go({ wpTab: 'queue' }), target: '[data-action="wp-tab"][data-tab="queue"]' },
       { title: 'Gate clearance', body: 'Who may enter today. A worker is cleared only when their company\'s safety file is Site Ready, the company isn\'t suspended, and their medical and induction are valid under your rules. Print a gate list or QR gate cards that security can scan.', go: go({ wpTab: 'gate' }), target: '[data-action="wp-tab"][data-tab="gate"]' },
       { title: 'What every safety file must contain', body: 'The site\'s requirements, each marked as a legal, site or best-practice requirement so nobody mistakes a site rule for the law, and as required or optional — optional ones never hold up Site Ready. New requirements go to every contractor\'s file at once, and you can send one request to all contractors.', go: go({ wpTab: 'requirements' }), target: '[data-action="wp-tab"][data-tab="requirements"]' },
     );
@@ -50,20 +50,20 @@ function hostSteps(){
 function contractorSteps(){
   const file = firstFile();
   const out = [
-    { title: 'Welcome to SiteGuard', body: 'SiteGuard keeps your company\'s safety files for every site you work on. Your documents are stored once and reused wherever they are needed; each site sees only its own file. This walkthrough takes about two minutes.', go: go({ nav: 'dashboard', activeSiteId: null, moreView: null }) },
+    { title: 'Welcome to COMVERA', body: 'COMVERA keeps your company\'s safety files for every site you work on. Your documents are stored once and reused wherever they are needed; each site sees only its own file. This walkthrough takes about two minutes.', go: go({ nav: 'dashboard', activeSiteId: null, moreView: null }) },
     { title: 'What you need to do', body: 'The dashboard puts your to-do list first: missing and expiring documents, corrections the site asked for, audit findings to fix, and requests with due dates.', target: '.hero, .dash-hero, .view-head' },
     { title: 'Join a site with its code', body: 'The site gives you a code. Type it under More → Join a site with a code, and your safety file for that site starts straight away with the site\'s requirements.', go: go({ nav: 'more', moreView: null }), target: '[data-action="join-site"], .view-head' },
-    { title: 'Your own projects', body: 'Working for a client who isn\'t on SiteGuard? Start a project: pick the documents they need (or copy another file\'s list), file them once from your library, and send a professional PDF or a secure link. The client doesn\'t need an account.', go: go({ nav: 'sites', activeSiteId: null, moreView: null }), target: '[data-action="new-project"], .view-head' },
+    { title: 'Safety files', body: 'Every safety file you hold, one per site or client. Create safety file starts a new one: for a site on COMVERA (type its code; the site sponsors that file) or for a client who isn\'t on COMVERA. Your company documents are reused in every file.', go: go({ nav: 'sites', activeSiteId: null, moreView: null }), target: '[data-action="sfb-start"], .view-head' },
   ];
   if(file){
     out.push(
-      { title: 'Your safety file for ' + file.name, body: 'Each requirement with its status. The guide walks you through what is missing: upload it, reuse it from your library, or let SiteGuard write the missing documents in one go with "Write documents now". Download the whole file as one bound PDF, or tick just the documents someone asked for — SiteGuard records a revision whenever the full file changes.', go: go({ nav: 'sites', activeSiteId: file.id, siteTab: 'compliance' }), target: '.builder-card, .readiness-hero, .view-head' },
+      { title: 'Your safety file for ' + file.name, body: 'Each requirement with its status. The guide walks you through what is missing: upload it, reuse it from your library, or let COMVERA write the missing documents in one go with "Write documents now". Download the whole file as one bound PDF, or tick just the documents someone asked for — COMVERA records a revision whenever the full file changes.', go: go({ nav: 'sites', activeSiteId: file.id, siteTab: 'compliance' }), target: '.builder-card, .readiness-hero, .view-head' },
       { title: 'Audits and permits', body: 'When the site audits your work, the score and each finding appear here. Fix it, say what was done, and the site closes it. Request permits to work here too.', go: go({ siteTab: 'activity' }), target: '[data-action="site-tab"][data-tab="activity"]' },
       { title: 'Your people and gate cards', body: 'Assign your workers to the site. Each one shows whether they are cleared at the gate and, if not, exactly why. Print QR gate cards for security to scan.', go: go({ siteTab: 'people' }), target: '[data-action="site-tab"][data-tab="people"]' },
     );
   }
   out.push(
-    { title: 'Your document library', body: 'Every document you hold, grouped by status, with expiry dates. Replace one here and SiteGuard shows every site file it affects.', go: go({ nav: 'passport', activeSiteId: null }), target: '[data-action="nav"][data-nav="passport"]' },
+    { title: 'Your document library', body: 'Every document you hold, grouped by status, with expiry dates. Replace one here and COMVERA shows every site file it affects.', go: go({ nav: 'passport', activeSiteId: null }), target: '[data-action="nav"][data-nav="passport"]' },
     { title: 'Document Studio', body: 'Don\'t have a document? Create it: risk assessments, method statements (tick the work activities and the tools used, and the hazards, controls, PPE and pre-use checks are filled in), policies, appointment letters and more, branded as yours. Drafts are for you to check and sign — they are not a certification.', go: go({ nav: 'more', moreView: 'studio' }), target: '.view-head' },
     { title: 'Log anything, anywhere', body: 'The + button is always there: upload a document, record a toolbox talk with signatures on one device, report an incident or log the diary.', go: go({ nav: 'dashboard', moreView: null }), target: '.fab' },
   );
@@ -197,7 +197,7 @@ function showOffer(){
   const o = document.createElement('div');
   o.className = 'overlay tutorial';
   o.innerHTML = '<div class="sheet tut-card" role="dialog" aria-modal="true" aria-labelledby="tutT"><div class="tut-icon">'+ICONS.sparkle+'</div>'
-    +'<h2 id="tutT">Welcome to SiteGuard'+(org().name ? ', ' + org().name : '')+'</h2>'
+    +'<h2 id="tutT">Welcome to COMVERA'+(org().name ? ', ' + org().name : '')+'</h2>'
     +'<p>'+(isHost() ? 'See how sites, contractors, reviews, audits and gate clearance fit together.' : 'See how your safety files, documents, sites and gate cards fit together.')+' The walkthrough takes about two minutes, and you can open it again any time from More → Walkthrough.</p>'
     +'<button class="btn primary block" id="tutGo">Take the walkthrough</button>'
     +'<button class="btn secondary block" style="margin-top:8px;" id="tutSkip">Not now</button></div>';

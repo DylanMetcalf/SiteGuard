@@ -107,9 +107,33 @@ describe('tools and equipment in risk assessments and method statements', () => 
       assert.match(out, /Guard fitted, disc rated/, id);
       assert.match(out, /Face shield over safety glasses/, id);
     }
+    const bp3 = blueprintById('risk-assessment')!;
+    const three = JSON.stringify(bp3.build({ values: { scope: 'Roof work', matrix: '3×3 (scores 1–9)' }, company: { name: 'Mu' }, preparer: { name: 'T' } }));
+    assert.match(three, /3×3 matrix/);
+    assert.doesNotMatch(three, /25 High/);
+    assert.match(JSON.stringify(bp3.build({ values: { scope: 'Roof work' }, company: { name: 'Mu' }, preparer: { name: 'T' } })), /25 High/, '5×5 by default');
     const bad = await con.post('/api/studio/documents', { blueprintId: 'risk-assessment', values: { scope: 'Roof', tools: 'Lightsaber' } });
     assert.equal(bad.status, 400);
     const ok = await con.post('/api/studio/documents', { blueprintId: 'risk-assessment', values: { scope: 'Roof', tools: 'Angle grinder; Scaffold / mobile scaffold tower' } });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  });
+});
+
+describe('safety file preview and arranging a project file', () => {
+  it('previews without recording a revision, and lets the contractor reorder its own project', async () => {
+    const before = (await pool.query('select count(*)::int as n from safety_file_versions where site_id = $1', [fileId])).rows[0].n;
+    const pv = await con.req('GET', `/api/sites/${fileId}/safety-file.pdf?preview=1`);
+    assert.equal(pv.status, 200);
+    assert.match(String(pv.raw.headers['content-disposition']), /^inline;.*preview\.pdf/);
+    assert.equal((await pool.query('select count(*)::int as n from safety_file_versions where site_id = $1', [fileId])).rows[0].n, before);
+
+    const p = (await con.post('/api/projects', { clientName: 'Xi Retail', name: 'Store fit-out', requirements: [
+      { category: 'Client', name: 'First', source: 'client' }, { category: 'Client', name: 'Second', source: 'client' },
+    ] })).body.id;
+    const ids = ((await con.state()).state.requirements[p] as { id: string }[]).map((r) => r.id);
+    assert.equal((await con.post(`/api/projects/${p}/requirements/order`, { ids: [ids[0]] })).status, 400);
+    assert.equal((await mine.post(`/api/projects/${p}/requirements/order`, { ids: [...ids].reverse() })).status, 403);
+    assert.equal((await con.post(`/api/projects/${p}/requirements/order`, { ids: [...ids].reverse() })).status, 200);
+    assert.deepEqual(((await con.state()).state.requirements[p] as { name: string }[]).map((r) => r.name), ['Second', 'First']);
   });
 });

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { many, one, pool, type Db } from '../db/pool.js';
+import { audit } from '../lib/audit.js';
 import { notFound } from '../lib/errors.js';
 import { isUuid, loadSite, requireOrg, type OrgCtx } from '../lib/authz.js';
 import { contentDisposition, storage } from '../lib/storage.js';
@@ -65,6 +66,9 @@ export default async function fileRoutes(app: FastifyInstance) {
     if (!isUuid(id)) throw notFound();
     const file = await one<FileRow>(pool, 'select id, org_id, storage_key, filename, content_type from files where id = $1', [id]);
     if (!file || !(await canReadFile(pool, ctx, file))) throw notFound();
-    return sendFile(reply, file, (req.query as { download?: string }).download === '1');
+    const download = (req.query as { download?: string }).download === '1';
+    // Downloads, and any opening of another company's document, go into the audit trail.
+    if (download || file.org_id !== ctx.org.id) await audit(pool, ctx, download ? 'Downloaded file' : 'Opened file', file.filename);
+    return sendFile(reply, file, download);
   });
 }

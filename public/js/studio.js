@@ -48,18 +48,24 @@ export function renderStudio(){
   const cats = ['All', ...catalog.categories];
   const bps = catalog.blueprints.filter(b=>cat==='All' || b.category===cat);
   const ai = S.boot.features.ai;
-  let html = '<div class="dash-hero" style="margin-top:0;"><p class="hero-eyebrow">Document Studio</p><h1>Professional safety documents in minutes</h1>'
-    +'<p class="greeting">Answer a few questions and SiteGuard writes a complete, branded document — with your logo, document number, revision control and sign-off blocks — as PDF and Word.'
-    +(ai ? ' AI tailors every document to the job and can research the site\'s own requirements.' : '')+'</p></div>';
+  const contractor = S.boot.org.kind === 'contractor';
+  const ro = S.boot.org.standing === 'lapsed';
+  let html = '<div class="dash-hero" style="margin-top:0;"><p class="hero-eyebrow">Document Studio</p><h1>Your documents, and the ones you still need</h1>'
+    +'<p class="greeting">Keep every document in one place, upload what you have, and let COMVERA write the rest — branded with your logo, numbered, with revision control and sign-off blocks, as PDF and Word.'
+    +(ai ? ' AI tailors every document to the job and can research the site\'s own requirements.' : '')+' Every draft is yours to check and sign before it is used.</p>'
+    +(ro ? '' : '<div class="hero-actions">'+(contractor ? '<button class="btn primary" data-action="upload-document">'+ICONS.upload+' Upload document</button>' : '')
+      +'<button class="btn '+(contractor?'secondary':'primary')+'" data-action="studio-jump-templates">'+ICONS.plus+' Create document</button>'
+      +(contractor ? '<button class="btn secondary" data-action="sfb-start">'+ICONS.passport+' Create safety file</button>' : '')+'</div>')+'</div>';
+  html += '<div class="section-title" id="studio-docs">My documents</div>' + libraryHtml();
+  html += '<div class="section-title" id="studio-templates">Create a document</div>';
   html += '<div class="studio-cats" role="tablist">'+cats.map(c=>'<button class="site-picker-chip'+(c===cat?' active':'')+'" data-action="studio-cat" data-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>').join('')+'</div>';
   html += '<div class="studio-grid">'+bps.map(b=>'<button class="studio-card" data-action="studio-new" data-bp="'+b.id+'"><span class="qa-icon">'+(CATEGORY_ICON[b.category]||ICONS.passport)+'</span><h4>'+escapeHtml(b.name)+'</h4><p>'+escapeHtml(b.description)+'</p><span class="badge sage" style="align-self:flex-start;">'+escapeHtml(b.category)+'</span></button>').join('')+'</div>';
-  html += '<div class="section-title" id="studio-docs">Your documents</div>' + libraryHtml();
   return html;
 }
 
 /* ---------- Your documents: grouped by where each one stands ---------- */
 const GROUPS = [
-  ['missing', 'Missing', 'Still needed by a site — SiteGuard can write these'],
+  ['missing', 'Missing', 'Still needed by a site — COMVERA can write these'],
   ['draft', 'Not submitted', 'Created but not yet sent to a site'],
   ['review', 'In review', 'Waiting for the site to review'],
   ['changes', 'Needs changes', 'Sent back, expired, or a newer revision to submit'],
@@ -165,7 +171,7 @@ export async function openStudioForm(bpId, ctx = {}){
     + fields.map(f=>fieldHtml(f, values[f.id])).join('')
     +(ctx.reviseOf ? '<label class="field-label" for="sf_revisionNote">What changed?</label><input type="text" id="sf_revisionNote" placeholder="e.g. Annual review; updated emergency contacts">' : '')
     +(S.boot.features.ai ? '<label class="toggle-row" style="border:none;margin-top:8px;"><span>Research the site\'s published requirements<br><span class="site-card-sub">Uses web search; takes a little longer</span></span><input type="checkbox" id="sf_research"></label>' : '')
-    +'<div class="site-card-sub" style="margin-top:10px;">'+(S.boot.features.ai ? 'SiteGuard drafts the document from its safety templates, then AI tailors it to your answers.' : 'SiteGuard writes the document from its safety templates, tailored to the work you describe.')+' Your logo, colours and document numbering are applied automatically.</div>'
+    +'<div class="site-card-sub" style="margin-top:10px;">'+(S.boot.features.ai ? 'COMVERA drafts the document from its safety templates, then AI tailors it to your answers.' : 'COMVERA writes the document from its safety templates, tailored to the work you describe.')+' Your logo, colours and document numbering are applied automatically.</div>'
     +'<button class="btn primary block" style="margin-top:12px;" data-action="studio-generate" id="studioGo">'+(ctx.reviseOf?'Create revision':'Create document')+'</button>'
     +'<div id="studioOut"></div>');
 }
@@ -280,3 +286,4 @@ on('studio-delete', async (el)=>{
   try{ await api.del('/api/studio/documents/'+el.dataset.id); await loadDocs(true); showToast('Document deleted'); render(); }
   catch(e){ el.disabled = false; showToast(e.message); }
 });
+on('studio-jump-templates', ()=>{ const t = document.getElementById('studio-templates'); if(t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); });

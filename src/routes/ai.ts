@@ -7,6 +7,8 @@ import { HttpError } from '../lib/errors.js';
 import { templateDraft } from '../lib/drafts.js';
 import { DRAFT_TYPES, reserveAiRequest, streamDraft } from '../lib/ai.js';
 import { rl } from './auth.js';
+import { audit } from '../lib/audit.js';
+import { pool } from '../db/pool.js';
 
 export default async function aiRoutes(app: FastifyInstance) {
   /**
@@ -31,6 +33,7 @@ export default async function aiRoutes(app: FastifyInstance) {
       return templateDraft(input);
     }
     await reserveAiRequest(ctx.org.id);
+    await audit(pool, ctx, 'Used AI drafting', String((input as { type?: string }).type ?? 'draft').slice(0, 100));
 
     const abort = new AbortController();
     // The response closing before we finish means the browser went away.

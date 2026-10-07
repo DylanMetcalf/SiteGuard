@@ -108,7 +108,7 @@ export function templateDraft(input: DraftInput): string {
         '',
         'QUESTIONS TO ASK THE CREW\n  - What is the most dangerous part of today\'s job?\n  - What will you do if something changes or goes wrong?\n  - Who do you tell if you see something unsafe?',
         '',
-        'ATTENDANCE\n  Record attendance and signatures in SiteGuard (Toolbox talks) or below.\n  Name ______________________  Signature __________\n  Name ______________________  Signature __________',
+        'ATTENDANCE\n  Record attendance and signatures in COMVERA (Toolbox talks) or below.\n  Name ______________________  Signature __________\n  Name ______________________  Signature __________',
         '',
         FOOTER,
       ].join('\n');
@@ -132,7 +132,7 @@ export function templateDraft(input: DraftInput): string {
           'Give first aid only if trained; do not move an injured person unless in danger.',
           'Evacuate to the assembly point and report for the head count.',
           'Do not re-enter until the site declares the area safe.',
-          'Report the incident in SiteGuard as soon as possible.',
+          'Report the incident in COMVERA as soon as possible.',
         ]),
         '',
         'RESCUE\n  Describe how a person would be rescued for this scope (e.g. from height or a confined space) and the equipment kept at the work area.',

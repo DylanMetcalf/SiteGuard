@@ -6,7 +6,7 @@
 import type { Db } from '../db/pool.js';
 
 export interface NotificationLink {
-  kind: 'req' | 'review' | 'site' | 'studio' | 'requests';
+  kind: 'req' | 'review' | 'site' | 'studio' | 'requests' | 'exchange';
   id?: string;
   siteId?: string;
 }

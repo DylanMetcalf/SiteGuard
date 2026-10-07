@@ -2,12 +2,12 @@
 
 import { api } from './api.js';
 import { S, on, reload, render, showToast, escapeHtml, val } from './core.js';
-import { renderLanding } from './landing.js';
+import { renderLanding, renderPublic, PUBLIC_PAGES, publicPageFor } from './landing.js';
 
-const brand = '<div class="auth-hero"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div></div></div>'
+const brand = '<div class="auth-hero"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">COMVERA</div></div></div>'
   +'<p class="auth-tagline">Safety files, contractor compliance and site safety — in one place.</p>'
   +'<div class="auth-points"><span>Starter packs for SA mines</span><span>Live contractor readiness</span><span>Branded documents in minutes</span></div></div>';
-const home = () => (S.boot && S.boot.authenticated) || S.authView === 'invite' || S.authView === 'site-invite' || S.authView === 'reset' ? '' : '<button class="linkish auth-home" data-action="auth-go" data-view="landing">← About SiteGuard</button>';
+const home = () => (S.boot && S.boot.authenticated) || S.authView === 'invite' || S.authView === 'site-invite' || S.authView === 'reset' ? '' : '<button class="linkish auth-home" data-action="auth-go" data-view="landing">← About COMVERA</button>';
 const wrap = (inner) => '<div class="auth-shell">'+brand+'<div class="onboard-wrap">'+home()+inner+'</div></div>';
 const errorBox = () => S.authContext.error ? '<div class="form-error" role="alert">'+escapeHtml(S.authContext.error)+'</div>' : '';
 const okBox = () => S.authContext.ok ? '<div class="form-ok" role="status">'+escapeHtml(S.authContext.ok)+'</div>' : '';
@@ -38,6 +38,12 @@ export async function handleDeepLink(){
   const url = new URL(location.href);
   const token = url.searchParams.get('token') || '';
   const path = url.pathname;
+  const promo = url.searchParams.get('code');
+  if(promo && /^[A-Za-z0-9][A-Za-z0-9_-]{2,39}$/.test(promo)){ S.authContext = Object.assign({}, S.authContext, { promo }); if(path === '/signup' || path === '/'){ S.authView = 'signup'; return false; } }
+  // From an Exchange portal ("Create your COMVERA workspace"): plain sign-up, nothing pre-linked.
+  if(path === '/signup'){ const k = url.searchParams.get('kind'); S.authView = 'signup'; if(k === 'contractor' || k === 'host') S.authContext = Object.assign({}, S.authContext, { kind:k }); return false; }
+  const pub = publicPageFor(path);
+  if(pub){ S.authView = pub; if(pub==='pricing') loadPricing(); return false; }
   if(path === '/reset-password' && token){ S.authView = 'reset'; S.authContext = { token }; return true; }
   if(path === '/verify-email' && token){
     try{ await api.post('/api/auth/verify-email', { token }); S.authContext = { ok:'Email confirmed — thanks.' }; }
@@ -72,6 +78,7 @@ export function renderAuth(){
   const signedIn = S.boot && S.boot.authenticated;
   const features = (S.boot && S.boot.features) || {};
   if(v === 'landing') return renderLanding(features);
+  if(PUBLIC_PAGES[v]) return renderPublic(v, features, S.publicCtx);
 
   if(v === 'invite'){
     const inv = S.authContext.invite;
@@ -98,7 +105,7 @@ export function renderAuth(){
     if(!si) return wrap('<div class="card"><h3>Invitation unavailable</h3>'+errorBox()+'<button class="btn secondary block" style="margin-top:12px;" data-action="auth-go" data-view="signin">Go to sign in</button></div>');
     const head = '<div class="view-head" style="text-align:center;"><h1>Site invitation</h1><p>'+escapeHtml(si.host_name)+' invited '+escapeHtml(si.contractor_name)+'</p></div>'
       +'<div class="card checkpoint"><div class="site-card-title">'+escapeHtml(si.site_name)+'</div><div class="site-card-sub">'+escapeHtml(si.location||'')+'</div>'
-      +'<div class="site-card-sub" style="margin-top:8px;">Accepting shows you exactly which documents the site needs and tracks your readiness as you upload them. SiteGuard is free for contractors.</div></div>';
+      +'<div class="site-card-sub" style="margin-top:8px;">Accepting shows you exactly which documents the site needs and tracks your readiness as you upload them. Your safety file for this site is sponsored by the site — no subscription needed for it.</div></div>';
     if(si.status !== 'pending'){
       return wrap(head+'<div class="card"><div class="site-card-sub">This invitation was already '+escapeHtml(si.status)+'.</div><button class="btn secondary block" style="margin-top:12px;" data-action="auth-done">Continue</button></div>');
     }
@@ -122,9 +129,9 @@ export function renderAuth(){
     }
     if(S.authContext.showSignin){
       return wrap(head+signInCard('Sign in to your contractor account to respond.', si.email||'')
-        +'<button class="linkish" style="margin-top:6px;" data-action="auth-show-signin" data-show="0">New to SiteGuard? Create an account</button>');
+        +'<button class="linkish" style="margin-top:6px;" data-action="auth-show-signin" data-show="0">New to COMVERA? Create an account</button>');
     }
-    return wrap(head+'<div class="card"><div class="site-card-title" style="font-size:14px;">New to SiteGuard?</div>'
+    return wrap(head+'<div class="card"><div class="site-card-title" style="font-size:14px;">New to COMVERA?</div>'
       +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name">'
       +'<label class="field-label" for="suOrgName">Company name</label><input type="text" id="suOrgName" value="'+escapeHtml(si.contractor_name)+'">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email" value="'+escapeHtml(si.email||'')+'">'
@@ -148,17 +155,18 @@ export function renderAuth(){
   }
 
   if(v === 'signup'){
-    return wrap('<div class="view-head" style="text-align:center;"><h1>Create your organisation</h1><p>Site owners get a 14-day trial with no card. Contractors are always free.</p></div><div class="card">'
+    return wrap('<div class="view-head" style="text-align:center;"><h1>Create your organisation</h1><p>Every account starts with a 14-day trial of the full product, no card needed.</p></div><div class="card">'
       +'<div class="field-label" style="margin-top:0;">Who are you signing up for?</div>'
       +'<div class="role-cards" role="radiogroup">'
         +roleCard('host', 'We run a site or mine', 'Create your sites, set what every contractor\'s safety file must contain, share a site code and vet what comes in.')
-        +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, or build a safety file for any client yourself. Free.')
+        +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, or build safety files for any client yourself.')
       +'</div>'
       +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name" placeholder="e.g. Thandi Nkosi">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email">'
       +'<label class="field-label" for="suPassword">Password</label><input type="password" id="suPassword" autocomplete="new-password">'
       +'<div class="site-card-sub" style="margin-top:4px;">At least 10 characters.</div>'
       +'<label class="field-label" for="suOrgName">Organisation name</label><input type="text" id="suOrgName" placeholder="e.g. Riverside Mining Group, or your own company name">'
+      +'<details class="promo-box"'+(S.authContext.promo?' open':'')+'><summary class="linkish">Have a promo code?</summary><input type="text" id="suPromo" maxlength="40" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. COMVERA-LIFETIME" value="'+escapeHtml(S.authContext.promo||'')+'"></details>'
       +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="new">Create my organisation</button>'+errorBox()
       +'<div class="auth-links"><button class="linkish" data-action="auth-go" data-view="signin">Already have an account? Sign in</button></div></div>'
       + demoCard(features));
@@ -187,7 +195,7 @@ function signInCard(note, email){
 function demoCard(features){
   if(!features.demo) return '';
   return '<div class="card" style="margin-top:10px;text-align:center;">'
-    +'<div class="site-card-sub" style="margin-bottom:8px;">Not ready to enter real information? Explore SiteGuard in a private sandbox with realistic sample data — an example mine, contractors and safety files. It\'s separate from any real account and deleted after a few days.</div>'
+    +'<div class="site-card-sub" style="margin-bottom:8px;">Not ready to enter real information? Explore COMVERA in a private sandbox with realistic sample data — an example mine, contractors and safety files. It\'s separate from any real account and deleted after a few days.</div>'
     +'<button class="btn secondary block" data-action="start-demo">Explore the demo</button>'
     + (S.authContext.cleanForm
       ? '<div style="text-align:left;margin-top:16px;border-top:1px solid var(--grey-line);padding-top:14px;"><div class="site-card-title">Start fresh</div>'
@@ -210,6 +218,27 @@ export function renderNoOrg(){
 }
 
 /* ============ actions ============ */
+/* ---------- the public site ---------- */
+S.publicCtx = S.publicCtx || {};
+function loadPricing(){
+  if(S.publicCtx.pricing && !S.publicCtx.pricing.error) return;
+  api.get('/api/pricing').then((r)=>{ S.publicCtx.pricing = r; render(); }).catch(()=>{ S.publicCtx.pricing = { error: true }; render(); });
+}
+export function showPublic(page, push){
+  if(page==='pricing') loadPricing();
+  if(page==='contact') S.publicCtx = Object.assign({}, S.publicCtx, { sent: false, error: '' });
+  if(push !== false) history.pushState({ publicPage: page }, '', PUBLIC_PAGES[page] || '/');
+  go(page);
+  window.scrollTo(0, 0);
+}
+on('public-go', (el, e)=>{ if(e && (e.metaKey || e.ctrlKey || e.shiftKey)) return; if(e && e.preventDefault) e.preventDefault(); showPublic(el.dataset.page); });
+on('contact-send', async (el)=>{
+  const body = { name: val('ctName'), email: val('ctEmail'), phone: val('ctPhone'), company: val('ctCompany'), topic: val('ctTopic'), message: (document.getElementById('ctMessage')||{}).value || '', website: val('ctWebsite') };
+  if(!body.name || !body.email || body.message.trim().length < 5){ S.publicCtx.error = 'Add your name, email address and a short message.'; keepTyped(render); return; }
+  el.disabled = true;
+  try{ await api.post('/api/contact', body); S.publicCtx.sent = true; S.publicCtx.error = ''; render(); }
+  catch(e){ S.publicCtx.error = e.message; el.disabled = false; keepTyped(render); }
+});
 on('auth-go', (el)=>{ go(el.dataset.view, el.dataset.kind ? { kind: el.dataset.kind } : undefined); window.scrollTo(0, 0); });
 on('auth-show-signin', (el)=>{ S.authContext.showSignin = el.dataset.show === '1'; S.authContext.error = ''; render(); });
 on('auth-done', ()=>finish());
@@ -233,6 +262,7 @@ on('signup', async (el)=>{
     body.orgName = val('suOrgName'); body.orgKind = S.authContext.kind;
     if(!body.orgKind){ S.authContext.error = 'Choose whether you run a site or are a contractor.'; keepTyped(render); const c = document.querySelector('.role-card'); if(c) c.focus(); return; }
     if(!body.orgName) return need('Enter your company or organisation name.', 'suOrgName');
+    const promo = val('suPromo'); if(promo) body.promoCode = promo;
   }
   if(mode === 'invite') body.inviteToken = S.authContext.token;
   if(mode === 'site-invite'){ body.siteInviteToken = S.authContext.token; body.orgName = val('suOrgName'); body.orgKind = 'contractor'; }
@@ -245,7 +275,7 @@ on('signup', async (el)=>{
       const site = Object.values(S.state.sites).find(x=>x.name===invitedSite);
       if(site){ S.nav='sites'; S.activeSiteId=site.id; S.siteTab='compliance'; render(); }
     }
-    showToast(mode === 'new' ? 'Welcome to SiteGuard — check your email to confirm your address.' : 'Welcome to SiteGuard');
+    showToast(mode === 'new' ? 'Welcome to COMVERA — check your email to confirm your address.' : 'Welcome to COMVERA');
   }catch(e){ fail(e); }
 });
 

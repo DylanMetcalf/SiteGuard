@@ -32,7 +32,7 @@ describe('organisation data export', () => {
   it('gives an admin their own organisation only, without secrets, and records it', async () => {
     const r = await host.req('GET', '/api/org/export');
     assert.equal(r.status, 200);
-    assert.match(String(r.raw.headers['content-disposition']), /siteguard-export-\d{4}-\d{2}-\d{2}\.json/);
+    assert.match(String(r.raw.headers['content-disposition']), /comvera-export-\d{4}-\d{2}-\d{2}\.json/);
     const text = r.raw.body;
     const data = JSON.parse(text);
     assert.equal(data.organisation.name, 'Omicron Mining');
@@ -52,5 +52,18 @@ describe('organisation data export', () => {
     const member = (await signup(app, { orgName: '', orgKind: 'host', email, inviteToken: token })).agent;
     assert.equal((await member.req('GET', '/api/org/export')).status, 403);
     assert.equal((await new Agent(app).req('GET', '/api/org/export')).status, 401);
+  });
+});
+
+describe('public contact form', () => {
+  it('stores an enquiry, ignores bots, and rejects incomplete ones', async () => {
+    const ok = await app.inject({ method: 'POST', url: '/api/contact', payload: { name: 'Nomsa', email: 'nomsa@example.com', topic: 'sales', message: 'We have six sites near Kathu.' } });
+    assert.equal(ok.statusCode, 200);
+    const bot = await app.inject({ method: 'POST', url: '/api/contact', payload: { name: 'Bot', email: 'bot@example.com', message: 'Buy now buy now', website: 'spam.example' } });
+    assert.equal(bot.statusCode, 200);
+    assert.equal((await app.inject({ method: 'POST', url: '/api/contact', payload: { name: 'X', email: 'not-an-email', message: 'hello there' } })).statusCode, 400);
+    const { pool } = await import('./helpers.js');
+    const rows = (await pool.query(`select name from enquiries`)).rows.map((r: { name: string }) => r.name);
+    assert.deepEqual(rows, ['Nomsa']);
   });
 });
