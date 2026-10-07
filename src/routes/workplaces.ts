@@ -8,6 +8,7 @@
  * per contractor exactly as before.
  */
 import { recheckSiteReady } from '../lib/siteready.js';
+import { track } from '../lib/events.js';
 import type { FastifyInstance } from 'fastify';
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
@@ -362,6 +363,7 @@ export async function joinWorkplaceByCode(db: Db, ctx: OrgCtx, code: string): Pr
     await db.query(`insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`, [site.id, r.category, r.name, r.source, r.why, i, !!r.optional]);
   }
   await sponsorFile(db, site.id);
+  await track(db, ctx.org.id, 'site_joined');
   await audit(db, ctx, 'Joined site with site code', `${w.name} — ${w.requirements.length} requirements`, site.id);
   await notifyOrg(db, w.org_id, [...REVIEWERS], { kind: 'accepted', title: `${ctx.org.name} joined ${w.name}`, body: `${ctx.org.trade ? ctx.org.trade + ' · ' : ''}They can now see the site's requirements and start their safety file.`, link: { kind: 'site', siteId: site.id } });
   await publishChange(db, [w.org_id, ctx.org.id]);

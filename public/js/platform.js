@@ -51,6 +51,10 @@ export function renderPlatform(){
   html += '<div class="section-title">Enquiries from the contact page</div><div class="card">'
     + ((c.enquiries||[]).length ? c.enquiries.map(q=>'<div style="padding:6px 0;border-bottom:1px solid var(--line);"><div class="site-card-sub">'+escapeHtml(q.topic)+' · '+escapeHtml(q.name)+(q.company?' · '+escapeHtml(q.company):'')+' · '+timeAgo(q.createdAt)+'</div><div>'+escapeHtml(q.message)+'</div><div class="site-card-sub"><a href="mailto:'+escapeHtml(q.email)+'">'+escapeHtml(q.email)+'</a>'+(q.phone?' · '+escapeHtml(q.phone):'')+'</div></div>').join('') : '<div class="site-card-sub">No enquiries yet.</div>')
     + '</div>';
+  const EV = { signup:'Sign-ups', trial_started:'Trials started', first_safety_file:'Companies with a first safety file', safety_file_export:'Safety file PDFs built', document_upload:'Documents uploaded', ai_generation:'AI requests', invitation_sent:'Invitations sent', site_joined:'Sites joined with a code', subscription_started:'Subscriptions started', promo_redeemed:'Promo codes redeemed' };
+  html += '<div class="section-title">Product milestones</div><div class="card"><div class="site-card-sub" style="margin-bottom:6px;">Counts only — no names, pages or tracking cookies.</div>'
+    + ((c.productEvents||[]).length ? c.productEvents.map(e=>stat(EV[e.event]||e.event, e.total+' ('+e.last30+' in 30 days, '+e.orgs+' companies)')).join('') : '<div class="site-card-sub">Nothing yet.</div>')
+    + '</div>';
   html += promosSection(c) + grantsSection(c) + pricingSection(c);
   html += '<div class="site-card-sub">Updated '+timeAgo(c.generatedAt)+'. <button class="linkish" data-action="platform-refresh">Refresh</button></div>';
   return html;

@@ -76,6 +76,9 @@ export default async function adminRoutes(app: FastifyInstance) {
       health: { emailFailed7d: emailFailed, emailStuck, uptimeSeconds: Math.round(process.uptime()) },
       recentSignups: signups.map((o: { plan: string }) => ({ ...o, plan: planName(o.plan) })),
       recentFeedback: feedback,
+      // Milestones reached, by event: all time and the last 30 days (organisation counts only).
+      productEvents: await many(pool, `select event, count(*)::int as total, count(*) filter (where created_at > now() - interval '30 days')::int as last30,
+          count(distinct org_id)::int as orgs from product_events group by event order by event`),
       enquiries: await many(pool, `select name, email, phone, company, topic, left(message, 500) as message, created_at as "createdAt" from enquiries order by created_at desc limit 10`),
     };
   });

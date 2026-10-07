@@ -1,5 +1,6 @@
 import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
+import { track } from '../lib/events.js';
 import { z } from 'zod';
 import { many, one, pool, withTx, type Db } from '../db/pool.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
@@ -87,6 +88,7 @@ async function inviteContractor(
     }));
   }
   await audit(db, ctx, 'Invited contractor', `${contractor.name} to ${site.name}`, site.id);
+  await track(db, ctx.org.id, 'invitation_sent');
 }
 
 export async function declineSiteInvitation(db: Db, ctx: OrgCtx, invitationId: string, viaToken = false) {

@@ -5,6 +5,7 @@
  * reachable through it.
  */
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { track, trackFirst } from '../lib/events.js';
 import { z } from 'zod';
 import { many, one, pool, withTx } from '../db/pool.js';
 import { conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
@@ -202,6 +203,10 @@ export default async function shareRoutes(app: FastifyInstance) {
     });
     if (created) await audit(pool, ctx, 'Compiled safety file', `Rev ${revision}`, id);
     else if (partial) await audit(pool, ctx, 'Compiled safety file (selected documents)', `${only ? only.length : 'all'} document${only?.length === 1 ? '' : 's'} chosen`, id);
+    if (!preview) {
+      await track(pool, ctx.org.id, 'safety_file_export');
+      await trackFirst(pool, ctx.org.id, 'first_safety_file');
+    }
     // A preview opens in the browser's PDF viewer; everything else downloads.
     reply.header('cache-control', 'private, no-store').header('content-disposition', contentDisposition(filename, preview));
     return reply.type('application/pdf').send(pdf);

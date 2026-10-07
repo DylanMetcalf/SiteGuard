@@ -1,5 +1,6 @@
 import { recheckSiteReady } from '../lib/siteready.js';
 import { can } from '../lib/entitlements.js';
+import { track } from '../lib/events.js';
 import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -151,6 +152,8 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (doc.status === 'awaiting_review') throw conflict('This document is waiting on review. You can replace it if the reviewer asks for a correction.');
       const f = await storeFile(db, ctx, buf, file.filename, file.mimetype);
       await db.query('update documents set pending_file_id = $2 where id = $1', [doc.id, f.id]);
+      await audit(db, ctx, 'Uploaded file', `${s.name} — ${f.filename}`, s.siteId);
+      await track(db, ctx.org.id, 'document_upload');
       await publishChange(db, [ctx.org.id]);
       return f;
     });

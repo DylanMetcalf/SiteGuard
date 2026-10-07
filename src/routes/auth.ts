@@ -10,6 +10,8 @@ import { requireUser, requireOrg, canAdminOrg, type Role, type OrgCtx } from '..
 import { appUrl, queueEmail } from '../lib/email.js';
 import { defaultPlanFor, type OrgKind } from '../lib/plans.js';
 import { sponsorFile } from '../lib/sponsorship.js';
+import { track } from '../lib/events.js';
+import { redeemPromo } from '../lib/promos.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 
@@ -83,6 +85,15 @@ export async function acceptSiteInvitation(db: Db, ctx: OrgCtx, invitationId: st
   return { siteId: inv.site_id, hostOrgId: inv.org_id };
 }
 
+/** Sign-in and sign-out go into the organisation's audit trail (who, when, from which address). */
+async function signInEvent(orgId: string, userId: string, action: string, ip: string) {
+  await pool.query(
+    `insert into audit_events (org_id, actor_id, actor_name, actor_role, action, detail)
+     select $1, u.id, u.name, coalesce(m.role, ''), $3, $4 from users u left join memberships m on m.user_id = u.id and m.org_id = $1 where u.id = $2`,
+    [orgId, userId, action, `from ${ip}`],
+  );
+}
+
 export default async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/signup', rl(10), async (req, reply) => {
     const body = z
@@ -94,6 +105,8 @@ export default async function authRoutes(app: FastifyInstance) {
         orgKind: z.enum(['host', 'contractor']).optional(),
         inviteToken: z.string().max(100).optional(),
         siteInviteToken: z.string().max(100).optional(),
+        /** A promo code from the platform owner (e.g. lifetime access); redeemed for the new organisation. */
+        promoCode: z.string().trim().max(40).optional(),
       })
       .parse(req.body);
     const problem = passwordProblem(body.password);
@@ -150,6 +163,16 @@ export default async function authRoutes(app: FastifyInstance) {
       const org = (await one(db, 'select * from organisations where id = $1', [orgId]))!;
       const ctx = { user: { id: user.id, email: body.email, name: body.name, title: '', phone: '', email_verified_at: null, is_demo: false }, sessionId: '', csrfToken: '', org, role } as OrgCtx;
       await audit(db, ctx, body.inviteToken ? 'Joined organisation' : 'Organisation created', org.name);
+      if (!body.inviteToken) {
+        await track(db, orgId, 'signup');
+        await track(db, orgId, 'trial_started');
+        // A code typed at sign-up is redeemed for the new company; a bad code stops sign-up with a clear message.
+        if (body.promoCode) {
+          const r = await redeemPromo(db, ctx, body.promoCode);
+          await audit(db, ctx, 'Redeemed promo code', `${body.promoCode.toUpperCase()} at sign-up — ${r.kind === 'grant' ? r.plan + (r.until ? ' until ' + r.until.toISOString().slice(0, 10) : ', no end date') : r.percentOff + '% off ' + r.plan + ' at checkout'}`);
+          await track(db, orgId, 'promo_redeemed');
+        }
+      }
       if (siteInvitationId) await acceptSiteInvitation(db, ctx, siteInvitationId);
       await publishChange(db, [orgId]);
       await createSession(db, reply, req, user.id, orgId);
@@ -188,10 +211,12 @@ export default async function authRoutes(app: FastifyInstance) {
         [user.id, user.last_active_org_id],
       ))?.org_id ?? null;
     await createSession(pool, reply, req, user.id, orgId);
+    if (orgId) await signInEvent(orgId, user.id, 'Signed in', req.ip);
     return { ok: true };
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
+    if (req.ctx?.org) await signInEvent(req.ctx.org.id, req.ctx.user.id, 'Signed out', req.ip);
     if (req.ctx) await destroySession(pool, reply, req.ctx.sessionId);
     else reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { ok: true };

@@ -840,3 +840,4 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .lp-actions .linkish{white-space:nowrap;}
 @media (min-width:900px){ .lp-nav{gap:14px;} .lp-link{font-size:13.5px;} .lp-top{gap:16px;} }
 @media (min-width:900px) and (max-width:1180px){ .lp-link[data-page="builder"]{display:none;} }
+.promo-box{margin-top:12px;} .promo-box summary{cursor:pointer;font-size:13.5px;} .promo-box input{margin-top:8px;}

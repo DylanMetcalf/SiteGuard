@@ -5,6 +5,7 @@
  * Stripe is the source of truth; the webhook mirrors it onto the organisation.
  */
 import type { FastifyInstance } from 'fastify';
+import { trackFirst } from '../lib/events.js';
 import Stripe from 'stripe';
 import { z } from 'zod';
 import { one, pool, withTx } from '../db/pool.js';
@@ -91,6 +92,7 @@ async function syncSubscription(sub: Stripe.Subscription) {
         periodEnd ? new Date(periodEnd * 1000) : null,
       ],
     );
+    if (!deleted && status === 'active') await trackFirst(db, org.id, 'subscription_started');
     await publishChange(db, [org.id]);
   });
 }

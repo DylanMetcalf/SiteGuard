@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { track } from '../lib/events.js';
 import { many, one, pool, withTx } from '../db/pool.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
 import {
@@ -128,6 +129,7 @@ export default async function orgRoutes(app: FastifyInstance) {
         action: { label: 'Accept invitation', url: appUrl(`/invite?token=${token}`) },
       });
       await audit(db, ctx, 'Invited user', `${body.email} as ${roleLabel(ctx.org.kind, body.role)}`);
+      await track(db, ctx.org.id, 'invitation_sent');
       await publishChange(db, [ctx.org.id]);
       return { id: inv.id };
     });

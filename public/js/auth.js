@@ -38,6 +38,8 @@ export async function handleDeepLink(){
   const url = new URL(location.href);
   const token = url.searchParams.get('token') || '';
   const path = url.pathname;
+  const promo = url.searchParams.get('code');
+  if(promo && /^[A-Za-z0-9][A-Za-z0-9_-]{2,39}$/.test(promo)){ S.authContext = Object.assign({}, S.authContext, { promo }); if(path === '/signup' || path === '/'){ S.authView = 'signup'; return false; } }
   const pub = publicPageFor(path);
   if(pub){ S.authView = pub; if(pub==='pricing') loadPricing(); return false; }
   if(path === '/reset-password' && token){ S.authView = 'reset'; S.authContext = { token }; return true; }
@@ -162,6 +164,7 @@ export function renderAuth(){
       +'<label class="field-label" for="suPassword">Password</label><input type="password" id="suPassword" autocomplete="new-password">'
       +'<div class="site-card-sub" style="margin-top:4px;">At least 10 characters.</div>'
       +'<label class="field-label" for="suOrgName">Organisation name</label><input type="text" id="suOrgName" placeholder="e.g. Riverside Mining Group, or your own company name">'
+      +'<details class="promo-box"'+(S.authContext.promo?' open':'')+'><summary class="linkish">Have a promo code?</summary><input type="text" id="suPromo" maxlength="40" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. COMVERA-LIFETIME" value="'+escapeHtml(S.authContext.promo||'')+'"></details>'
       +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="new">Create my organisation</button>'+errorBox()
       +'<div class="auth-links"><button class="linkish" data-action="auth-go" data-view="signin">Already have an account? Sign in</button></div></div>'
       + demoCard(features));
@@ -257,6 +260,7 @@ on('signup', async (el)=>{
     body.orgName = val('suOrgName'); body.orgKind = S.authContext.kind;
     if(!body.orgKind){ S.authContext.error = 'Choose whether you run a site or are a contractor.'; keepTyped(render); const c = document.querySelector('.role-card'); if(c) c.focus(); return; }
     if(!body.orgName) return need('Enter your company or organisation name.', 'suOrgName');
+    const promo = val('suPromo'); if(promo) body.promoCode = promo;
   }
   if(mode === 'invite') body.inviteToken = S.authContext.token;
   if(mode === 'site-invite'){ body.siteInviteToken = S.authContext.token; body.orgName = val('suOrgName'); body.orgKind = 'contractor'; }
