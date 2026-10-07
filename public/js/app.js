@@ -7,6 +7,7 @@ import { topbar, bottomNav, renderView } from './views.js';
 import './sheets.js';
 import './assistant.js';
 import { refreshStudio } from './studio.js';
+import { refreshExchanges } from './exchanges.js';
 import { refreshGuide } from './guide.js';
 import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
 import './inbox.js';
@@ -139,7 +140,7 @@ function startLive(){
   es.addEventListener('open', ()=>{ if(!S.live){ S.live = true; updateLiveDot(); } });
   es.addEventListener('change', ()=>{
     clearTimeout(refetchTimer);
-    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>{ refreshReview(); refreshStudio(); refreshGuide(); }).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
+    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>{ refreshReview(); refreshStudio(); refreshGuide(); refreshExchanges(); }).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
   });
   es.addEventListener('error', ()=>{
     S.live = false; updateLiveDot();

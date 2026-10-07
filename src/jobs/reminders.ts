@@ -194,4 +194,6 @@ export async function cleanupExpired(): Promise<void> {
   await pool.query(`delete from sessions where expires_at < now()`);
   await pool.query(`delete from email_tokens where expires_at < now() - interval '7 days'`);
   await pool.query(`delete from reminder_log where sent_at < now() - interval '180 days'`);
+  await pool.query(`delete from exchange_sessions where expires_at < now()`);
+  await pool.query(`delete from exchange_codes where expires_at < now() - interval '1 day'`);
 }

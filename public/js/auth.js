@@ -40,6 +40,8 @@ export async function handleDeepLink(){
   const path = url.pathname;
   const promo = url.searchParams.get('code');
   if(promo && /^[A-Za-z0-9][A-Za-z0-9_-]{2,39}$/.test(promo)){ S.authContext = Object.assign({}, S.authContext, { promo }); if(path === '/signup' || path === '/'){ S.authView = 'signup'; return false; } }
+  // From an Exchange portal ("Create your COMVERA workspace"): plain sign-up, nothing pre-linked.
+  if(path === '/signup'){ const k = url.searchParams.get('kind'); S.authView = 'signup'; if(k === 'contractor' || k === 'host') S.authContext = Object.assign({}, S.authContext, { kind:k }); return false; }
   const pub = publicPageFor(path);
   if(pub){ S.authView = pub; if(pub==='pricing') loadPricing(); return false; }
   if(path === '/reset-password' && token){ S.authView = 'reset'; S.authContext = { token }; return true; }

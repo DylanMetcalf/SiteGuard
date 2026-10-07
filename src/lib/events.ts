@@ -7,7 +7,8 @@ import type { Db } from '../db/pool.js';
 
 export type ProductEvent =
   | 'signup' | 'trial_started' | 'first_safety_file' | 'safety_file_export' | 'document_upload'
-  | 'ai_generation' | 'invitation_sent' | 'site_joined' | 'subscription_started' | 'promo_redeemed';
+  | 'ai_generation' | 'invitation_sent' | 'site_joined' | 'subscription_started' | 'promo_redeemed'
+  | 'exchange_request_sent' | 'exchange_share_sent' | 'exchange_submitted' | 'exchange_completed' | 'exchange_claimed';
 
 export async function track(db: Db, orgId: string | null, event: ProductEvent): Promise<void> {
   try {

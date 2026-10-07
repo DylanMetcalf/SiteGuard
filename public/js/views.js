@@ -17,6 +17,7 @@ import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
 import { renderWorkplace, workplaceCards } from './workplaces.js';
 import { isProject, projectBar, projectsSection } from './projects.js';
+import { renderExchanges, invalidateExchanges } from './exchanges.js';
 import { suspendedBanner, suspendControls, gateSection, auditsSection, validityCard, revisionsLink, timelineSection } from './oversight.js';
 
 /* ============ SHELL ============ */
@@ -184,7 +185,7 @@ function renderDashboard(){
   const head = '<div class="dash-hero"><div class="flexbetween" style="align-items:flex-start;"><div><p class="hero-eyebrow">'+org().name+'</p><h1>'+greeting()+'</h1>'
     +'<p class="greeting">'+(urgent ? urgent+' urgent item'+(urgent===1?'':'s')+' need'+(urgent===1?'s':'')+' you today.' : findings.length ? findings.length+' item'+(findings.length===1?'':'s')+' to look at — nothing urgent.' : 'Everything is in order across your sites.')+'</p></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn secondary small" data-action="start-tour">Walkthrough</button><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div></div>'
-    +(isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button><button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>'
+    +(isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button>'+(isOrgAdmin() ? '<button class="btn secondary" data-action="exchange-share">'+ICONS.link+' Share securely</button>' : '')+'<button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>'
       : isHost() ? '<div class="hero-actions">'+(isOrgAdmin() && !readOnly() ? '<button class="btn primary" data-action="new-site">'+ICONS.plus+' Add site</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="passport">Contractors</button><button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>' : '')
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
@@ -800,6 +801,7 @@ on('open-contractor', (el)=>{
     +(c.linked
       ? '<div class="notice" style="margin-top:12px;">'+c.name+' manages its own company details in COMVERA, so they can\'t be changed here. That keeps the record accurate and shows who is responsible for it.</div>'
       : (isOrgAdmin() && !readOnly() ? '<button class="btn secondary block" style="margin-top:12px;" data-action="edit-contractor" data-id="'+c.id+'">Correct invitation details</button><div class="site-card-sub" style="margin-top:6px;">You can correct the name or email you invited them with until they join. After that, they keep their own details up to date.</div>' : ''))
+    + ((isOrgAdmin() || canReview()) && !readOnly() ? '<div class="section-title">Documents</div><div class="card"><button class="menu-row" data-action="exchange-request-for" data-id="'+c.id+'"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Request documents</div><div class="qa-sub">Secure link by email — '+(c.linked ? 'they can upload without signing in' : 'no COMVERA account needed')+'</div></div>'+ICONS.chevron+'</button></div>' : '')
     + suspendControls(c));
 });
 on('contractor-site', (el)=>{ closeSheet(); S.nav='sites'; S.activeSiteId = el.dataset.site; S.siteTab='compliance'; render(); window.scrollTo(0,0); });
@@ -815,6 +817,7 @@ function renderMore(){
   html += item('studio', ICONS.passport, 'Document Studio', 'Your documents, plus branded safety documents as PDF and Word');
   if(isContractor() && isOrgAdmin() && !readOnly()) html += '<button class="menu-row" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">New project</div><div class="qa-sub">A safety file for a client who isn\'t on COMVERA</div></div>'+ICONS.chevron+'</button>';
   if(isContractor() && isOrgAdmin()) html += '<button class="menu-row" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Join a site with a code</div><div class="qa-sub">Type the code the site gave you</div></div>'+ICONS.chevron+'</button>';
+  html += item('exchanges', ICONS.link, 'Exchanges', isHost() ? 'Request documents from contractors — no account needed' : 'Share documents securely, and answer requests');
   const nf = (S.boot.agent||{findings:[]}).findings.length;
   html += item('agent', ICONS.verify, 'Compliance agent', nf ? nf+' item'+(nf===1?'':'s')+' need attention' : 'Continuous checks across every site');
   html += '<button class="menu-row" data-action="open-assistant"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">COMVERA Assistant</div><div class="qa-sub">Ask what a site or job needs, or how your sites are doing</div></div>'+ICONS.chevron+'</button>';
@@ -850,6 +853,7 @@ const MORE_VIEWS = {
   agent: renderAgent,
   studio: renderStudio,
   platform: renderPlatform,
+  exchanges: renderExchanges,
 };
 
 /* ---- Safety Centre (cross-site incidents & permits) ---- */
@@ -1174,7 +1178,7 @@ on('back-sites', ()=>{
 });
 on('focus-site', (el, e)=>{ e.stopPropagation(); S.focusSiteId = el.dataset.site; render(); });
 on('site-tab', (el)=>{ S.siteTab = el.dataset.tab; render(); });
-on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); render(); window.scrollTo(0,0); });
+on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); if(S.moreView==='exchanges'){ invalidateExchanges(); S.exchangeId = null; } render(); window.scrollTo(0,0); });
 on('doc-centre-filter', (el)=>{ S.docCentreFilter = el.dataset.filter; render(); });
 on('doc-centre-jump', (el)=>{ S.docCentreFilter = el.dataset.filter; S.hostPeopleTab = 'documents'; S.nav='passport'; render(); });
 on('safety-filter', (el)=>{ S.safetyFilter = el.dataset.filter; render(); });
