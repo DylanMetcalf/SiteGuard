@@ -34,13 +34,13 @@ const STATUS_COLOR: Record<string, string> = {
 export function page(title: string, body: string, foot = 'Shared from COMVERA. This view reflects the live record at the time you opened it and is read-only. It does not itself constitute a guarantee of legal compliance.'): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>${esc(title)} · COMVERA</title>
-<link rel="icon" type="image/png" href="/icons/icon-32.png">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
 <style>
 :root{--ink:#0E1A2B;--grey:#5E6A7A;--line:#E2E7E4;--paper:#F3F6F4;--raised:#FFFFFF;--brand:#16325C;--sage:#6E9C80;--green:#12805A;--red:#C0362C}
 @media (prefers-color-scheme: dark){:root{--ink:#E9EEF5;--grey:#8C99AB;--line:#243249;--paper:#0A1322;--raised:#111D31;--brand:#8FB2F2;--sage:#8FC0A2;--green:#6CD3A2;--red:#F28B80}}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 .wrap{max-width:760px;margin:0 auto;padding:20px 16px 40px}.brand{font-weight:700;font-size:16px;margin-bottom:16px}
-.brand span{display:inline-block;width:20px;height:20px;background:var(--brand);border-radius:6px;vertical-align:-4px;margin-right:8px;box-shadow:inset 0 0 0 5px var(--brand),inset 0 0 0 20px var(--sage)}
+.brand img{width:26px;height:26px;vertical-align:-7px;margin-right:8px;border-radius:7px}.brand{letter-spacing:.12em}
 .card{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 2px rgba(14,26,43,.05)}
 h1{font-size:20px;margin:0 0 4px}.sub{color:var(--grey);font-size:12.5px}.big{font:700 36px/1 system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:-.02em}
 table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -48,7 +48,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey
 .stamp{display:inline-block;border:2px solid var(--green);color:var(--green);padding:4px 12px;font-size:11px;letter-spacing:.08em;border-radius:999px;font-weight:700}
 .warn{border-color:var(--red);color:var(--red)}a{color:var(--brand)}.foot{font-size:11px;color:var(--grey);margin-top:18px}
 .scroll{overflow-x:auto}
-</style></head><body><div class="wrap"><div class="brand"><span></span>COMVERA</div>${body}
+</style></head><body><div class="wrap"><div class="brand"><img src="/icons/icon-small.svg" alt="">COMVERA</div>${body}
 <div class="foot">${foot}</div></div></body></html>`;
 }
 
