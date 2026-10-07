@@ -50,6 +50,18 @@ requirement that a blueprint can produce shows **Create it in Document Studio**,
 attached and submitted for review in one step. Documents due for review are flagged by the
 compliance agent. See `src/lib/studio/`.
 
+**COMVERA Exchange**: request or share specific documents with anyone, even people without a
+COMVERA account. A mine opens a contractor and chooses **Request documents** (or **Bulk request**
+to search its records, e.g. every "Working at Heights" certificate, and send one request per
+company). The contact gets an email with a secure link, confirms their email with a one-time code,
+and uploads straight to the mine: no password, no account, no attachment. The mine reviews each
+document, sends back what needs replacing (they get a new link with the reasons), and keeps its
+own copy. Contractors use **Share securely** to send their own documents with an expiry, a
+view-only option and revoke at any time, and see when they were opened and downloaded. Every
+step is in the audit trail. Contacts are remembered per company. Someone who later signs up can
+link exchanges sent to their verified email, after confirming they belong to their company.
+See **More → Exchanges** and `docs/ARCHITECTURE.md`.
+
 **One site, many contractors**: a mine creates a **site** once (name, location, emergency
 details) and ticks what every contractor's safety file must contain, starting from a researched
 **General safety file** list for mines (MHSA) or construction (Construction Regulations 2014).

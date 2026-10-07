@@ -139,7 +139,11 @@ async function start(){
     if(X.cover.signedIn){
       try{ await loadExchange(); }catch{ X.step = 'cover'; }
     }
-  }catch(e){ X.step = 'gone'; X.error = e.message; }
+  }catch(e){
+    // An older link (replaced by a newer email) still works while this browser's verified session lasts.
+    try{ if(e.code === 'exchange_link') await loadExchange(); else throw e; }
+    catch{ X.step = 'gone'; X.error = e.message; }
+  }
   render();
 }
 

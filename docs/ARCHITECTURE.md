@@ -115,6 +115,10 @@ refuse.
 | Archive, restore, duplicate a site; delete one nobody joined | ✓ | | | | |
 | Arrange the order of documents in own project file | | | | ✓ | |
 | Redeem a promo code | ✓ | | | ✓ | |
+| Request documents by Exchange (one company or bulk); review what comes back; resend; revoke | ✓ | ✓ | | ✓ | |
+| Share own documents by Exchange (expiry, view-only, revoke) | ✓ | ✓ | | ✓ | |
+| See the organisation's exchanges, contacts and their history | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Link earlier exchanges sent to one's own verified email (claim) | ✓ | | | ✓ | |
 | Platform overview (More → Platform) | only addresses in `PLATFORM_ADMIN_EMAILS` with a confirmed email; 404 for everyone else | | | | |
 
 More rules the server enforces:
@@ -165,6 +169,13 @@ More rules the server enforces:
   explicit whole-tenant purge (expired demo sandboxes) may opt out, for one transaction.
 - **POPIA-minded:** only the last 4 characters of ID numbers are stored for workers. Share pages
   are `noindex` and `no-referrer`.
+- **Exchange portal** (`/x/:token`, `/api/x/*`): the link token is 256-bit and stored hashed; it
+  only opens a cover page. A 6-digit code (stored hashed, 10 minutes, 5 attempts, at most 5 codes
+  an hour, sent only when the typed address matches, same answer either way) starts a 2-hour
+  session for that one exchange in a separate `cx` cookie (`httpOnly`, `SameSite=Strict`, path
+  `/api/x`) with its own `x-exchange-csrf` header. Pre-session calls must be JSON. A new email
+  replaces the link; revoking or expiry ends sessions. The portal never creates users or
+  organisations and can't reach any workspace endpoint.
 - **Demo isolation:** demo users can't sign in with a password or receive email. Persona switching
   is limited to users in the same sandbox, and sandboxes are deleted after 3 days.
   `DEV_ROLE_SWITCHER` refuses to start in production.
@@ -413,6 +424,40 @@ storage), and routes in `routes/studio.ts`.
   left out. It is read-only.
 - **Service worker** (`public/sw.js`): network-first for pages and static files, with `/offline.html`
   when there is no connection. It never caches `/api` and never runs cross-origin requests.
+
+## Exchange (requests and shares without an account)
+
+Three ideas stay separate: a **relationship** (`relationships`, `contacts`: who an organisation
+deals with; never a permission), an **exchange** (`exchanges`, `exchange_items`: one scoped,
+time-limited transaction) and a **workspace** (an organisation someone signed up for themselves).
+
+- **Request** (`POST /api/exchanges/request`, `/bulk-request`): the mine (or any workspace) names
+  the company, contact and documents; the recipient gets an email with a secure link, no
+  attachment. Uploads are stored as the **requester's own files** (`files.org_id` = sender,
+  `uploaded_by` null) and versioned in `exchange_submissions` (a draft until the recipient presses
+  Submit). The sender reviews per document; sending something back rotates the link and emails
+  the reasons once. Bulk request searches the mine's records (worker certificates on its sites,
+  site requirements, earlier requests), groups by company (one exchange each) and reports missing
+  contacts before sending (`dryRun`).
+- **Share** (`POST /api/exchanges/share`): only files the sender's organisation owns (company and
+  site documents, worker certificates, Studio PDFs). Items point at the sender's file; revoking
+  ends access and changes nothing in the sender's records. View-only blocks the download endpoint
+  (it can't stop someone photographing a screen). Opens, views and downloads are recorded.
+- **Status**: request `requested → opened → verified → submitted (Under review / Resubmitted) →
+  changes_requested | approved`; share `shared → opened → downloaded`. Whether access is live is
+  computed separately (`accessState`: active, expired, revoked): the record always stays.
+- **Audit**: every step goes into the sender's append-only audit trail with the reference
+  (`EX-1001 — …`), the recipient named by email; the detail screen shows it as History.
+- **Claiming** (`GET /api/exchanges/claimable`, `POST /api/exchanges/claim`): after someone
+  signs up, exchanges sent to their **verified** email are offered, never linked automatically.
+  An owner/admin must confirm, and confirm again when the company name the sender typed differs.
+  Claiming sets `recipient_org_id` (read-only view of status; a claimed share's files while access
+  lasts) and changes nothing else: no contacts, relationships or memberships are merged.
+- **Billing boundary**: sending is a workspace action (`requireWritable`); a recipient's upload or
+  submission never depends on anyone's plan, and using an exchange never starts a trial.
+- **Consent**: `marketing_consents` is written only when the recipient ticks the box.
+- **Screens**: `public/exchange.html` + `public/js/exchange.js` (portal), `public/js/exchanges.js`
+  (More → Exchanges, contractor sheet → Request documents, Documents → Share securely).
 
 ## Known limits and next steps
 

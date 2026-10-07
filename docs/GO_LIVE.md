@@ -184,7 +184,10 @@ browser.
 - **Privacy notice and terms are drafts** awaiting an attorney.
 - **Backups are Render's.** COMVERA doesn't make its own copies; test a restore monthly.
 - **No virus scanning of uploads yet** (files are type-checked and kept private). Recommended
-  before opening sign-ups to the public.
+  before opening sign-ups to the public. This matters more with **Exchanges**, where people
+  without an account upload files.
+- **Exchanges depend on email.** The secure link and the one-time code both arrive by email, so
+  Exchanges only work for outside people once Step 7 is done.
 
 ## 7. First test with your parents
 
@@ -208,5 +211,10 @@ Do this yourself first on your phone, then sit with them.
 9. Step 6: **Check and build the PDF** → **Preview**, then **Download**. Open the PDF.
    **You should see:** a cover page, contents, section dividers and page numbers.
 10. On a phone: Share → **Add to Home Screen**; open COMVERA from the new icon.
-11. Ask them: what was confusing? Where did they hesitate? Send notes with **More → Report a
+11. Try an **Exchange** with them: in their account, **Documents → Share securely**, tick the COID
+    letter, enter *your* email, **Share securely**. Open the email on your phone, type your email,
+    then the 6-digit code. **You should see:** the document, and in their account under
+    **More → Exchanges** that you opened and viewed it. Then tap **Revoke access** and reload your
+    page: it says the exchange was withdrawn.
+12. Ask them: what was confusing? Where did they hesitate? Send notes with **More → Report a
     problem or suggest an idea** so you see them under **More → Platform**.

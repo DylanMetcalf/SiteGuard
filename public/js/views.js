@@ -648,7 +648,8 @@ function renderPassport(){
   const contractorId = myContractorId();
   const mySites = Object.values(S.state.sites).filter(s=>s.status!=='invited' && s.status!=='declined');
   let html = '<div class="view-head"><div class="flexbetween"><h1>Your Documents</h1>'
-    +'<button class="btn secondary small" data-action="toggle-select">'+(S.docSelectMode?'Cancel':'Select')+'</button></div>'
+    +'<div style="display:flex;gap:6px;">'+(isOrgAdmin() && !readOnly() && !S.docSelectMode ? '<button class="btn secondary small" data-action="exchange-share">'+ICONS.link+' Share securely</button>' : '')
+    +'<button class="btn secondary small" data-action="toggle-select">'+(S.docSelectMode?'Cancel':'Select')+'</button></div></div>'
     +'<p>'+org().name+'</p></div>';
   if(!S.docSelectMode) html += studioWidget().replace('<div class="section-title">Document Studio</div>','');
   if(S.docSelectMode){
@@ -808,7 +809,8 @@ on('contractor-site', (el)=>{ closeSheet(); S.nav='sites'; S.activeSiteId = el.d
 
 /* ============ MORE ============ */
 function renderMore(){
-  if(S.moreView) return '<div style="margin-bottom:14px;"><button class="btn secondary small" data-action="goto-more" data-view="">← More</button></div>' + (MORE_VIEWS[S.moreView] ? MORE_VIEWS[S.moreView]() : '');
+  // An open exchange has its own "← Exchanges" back button.
+  if(S.moreView) return (S.moreView==='exchanges' && S.exchangeId ? '' : '<div style="margin-bottom:14px;"><button class="btn secondary small" data-action="goto-more" data-view="">← More</button></div>') + (MORE_VIEWS[S.moreView] ? MORE_VIEWS[S.moreView]() : '');
   const item = (view, icon, title, sub) => '<button class="menu-row" data-action="goto-more" data-view="'+view+'"><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
   let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div>'
     +'<button class="tour-cta" data-action="start-tour"><span class="tour-cta-ic">'+ICONS.sparkle+'</span><span><strong>Walkthrough</strong><span class="site-card-sub">A guided tour of every page, with auto-play for demos</span></span>'+ICONS.chevron+'</button>'

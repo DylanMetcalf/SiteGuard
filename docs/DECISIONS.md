@@ -5,6 +5,22 @@ Newest first.
 
 ---
 
+**DECISION** COMVERA Exchange: documents are requested or shared through a scoped, time-limited exchange reached by an emailed link plus a one-time code, not through accounts or attachments. Relationships and contacts are records, never permissions; the recipient gets no user, organisation, password or trial.
+**REASON** Most contractors (and many clients) have no COMVERA workspace and won't create one just to send a certificate. Email attachments can't be tracked, revoked or kept as a clean compliance record.
+**DATE** 2026-10-07
+
+**DECISION** A requested upload is stored as the requester's own file (its compliance copy); a share points at the sender's file and revoking only ends access.
+**REASON** The mine must keep what it relied on even if the contractor later changes or deletes its copy; the contractor's library must never become visible to the mine.
+**DATE** 2026-10-07
+
+**DECISION** Exchange history is linked to a new workspace only when a verified-email owner/admin explicitly claims it (with a second confirmation if the company name differs). Nothing is merged and nothing is linked automatically.
+**REASON** An email address can be shared, forwarded or belong to someone who has since moved company; matching on it alone could hand one company's records to another.
+**DATE** 2026-10-07
+
+**DECISION** Sending exchanges is a workspace action (blocked like any other write when an account lapses); answering one never depends on anyone's plan, and exchanges have no plan gate of their own yet.
+**REASON** Never block a recipient's submission to push a subscription; pricing for heavy exchange use can be decided with customer evidence.
+**DATE** 2026-10-07
+
 **DECISION** The product is renamed COMVERA. Customer-facing names, the logo, icons, emails, PDFs and Render service names change; internal names (database, Postgres channel and settings, test database) stay, so existing data and deployments keep working.
 **REASON** The platform will grow beyond safety files; the name and mark (an open ring closed by one node: a record completed and verified) are not tied to one product. The navy and sage palette is kept.
 **DATE** 2026-10-07

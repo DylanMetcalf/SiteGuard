@@ -368,6 +368,19 @@ WhatsApp or print for the site office. The contractor taps **Join a site with a 
 Either way the contractor then sees the site's document list, and the mine is notified when they
 join.
 
+## Getting documents from someone who isn't on COMVERA (Exchanges)
+
+Not every contractor will sign up. For them, open the contractor (**Contractors →** the company)
+and choose **Request documents**, or go to **More → Exchanges → Bulk request** to search across
+your contractors' records (for example "Working at Heights") and ask everyone at once. They get an
+email with a secure link, confirm their email with a 6-digit code and upload: no account or
+password. You review each document under **More → Exchanges**; anything you send back emails them
+a new link with your reason. Contractors can **Share securely** from their **Documents** page in
+the same way, with an expiry date, a view-only option and **Revoke access** at any time. The links
+only work for the person's own email address, expire, and every open, upload and download is in
+the audit trail. If that person later creates a COMVERA account, they can link those earlier
+exchanges under **More → Exchanges** after confirming they belong to their company.
+
 ## When something goes wrong
 
 | Symptom | Likely cause | Fix |

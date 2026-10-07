@@ -100,6 +100,43 @@ await mine.page.waitForTimeout(500);
 const wp = await mine.page.$('[data-action="open-workplace"]'); if (wp) { await wp.click(); await mine.page.waitForTimeout(900); }
 await shot(mine.page, 'mine-site', 'A mine\'s site: its code to share, contractors on it, the review queue, gate clearance and requirements.', { section: 'For a mine or site' });
 
+// ---------- Exchanges: documents from someone without an account ----------
+const outsider = `sipho.${stamp}@example.com`;
+await mine.api('POST', '/api/sites', { name: 'Kathu — Workshop', newContractor: { name: 'Ndlovu Rigging', contact: 'Sipho Ndlovu', email: outsider } });
+const rigging = (await db.query(`select c.id from contractors c join users u on u.email = $1 join memberships m on m.user_id = u.id and m.org_id = c.org_id where c.name = 'Ndlovu Rigging'`, [`walk-mine-${stamp}@example.com`])).rows[0].id;
+await mine.page.reload(); await mine.page.waitForTimeout(800);
+await mine.page.evaluate(() => { const b = document.querySelector('[data-action="nav"][data-nav="passport"]'); b && b.click(); });
+await mine.page.waitForTimeout(500);
+// Same as Contractors → the company → Request documents.
+await mine.page.evaluate((id) => { const b = document.createElement('button'); b.dataset.action = 'exchange-request-for'; b.dataset.id = id; document.body.appendChild(b); b.click(); b.remove(); }, rigging);
+await mine.page.waitForSelector('#xiDoc0');
+await mine.page.fill('#xiDoc0', 'Working at Heights certificate'); await mine.page.fill('#xiPerson0', 'Thabo Mokoena');
+await mine.page.fill('#xrMsg', 'Please send this before induction on Monday.');
+await shot(mine.page, 'exchange-request', 'Request documents from a contractor who isn\'t on COMVERA: who, which documents (and for which employee), by when.', { section: 'Exchanges: documents from anyone' });
+await mine.page.click('[data-action="exchange-request-send"]');
+await mine.page.waitForTimeout(1200);
+const link = (await db.query(`select text_body from email_outbox where to_email = $1 order by id desc limit 1`, [outsider])).rows[0].text_body.match(/\/x\/([A-Za-z0-9_-]+)/)[1];
+const phone = await browser.newContext({ viewport: { width: 390, height: 860 }, deviceScaleFactor: 2 });
+const portal = await phone.newPage();
+await portal.goto(B + '/x/' + link); await portal.waitForSelector('#xEmail');
+await shot(portal, 'exchange-portal', 'What the contractor sees from the email: no account or password — they confirm their email address with a one-time code.');
+await portal.fill('#xEmail', outsider); await portal.click('button[type=submit]'); await portal.waitForSelector('#xCode');
+const otp = (await db.query(`select subject from email_outbox where to_email = $1 and subject like 'Your COMVERA code%' order by id desc limit 1`, [outsider])).rows[0].subject.match(/(\d{6})/)[1];
+await portal.fill('#xCode', otp); await portal.click('button[type=submit]'); await portal.waitForSelector('[data-x-upload]');
+await (await portal.$('[data-x-upload]')).setInputFiles({ name: 'heights-certificate.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n') });
+await portal.waitForSelector('text=Ready to submit');
+await shot(portal, 'exchange-upload', 'They upload straight to the mine and press Submit. Only this one request is visible to them.');
+await portal.click('[data-x="submit"]'); await portal.waitForTimeout(1000);
+await mine.page.reload(); await mine.page.waitForTimeout(600);
+await mine.page.evaluate(() => { const b = document.querySelector('[data-action="nav"][data-nav="more"]'); b && b.click(); });
+await mine.page.evaluate(() => { const b = document.querySelector('[data-view="exchanges"]'); b && b.click(); });
+await mine.page.waitForSelector('[data-action="exchange-open"]');
+await mine.page.click('[data-action="exchange-open"]');
+await mine.page.waitForSelector('[data-action="exchange-decide"]');
+await mine.page.evaluate(() => { const h = [...document.querySelectorAll('.section-title')].find((x) => x.textContent.trim() === 'Documents'); h && h.scrollIntoView(); window.scrollBy(0, -90); });
+await shot(mine.page, 'exchange-review', 'The mine reviews each document: approve, or send it back with a reason (they get a new link). Every step is in the history.');
+await phone.close();
+
 // ---------- Platform (owner) ----------
 const ops = await account('contractor', 'COMVERA Owner', 'walkthrough-admin@comvera.test');
 await ops.api('POST', '/api/admin/promos', { code: `COMVERA-LIFETIME-${String(stamp).slice(-4)}`, description: 'Family and friends', plan: 'contractor_pro', maxRedemptions: 4 });

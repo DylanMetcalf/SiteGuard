@@ -48,6 +48,11 @@ haven't built.
 - The product name is COMVERA (internal DB/channel names still say siteguard: leave them). Plan
   enforcement is `features.billing` (`ENFORCE_PLANS` or Stripe); card payments are `features.payments`.
   Product statistics go through `track()` in `lib/events.ts` (no personal data).
+- Exchanges (`routes/exchange.ts`, portal `routes/exchangePortal.ts`, `lib/exchange.ts`): a relationship or contact is
+  never a permission; the portal (`/x/:token`, `/api/x/*`, cookie `cx`, header `x-exchange-csrf`) never creates users,
+  organisations or trials and sees one exchange only. Requested uploads are the requester's own files; shares point at
+  the sender's file (revoke never changes it). Claiming needs a verified email, an admin and explicit confirmation;
+  never auto-link or merge. Log every step with `exchangeAudit`; never block a recipient's submission over billing.
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and
