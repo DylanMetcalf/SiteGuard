@@ -5,6 +5,18 @@ Newest first.
 
 ---
 
+**DECISION** The product is renamed COMVERA. Customer-facing names, the logo, icons, emails, PDFs and Render service names change; internal names (database, Postgres channel and settings, test database) stay, so existing data and deployments keep working.
+**REASON** The platform will grow beyond safety files; the name and mark (an open ring closed by one node: a record completed and verified) are not tied to one product. The navy and sage palette is kept.
+**DATE** 2026-10-07
+
+**DECISION** Plan enforcement is separate from card payments: `ENFORCE_PLANS=true` turns on trials, plans, promo codes and sponsorship limits; Stripe only adds online checkout.
+**REASON** The beta needs real 14-day trials and lifetime codes for family before a payment provider is chosen.
+**DATE** 2026-10-07
+
+**DECISION** Product statistics are milestone counts per organisation (`product_events`): no user, page, IP or content, no cookies, no third-party analytics.
+**REASON** The owner needs to see what people reach (first safety file, first upload) without collecting personal information (POPIA data minimisation).
+**DATE** 2026-10-07
+
 **DECISION** Contractors pay for their own company; a mine's subscription sponsors only the contractor's file on that mine's site (`sponsorships`). Without its own plan a contractor can change only sponsored files; its own projects and other clients need a plan. Everyone starts with a 14-day trial of the full product; nothing is deleted when it ends.
 **REASON** "Free for contractors, always" gave away the product the contractor gets most value from. Sponsorship keeps the mine's workflow free for its contractors without making COMVERA free for every other client.
 **DATE** 2026-10-02

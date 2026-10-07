@@ -45,6 +45,9 @@ haven't built.
 - The platform overview (`routes/admin.ts`) is read-only, counts only, 404 unless `isPlatformAdmin`.
   The service worker (`public/sw.js`) must never cache `/api`. `/privacy` and `/terms` are drafts:
   describe real behaviour, never invent legal commitments.
+- The product name is COMVERA (internal DB/channel names still say siteguard: leave them). Plan
+  enforcement is `features.billing` (`ENFORCE_PLANS` or Stripe); card payments are `features.payments`.
+  Product statistics go through `track()` in `lib/events.ts` (no personal data).
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and

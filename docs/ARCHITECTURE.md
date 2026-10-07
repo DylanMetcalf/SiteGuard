@@ -380,6 +380,21 @@ storage), and routes in `routes/studio.ts`.
   `/for-sites`, `/pricing`, `/how-it-works`, `/contact` (SPA routes; the server serves the shell for each).
   `POST /api/contact` stores `enquiries` (rate-limited, honeypot) and emails `SUPPORT_EMAIL`.
 
+## Launch features (COMVERA)
+
+- **Brand assets**: `public/brand/` (symbol and horizontal logo, light/dark/mono SVG, PNGs, OpenGraph
+  card), `public/icons/` (app icons 16–1024, maskable icons), `public/favicon.ico`.
+- **`ENFORCE_PLANS`** (`features.billing`) vs **Stripe** (`features.payments`): trials, grants and
+  sponsorship apply with either; checkout and webhooks need Stripe.
+- **Sign-up promo codes**: `POST /api/auth/signup` accepts `promoCode`, redeemed in the same
+  transaction as the new organisation (`lib/promos.ts`); an invalid code fails the sign-up. `?code=` pre-fills it.
+- **Trial notices** (`jobs/trials.ts`, hourly): 3 days before and after the end, one email and one
+  in-app notice per organisation (deduplicated through `reminder_log`).
+- **Audit additions**: sign-in/sign-out (with IP), uploads, downloads and opening another company's
+  file, AI drafting.
+- **Product statistics** (`lib/events.ts`, table `product_events`): `track()` / `trackFirst()`, shown in
+  Platform. Failures never break the request.
+
 ## Plans, privacy pages, data export, platform overview, offline shell
 
 - **Entitlements** (`lib/entitlements.ts`): `PLAN_FEATURES` lists what each plan includes. Routes call

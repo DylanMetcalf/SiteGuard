@@ -42,7 +42,7 @@ function banners(){
   let html = '';
   if(o.isDemo) html += '<div class="banner warn"><span>'+(o.cleanDemo ? 'Your practice space — kept for 30 days. Switch between the mine and the contractor with the menu above.' : 'Demo with sample data. Switch people with the menu above.')+'</span><button class="btn small secondary" data-action="leave-demo">Create a real account</button></div>';
   if(!S.boot.me.verified) html += '<div class="banner info"><span>Confirm your email address — we sent a link to '+S.boot.me.email+'.</span><button class="btn small secondary" data-action="resend-verification">Resend</button></div>';
-  if(f.billing && !o.isDemo){
+  if(f.billing && !o.isDemo && !o.grant){
     if(isContractor() && !o.ownAccess && o.standing!=='lapsed') html += '<div class="banner info"><span>'+(o.subscriptionStatus==='trialing'?'Your trial has ended. ':'')+'Sites that sponsor you are still covered. Your own projects and other clients need a contractor plan.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="goto-more" data-view="billing">See plans</button>':'')+'</div>';
     else if(o.standing==='lapsed') html += '<div class="banner bad"><span>Read-only: '+(o.subscriptionStatus==='trialing'?'your trial has ended':'your subscription is inactive')+'. Everything stays viewable; choose a plan to keep making changes.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="goto-more" data-view="billing">Billing</button>':'')+'</div>';
     else if(o.standing==='grace') html += '<div class="banner warn"><span>We couldn\'t take your last payment. Update your card to avoid interruption.</span>'+(isOrgAdmin()?'<button class="btn small secondary" data-action="billing-portal">Update card</button>':'')+'</div>';
@@ -1034,11 +1034,13 @@ function renderBilling(){
   if(b.coupon) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">Promo code '+escapeHtml(b.coupon)+' will be applied when you subscribe.</div>';
   const current = b.plans.find(p=>p.id===b.plan);
   html += '<div class="card checkpoint"><div class="kv"><span>Current plan</span><span>'+escapeHtml(current?current.name:b.plan)+'</span></div>'
-    +'<div class="kv"><span>Status</span><span>'+(b.status==='trialing' && b.trialEndsAt ? (new Date(b.trialEndsAt) > new Date() ? 'Trial until '+timeAgo(b.trialEndsAt) : 'Trial ended '+timeAgo(b.trialEndsAt)) : escapeHtml(b.status))+'</span></div>'
+    +'<div class="kv"><span>Status</span><span>'+(b.grant ? 'Given by COMVERA' : b.status==='trialing' && b.trialEndsAt ? (new Date(b.trialEndsAt) > new Date() ? 'Trial until '+timeAgo(b.trialEndsAt) : 'Trial ended '+timeAgo(b.trialEndsAt)) : escapeHtml(b.status))+'</span></div>'
     +'<div class="kv"><span>Seats</span><span>'+b.seatsUsed+' used of '+b.seatLimit+'</span></div>'
     +(b.activeSites!==null?'<div class="kv"><span>Active sites</span><span>'+b.activeSites+(current&&current.siteLimit?' of '+current.siteLimit:'')+'</span></div>':'')
     +(b.currentPeriodEnd?'<div class="kv"><span>Renews</span><span>'+timeAgo(b.currentPeriodEnd)+'</span></div>':'')
     +(b.hasCustomer?'<button class="btn secondary block" style="margin-top:10px;" data-action="billing-portal">Payment method &amp; invoices</button>':'')+'</div>';
+  // A plan given with no end date needs nothing more from the customer.
+  if(b.grant && !b.grant.until) return html + promo;
   html += '<div class="section-title">'+(b.hasSubscription?'Change plan or seats':'Choose a plan')+'</div>';
   html += '<label class="field-label" for="billSeats">Seats</label><input type="number" id="billSeats" min="'+Math.max(1,b.seatsUsed)+'" value="'+Math.max(b.seatLimit, b.seatsUsed)+'">';
   html += b.plans.map(p=>'<div class="plan-card'+(p.id===b.plan?' current':'')+'"><div class="flexbetween"><div class="site-card-title">'+escapeHtml(p.name)+'</div>'+(p.id===b.plan && (b.ownAccess || b.status!=='trialing') ?'<span class="badge approved">Current</span>':'')+'</div>'

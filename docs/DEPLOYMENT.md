@@ -44,7 +44,7 @@ DATABASE_URL=postgres://...
 DATABASE_SSL=true
 TRUST_PROXY=true                 # behind Fly/Render/ALB, so rate limits see real client IPs
 STORAGE_DRIVER=s3
-S3_BUCKET=siteguard-documents
+S3_BUCKET=comvera-documents
 S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com   # omit for AWS S3
 S3_REGION=auto                   # or af-south-1
 S3_ACCESS_KEY_ID=...
@@ -101,7 +101,7 @@ bucket versioning or lifecycle backups if your retention policy requires them.
 docker compose up -d                    # Postgres, MinIO (+ bucket), Mailpit
 cat >> .env <<'EOF'
 STORAGE_DRIVER=s3
-S3_BUCKET=siteguard-documents
+S3_BUCKET=comvera-documents
 S3_ENDPOINT=http://localhost:9000
 S3_REGION=us-east-1
 S3_FORCE_PATH_STYLE=true

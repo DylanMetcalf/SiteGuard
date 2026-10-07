@@ -28,9 +28,9 @@ The domain comes before email because email providers need to check you own the 
 To click through COMVERA before paying for anything, deploy the free demo version:
 
 1. Sign up at **render.com** with your GitHub account.
-2. Click **New → Blueprint** and choose the `COMVERA` repository.
+2. Click **New → Blueprint** and choose your COMVERA repository on GitHub (it is still called `SiteGuard` there unless you rename it).
 3. In **Blueprint Path**, type `render.free.yaml`. There is nothing else to fill in.
-4. Click **Apply** and wait 5–10 minutes. Open the `https://siteguard-demo-xxxx.onrender.com` link.
+4. Click **Apply** and wait 5–10 minutes. Open the `https://comvera-demo-xxxx.onrender.com` link.
 5. Choose how to try it:
    - **Explore the demo**: a sample mine with contractors and documents already in it.
    - **Or start fresh with no sample data**: type your mine's name, a contractor's name and your
@@ -55,7 +55,7 @@ exactly what to create.
 1. Go to **render.com** and sign up with your **GitHub** account (the one that owns this repository).
 2. Add a payment card under **Billing**. The blueprint uses small paid plans because the free plans
    sleep when idle and delete the database after 30 days.
-3. Click **New → Blueprint**, choose the `COMVERA` repository, and click **Apply**.
+3. Click **New → Blueprint**, choose your COMVERA repository on GitHub (it is still called `SiteGuard` there unless you rename it), and click **Apply**.
 4. Render asks for a few values. **Leave them all blank for now** and continue. You'll fill them in
    during steps 2, 3 and the AI step.
 5. Wait for the first deploy to finish (5–10 minutes). Render shows a link like
@@ -64,13 +64,13 @@ exactly what to create.
 
 What Render created:
 
-- **siteguard** (web service): the app. Its region is Frankfurt, Render's closest region to South
+- **comvera** (web service): the app. Its region is Frankfurt, Render's closest region to South
   Africa (pages load in a blink; uploads take a moment longer than they would from Johannesburg).
-- **siteguard-db** (Postgres database): all your customers' records. Render backs it up.
+- **comvera-db** (Postgres database): all your customers' records. Render backs it up.
 - **uploads** (a 5 GB disk attached to the app): uploaded documents. Render snapshots it daily.
   You can grow it later with one click, but never shrink it.
 
-> Where to change settings later: open the **siteguard** service → **Environment**. Every change
+> Where to change settings later: open the **comvera** service → **Environment**. Every change
 > there restarts the app with the new value (about a minute).
 
 ## Step 3 — Domain from domains.co.za (≈ 15 minutes + waiting)
@@ -80,13 +80,13 @@ What Render created:
    rise a little.) You don't need their web hosting — Render is your hosting.
 2. Decide the app's address. We recommend **`app.yourdomain.co.za`**, which leaves the main address
    free for a marketing website later.
-3. In Render: **siteguard → Settings → Custom Domains → Add**, type `app.yourdomain.co.za`. Render
+3. In Render: **comvera → Settings → Custom Domains → Add**, type `app.yourdomain.co.za`. Render
    shows a **CNAME** record, e.g. `app` → `comvera-xxxx.onrender.com`.
 4. In domains.co.za: log in → **My Domains → your domain → DNS / Manage DNS**. Add a record:
    - Type: `CNAME`, Name/Host: `app`, Value/Target: the `…onrender.com` address Render showed you.
 5. Back in Render, click **Verify**. It can take from a few minutes to a few hours for the new
    record to spread. Render then issues the padlock (HTTPS certificate) automatically.
-6. In Render: **siteguard → Environment**, set `APP_URL` to `https://app.yourdomain.co.za` and save.
+6. In Render: **comvera → Environment**, set `APP_URL` to `https://app.yourdomain.co.za` and save.
    This makes the links in emails point to your address.
 
 ## Step 2 — Email with Resend (≈ 20 minutes + waiting)
@@ -104,14 +104,14 @@ the next plan is about $20/month for 50,000.
    Name `_dmarc`, Value `v=DMARC1; p=none; rua=mailto:you@yourdomain.co.za`.
 5. In Resend: **API Keys → Create API key** (permission: *Sending access*). Copy it — it starts
    with `re_`.
-6. In Render: **siteguard → Environment**, set:
+6. In Render: **comvera → Environment**, set:
    - `SMTP_URL` = `smtps://resend:re_YOUR_KEY_HERE@smtp.resend.com:465`
    - `EMAIL_FROM` = `COMVERA <no-reply@yourdomain.co.za>`
    - `SUPPORT_EMAIL` = your own address. When a user taps **More → Report a problem**, it lands here.
 7. Test: create a real account on your site. The confirmation email should arrive within a minute.
    (Check spam the first time and mark it "not spam".)
 
-Until `SMTP_URL` is set, emails aren't sent: they are written to Render's log (**siteguard →
+Until `SMTP_URL` is set, emails aren't sent: they are written to Render's log (**comvera →
 Logs**), which is handy for testing but not for customers.
 
 **Your own mailbox** (e.g. `you@yourdomain.co.za` to receive replies) is separate from Resend,
@@ -127,8 +127,8 @@ records don't clash with them.
 3. So the assistant can research a specific mine's published requirements: in the console, make sure
    **web search** is allowed for your organisation (under the organisation's settings/privacy
    controls). Without it, the assistant still works; it just relies on built-in knowledge.
-4. **API Keys → Create Key**, name it `siteguard-production`, and copy it (starts with `sk-ant-`).
-5. In Render: **siteguard → Environment**, set `ANTHROPIC_API_KEY` to that key and save.
+4. **API Keys → Create Key**, name it `comvera-production`, and copy it (starts with `sk-ant-`).
+5. In Render: **comvera → Environment**, set `ANTHROPIC_API_KEY` to that key and save.
 6. Check: open **More → Organisation settings**; the AI section says *AI drafting and expiry-date
    detection are on*. The assistant's header now shows an **AI** badge instead of *Built-in rules*.
 
@@ -234,7 +234,7 @@ covers.
 - **Uptime check.** In GitHub: **Settings → Secrets and variables → Actions → Variables → New
   repository variable**, name `COMVERA_URL`, value `https://app.yourdomain.co.za`. GitHub then
   checks the site every 30 minutes and emails you if it's down.
-- **Logs.** Render → **siteguard → Logs** shows what the app is doing, including any emails
+- **Logs.** Render → **comvera → Logs** shows what the app is doing, including any emails
   written to the log while email isn't set up.
 - **Compliance agent.** Runs inside the app every 15 minutes on every customer's sites, and emails
   each customer's admins a summary on Monday mornings. Nothing to set up.
@@ -245,7 +245,7 @@ covers.
 - **Backups.** Render backs up the paid database and snapshots the disk daily. Once a month, try a
   restore of the database into a new one to prove it works.
 
-- **Your platform overview.** In Render → **siteguard → Environment**, set `PLATFORM_ADMIN_EMAILS` to
+- **Your platform overview.** In Render → **comvera → Environment**, set `PLATFORM_ADMIN_EMAILS` to
   your own email address. Sign up with that address and confirm it from the email. **More → Platform**
   then shows sign-ups, plans, usage, failed emails and the latest feedback. Nobody else can see it.
 - **Privacy notice and terms.** `/privacy` and `/terms` are drafts that describe what COMVERA does.
@@ -259,7 +259,7 @@ covers.
 
 ## Sharing COMVERA with testers
 
-Send people your app's address (for example `https://siteguard.onrender.com`). They land on a page
+Send people your app's address (for example `https://comvera.onrender.com`). They land on a page
 that explains COMVERA, with three ways in:
 
 - **Create a free account**: they choose "We run a site or mine" or "We're a contractor", then
@@ -350,7 +350,7 @@ Tap **Or start fresh with no sample data**, name the prospect's mine and two of 
   summary, and merging it deploys it.
 - **Safety net:** CI runs the tests on every pull request, so a change that breaks something is
   flagged before you merge it. Render marks a deploy as failed if the app doesn't pass its health
-  check, and **siteguard → Events → Rollback** returns to the previous version with one click.
+  check, and **comvera → Events → Rollback** returns to the previous version with one click.
 
 ## Branding your documents
 
@@ -376,7 +376,7 @@ join.
 | Email links point to `localhost` or `onrender.com` | `APP_URL` not set to your domain | Set `APP_URL` in Render |
 | "AI drafting isn't configured" / *Built-in rules* badge | `ANTHROPIC_API_KEY` missing | Add it in Render → Environment |
 | Assistant says the AI service is busy | Anthropic rate limit or outage | It falls back to built-in rules automatically; try again later |
-| Site shows an error page | Deploy failed | Render → siteguard → Events shows the failed deploy and its log |
+| Site shows an error page | Deploy failed | Render → comvera → Events shows the failed deploy and its log |
 | Custom domain stuck on *Verifying* | DNS still spreading, or a typo in the CNAME | Re-check the record in domains.co.za; wait a few hours |
 | "That code isn't valid or has expired" | Code older than 14 days, a newer code was made, or the contractor already joined | Tap **Get a join code** again on the site and give them the new one |
 | A document in the bound safety file shows "not merged" | It's a Word file or a password-protected PDF | Upload a PDF version, or open the original in COMVERA |

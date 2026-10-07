@@ -259,6 +259,12 @@ docs/                      Architecture and deployment guides
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): tenancy model, permission matrix, how the UI gets its
   data, security measures, and known limits.
+- **[docs/GO_LIVE.md](docs/GO_LIVE.md): start here to put COMVERA online** — the step-by-step checklist,
+  costs, accounts, keys, and the first test with family and friends.
+- [docs/walkthrough/COMVERA-Walkthrough.pdf](docs/walkthrough/COMVERA-Walkthrough.pdf) (and
+  `docs/walkthrough/index.html`): an illustrated walkthrough of the real app, rebuilt with
+  `node scripts/walkthrough.mjs`.
+- [docs/DESKTOP.md](docs/DESKTOP.md): installing COMVERA on Windows and macOS today, and packaging it later.
 - [docs/LAUNCH_GUIDE.md](docs/LAUNCH_GUIDE.md): plain-language launch steps, costs and demo script.
 - [docs/OPERATIONS.md](docs/OPERATIONS.md): backups, recovery targets and what to do when something breaks.
 - [docs/ROADMAP.md](docs/ROADMAP.md): the COMVERA 2.0 audit and build plan, and what was built.
