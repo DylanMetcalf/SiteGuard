@@ -13,7 +13,7 @@ describe('configuration', () => {
     const c = JSON.parse(out.trim().split('\n').pop()!);
     assert.equal(c.APP_URL, 'https://siteguard-test.onrender.com');
     assert.equal(c.SUPPORT_EMAIL, undefined);
-    assert.match(c.EMAIL_FROM, /SiteGuard/);
+    assert.match(c.EMAIL_FROM, /COMVERA/);
     assert.equal(c.ANTHROPIC_API_KEY, undefined);
   });
 });

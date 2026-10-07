@@ -1,4 +1,4 @@
-/** Contractor projects: safety files a contractor builds for clients that aren't on SiteGuard. */
+/** Contractor projects: safety files a contractor builds for clients that aren't on COMVERA. */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { FastifyInstance } from 'fastify';
@@ -43,7 +43,7 @@ describe('contractor projects', () => {
     assert.equal(members.rows[0].n, 0, 'nobody can sign in to a client record');
   });
 
-  it('files documents straight away, since nobody reviews a project in SiteGuard', async () => {
+  it('files documents straight away, since nobody reviews a project in COMVERA', async () => {
     const reqs = (await con.state()).state.requirements[pid] as { id: string; name: string }[];
     const target = reqs[0];
     await con.upload(`/api/documents/${target.id}/file`, 'doc.pdf', PDF);

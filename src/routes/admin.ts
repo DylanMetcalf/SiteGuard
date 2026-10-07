@@ -25,7 +25,7 @@ function requirePlatformAdmin(req: FastifyRequest) {
 /** Platform actions on a customer's account go into that customer's own audit trail. */
 async function auditPlatform(db: import('../db/pool.js').Db, orgId: string, actor: string, action: string, detail: string) {
   await db.query(
-    `insert into audit_events (org_id, actor_name, actor_role, action, detail) values ($1, $2, 'SiteGuard platform', $3, $4)`,
+    `insert into audit_events (org_id, actor_name, actor_role, action, detail) values ($1, $2, 'COMVERA platform', $3, $4)`,
     [orgId, actor, action, detail.slice(0, 500)],
   );
 }
@@ -148,7 +148,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       if (b.plan && (!PLANS[b.plan] || PLANS[b.plan].kind !== org.kind || b.plan === 'contractor_free')) throw conflict('That plan is not for this kind of organisation.');
       const until = b.until ? `${b.until}T23:59:59+02:00` : null;
       await db.query('update organisations set grant_plan = $2, grant_until = $3, grant_source = $4 where id = $1', [id, b.plan, b.plan ? until : null, b.plan ? `admin${b.note ? ': ' + b.note : ''}` : null]);
-      await auditPlatform(db, id, ctx.user.name, b.plan ? 'Plan given by SiteGuard' : 'Plan from SiteGuard removed', b.plan ? `${PLANS[b.plan].name}${b.until ? ' until ' + b.until : ', no end date'}` : '');
+      await auditPlatform(db, id, ctx.user.name, b.plan ? 'Plan given by COMVERA' : 'Plan from COMVERA removed', b.plan ? `${PLANS[b.plan].name}${b.until ? ' until ' + b.until : ', no end date'}` : '');
       await publishChange(db, [id]);
     });
     return { ok: true };

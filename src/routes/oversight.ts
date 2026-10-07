@@ -21,7 +21,7 @@ import { sponsorFile } from '../lib/sponsorship.js';
 
 /** The standard monthly audit checklist; the auditor can add items of their own. */
 export const AUDIT_ITEMS = [
-  'Safety file is on site, current and matches SiteGuard',
+  'Safety file is on site, current and matches COMVERA',
   'Every worker on site is cleared at the gate (medical and induction)',
   'Toolbox talk held today and signed',
   'Risk assessment and method statement available and followed',

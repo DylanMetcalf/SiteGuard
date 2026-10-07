@@ -38,7 +38,7 @@ create table doc_comments (
 );
 create index doc_comments_doc_idx on doc_comments (org_id, doc_number, created_at);
 
--- A link that lets someone without a SiteGuard account review one document
+-- A link that lets someone without a COMVERA account review one document
 -- (always its latest revision). Only the token's hash is stored.
 create table review_links (
   id              uuid primary key default gen_random_uuid(),

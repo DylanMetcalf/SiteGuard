@@ -1,7 +1,7 @@
 /**
  * Document Studio blueprints. Each blueprint asks a few questions and builds a
  * complete, professionally structured document from the answers plus
- * SiteGuard's work-type knowledge. The AI (when configured) starts from this
+ * COMVERA's work-type knowledge. The AI (when configured) starts from this
  * draft and tailors it; without a key this draft is the document.
  *
  * Content is original, written to the structure SHE departments expect
@@ -83,7 +83,7 @@ const scopeText = (i: BuildInput) => v(i, 'scope', v(i, 'task', 'the work descri
 const workText = (i: BuildInput) => [scopeText(i), v(i, 'activities')].filter(Boolean).join('; ');
 const activityField: Field = {
   id: 'activities', label: 'Work activities (tick all that apply)', type: 'checks', options: WORK_PROFILES.map((p) => p.label),
-  help: 'Each activity adds its hazards, controls, PPE and permits. SiteGuard also picks them up from the scope of work.',
+  help: 'Each activity adds its hazards, controls, PPE and permits. COMVERA also picks them up from the scope of work.',
 };
 const toolsField: Field = {
   id: 'tools', label: 'Tools and equipment (tick all that will be used)', type: 'checks', options: TOOLS.map((t) => t.label),
@@ -131,7 +131,7 @@ function responsibilities(i: BuildInput, rows: [string, string][]): Section {
 
 function recordsReview(i: BuildInput, records: string[], months: number): Section[] {
   return [
-    sec('Records', bullets([...records, 'Records are kept for at least the period the client and the law require, and are available to the client on request. SiteGuard holds the electronic copy and its revision history.'])),
+    sec('Records', bullets([...records, 'Records are kept for at least the period the client and the law require, and are available to the client on request. COMVERA holds the electronic copy and its revision history.'])),
     sec('Review', para(`This document is reviewed at least every ${months} months, and immediately after an incident, a change in the work method, equipment, legislation or site requirements. Changes are recorded in the revision history.`)),
   ];
 }
@@ -285,7 +285,7 @@ const shePlan: Blueprint = {
         sec('Competence, training and medical fitness', bullets(['Every worker holds a valid medical certificate of fitness for the work.', "Every worker completes the client's site induction before starting.", 'Task-specific training and competency certificates are kept for each worker (competency matrix).', 'Daily toolbox talks cover the day\'s hazards and controls; attendance is signed.'])),
         sec('Personal protective equipment', bullets(ppeFor(scope)), para('PPE is issued free of charge and recorded on the PPE issue register.')),
         sec('Emergency preparedness', para("We follow the client's emergency response plan. Every worker knows the assembly point and emergency number."), ...emergencyBlocks(i)),
-        sec('Incident reporting', numbered(['Make the area safe and provide first aid.', 'Report the incident to the supervisor and the client immediately.', "Record it in SiteGuard the same shift and preserve the scene until released.", 'Investigate, find the root cause and implement corrective actions.', 'Report to the authorities where the law requires (OHS Act s24; MHSA on mines).'])),
+        sec('Incident reporting', numbered(['Make the area safe and provide first aid.', 'Report the incident to the supervisor and the client immediately.', "Record it in COMVERA the same shift and preserve the scene until released.", 'Investigate, find the root cause and implement corrective actions.', 'Report to the authorities where the law requires (OHS Act s24; MHSA on mines).'])),
         sec('Environmental management', bullets(['Keep work areas clean; separate and dispose of waste at designated points.', 'Store fuels and chemicals in bunded areas with spill kits available.', 'Control dust and noise; report any spill immediately.'])),
         sec('Monitoring and inspections', bullets(['Daily pre-task risk assessment and toolbox talk', 'Weekly SHE inspection by the safety officer', 'Monthly SHE report to the client', 'Planned task observations by supervisors'])),
         ...recordsReview(i, ['Risk assessments and method statements', 'Permits', 'Toolbox talk attendance', 'Inspection registers', 'Incident reports', 'Training and medical records'], 12),

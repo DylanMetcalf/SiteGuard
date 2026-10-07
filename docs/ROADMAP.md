@@ -1,6 +1,6 @@
-# SiteGuard 2.0: audit and implementation plan
+# COMVERA 2.0: audit and implementation plan
 
-This responds to the owner's 96-point "SiteGuard 2.0" brief (30 Sep 2026). The brief asks for an
+This responds to the owner's 96-point "COMVERA 2.0" brief (30 Sep 2026). The brief asks for an
 audit of what exists before anything is built. This page is that audit, and the plan built from it.
 It complements `SPEC_COVERAGE.md` (the earlier 117-point spec) and `PARKING_LOT.md` (what we
 deliberately haven't built).
@@ -26,7 +26,7 @@ deliberately haven't built).
 
 | Brief | State before this round | This round |
 |---|---|---|
-| 4–5, 8 Safety File Builder, site-specific files, guided creation | ✅ Every site has its own file. There is a six-step guide per file (company documents, people, documents SiteGuard writes, certificates, extras, check and download). *Build my safety file* writes every missing document. | Keep. Make "Build safety file" more obvious (dashboard and file page). |
+| 4–5, 8 Safety File Builder, site-specific files, guided creation | ✅ Every site has its own file. There is a six-step guide per file (company documents, people, documents COMVERA writes, certificates, extras, check and download). *Build my safety file* writes every missing document. | Keep. Make "Build safety file" more obvious (dashboard and file page). |
 | 6 Individual documents, required vs optional | 🟡 Documents can be picked individually from starter lists, but every requirement is mandatory. | 🆕 Optional requirements. Missing optional items don't block readiness or Site Ready. |
 | 7 Document states | 🟡 Missing, awaiting review, complete, expiring, expired and correction required. There is no *optional* or *not applicable*. | 🆕 Optional. Not applicable is handled by making an item optional or removing it (a site decision). |
 | 9 Studio returns to the file | ✅ "Create it in Document Studio" → attach → submit, in one flow. | — |
@@ -46,7 +46,7 @@ deliberately haven't built).
 | 31 Compliance access card | ✅ Worker QR gate cards and a public gate page with no personal details; Site Ready verification codes. | — |
 | 32 Letter of Good Standing | ✅ A company document with expiry, a validity rule, reminders and gate/readiness effects. | — |
 | 33–34 Compliance dashboard; "why?" | ✅ Readiness with "Why 78%?", the agent's findings and gate reasons. | — |
-| 35, 67–68 POPIA, legal pages, footer | 🟡 Privacy by design (last 4 ID digits, tenant isolation, append-only audit, scoped links), but no privacy/terms pages and no data export. | 🆕 Privacy and terms pages describing what SiteGuard actually does, marked for legal review; footer links; an organisation data export. |
+| 35, 67–68 POPIA, legal pages, footer | 🟡 Privacy by design (last 4 ID digits, tenant isolation, append-only audit, scoped links), but no privacy/terms pages and no data export. | 🆕 Privacy and terms pages describing what COMVERA actually does, marked for legal review; footer links; an organisation data export. |
 | 36 Security | ✅ Tested tenant isolation, CSRF, rate limits, magic-byte uploads and a CSP. Two independent reviews per round. | Review again. |
 | 37–38 Multi-tenant, roles | ✅ Owner, admin, reviewer and staff roles on each side, with multi-organisation users. | — |
 | 39–43 Self-service billing, entitlements | 🟡 Stripe works, but plan checks are scattered through the code. | 🆕 One central list of what each plan includes. |

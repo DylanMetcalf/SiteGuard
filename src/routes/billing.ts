@@ -147,7 +147,7 @@ export default async function billingRoutes(app: FastifyInstance) {
       client_reference_id: ctx.org.id,
       line_items: [{ price: plan.stripePrice, quantity: b.seats }],
       subscription_data: { metadata: { org_id: ctx.org.id } },
-      // A redeemed SiteGuard promo code applies its Stripe coupon; otherwise customers may type a Stripe promotion code.
+      // A redeemed COMVERA promo code applies its Stripe coupon; otherwise customers may type a Stripe promotion code.
       ...(coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
       success_url: appUrl('/?billing=success'),
       cancel_url: appUrl('/?billing=cancelled'),
@@ -181,7 +181,7 @@ export default async function billingRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /** Redeem a SiteGuard promo code (works on a lapsed account too: that is often why it's used). */
+  /** Redeem a COMVERA promo code (works on a lapsed account too: that is often why it's used). */
   app.post('/api/billing/redeem', rl(10), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireAdmin(ctx);

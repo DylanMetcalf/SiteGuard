@@ -2,16 +2,16 @@
  * Public privacy notice and terms of use. They describe what the software
  * actually does with data; the legal wording is deliberately left as a draft
  * for the operator's attorney (see docs/LAUNCH_GUIDE.md). Nothing here claims
- * a certification or a legal position SiteGuard has not been given.
+ * a certification or a legal position COMVERA has not been given.
  */
 import type { FastifyInstance } from 'fastify';
 import { config, features } from '../config.js';
 import { esc, page } from './share.js';
 
 const DRAFT = `<div class="card" style="border-color:var(--red)"><strong>Draft — awaiting legal review.</strong>
-<p class="sub" style="margin:4px 0 0">This page describes how the SiteGuard software handles information. The operator of this service must have it reviewed by an attorney (including for POPIA) before relying on it.</p></div>`;
+<p class="sub" style="margin:4px 0 0">This page describes how the COMVERA software handles information. The operator of this service must have it reviewed by an attorney (including for POPIA) before relying on it.</p></div>`;
 
-const FOOT = 'SiteGuard keeps records and shows their status. It does not certify legal compliance and is not legal advice. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/">Home</a>';
+const FOOT = 'COMVERA keeps records and shows their status. It does not certify legal compliance and is not legal advice. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/">Home</a>';
 
 const contact = () =>
   config.SUPPORT_EMAIL
@@ -23,13 +23,13 @@ function privacy(): string {
     'Hosting and database provider (where the service runs).',
     'File storage provider for uploaded documents.',
     features.email ? 'Email delivery provider for invitations, reminders and notifications.' : null,
-    features.billing ? 'Stripe, for subscriptions and card payments. SiteGuard never sees or stores card numbers.' : null,
+    features.billing ? 'Stripe, for subscriptions and card payments. COMVERA never sees or stores card numbers.' : null,
     features.ai ? 'Anthropic, for AI drafting and reading expiry dates, called from the server only, when someone uses an AI feature. API keys are never sent to the browser.' : null,
   ].filter(Boolean);
   return `${DRAFT}
-<div class="card"><h1>Privacy notice</h1><p class="sub">How SiteGuard handles personal information</p>
+<div class="card"><h1>Privacy notice</h1><p class="sub">How COMVERA handles personal information</p>
 <h3>Who is responsible</h3>
-<p>Each organisation (a mine, principal employer or contractor) decides what it records about its own people and projects, and is responsible for that information. The operator of this SiteGuard service processes it on their behalf. Questions: ${contact()}.</p>
+<p>Each organisation (a mine, principal employer or contractor) decides what it records about its own people and projects, and is responsible for that information. The operator of this COMVERA service processes it on their behalf. Questions: ${contact()}.</p>
 <h3>What is recorded</h3>
 <ul>
 <li><strong>Accounts:</strong> name, email address, job title and phone number if given, and a securely hashed password (never stored in readable form).</li>
@@ -54,14 +54,14 @@ function privacy(): string {
 
 function terms(): string {
   return `${DRAFT}
-<div class="card"><h1>Terms of use</h1><p class="sub">The basics of using SiteGuard</p>
-<h3>What SiteGuard is</h3>
+<div class="card"><h1>Terms of use</h1><p class="sub">The basics of using COMVERA</p>
+<h3>What COMVERA is</h3>
 <p>Software for keeping contractor safety files, site records and their review history. It shows the status of the records held in it.</p>
-<h3>What SiteGuard is not</h3>
+<h3>What COMVERA is not</h3>
 <ul>
 <li>It does not certify legal compliance and is not legal advice. Requirement lists are a starting point that each organisation must check for its own sites.</li>
 <li>Documents drafted with templates or AI are drafts. A competent person must check, sign and take responsibility for them.</li>
-<li>"Site Ready", gate clearance and readiness percentages reflect the records in SiteGuard and the approvals given by the people using it.</li>
+<li>"Site Ready", gate clearance and readiness percentages reflect the records in COMVERA and the approvals given by the people using it.</li>
 </ul>
 <h3>Your responsibilities</h3>
 <ul><li>Keep your sign-in details private and invite only people who should have access.</li><li>Upload only information you are entitled to share, and keep it accurate.</li><li>Use share links with care: anyone with the link can view what it shows until it expires or is revoked.</li></ul>

@@ -51,7 +51,7 @@ export function renderStudio(){
   const contractor = S.boot.org.kind === 'contractor';
   const ro = S.boot.org.standing === 'lapsed';
   let html = '<div class="dash-hero" style="margin-top:0;"><p class="hero-eyebrow">Document Studio</p><h1>Your documents, and the ones you still need</h1>'
-    +'<p class="greeting">Keep every document in one place, upload what you have, and let SiteGuard write the rest — branded with your logo, numbered, with revision control and sign-off blocks, as PDF and Word.'
+    +'<p class="greeting">Keep every document in one place, upload what you have, and let COMVERA write the rest — branded with your logo, numbered, with revision control and sign-off blocks, as PDF and Word.'
     +(ai ? ' AI tailors every document to the job and can research the site\'s own requirements.' : '')+' Every draft is yours to check and sign before it is used.</p>'
     +(ro ? '' : '<div class="hero-actions">'+(contractor ? '<button class="btn primary" data-action="upload-document">'+ICONS.upload+' Upload document</button>' : '')
       +'<button class="btn '+(contractor?'secondary':'primary')+'" data-action="studio-jump-templates">'+ICONS.plus+' Create document</button>'
@@ -65,7 +65,7 @@ export function renderStudio(){
 
 /* ---------- Your documents: grouped by where each one stands ---------- */
 const GROUPS = [
-  ['missing', 'Missing', 'Still needed by a site — SiteGuard can write these'],
+  ['missing', 'Missing', 'Still needed by a site — COMVERA can write these'],
   ['draft', 'Not submitted', 'Created but not yet sent to a site'],
   ['review', 'In review', 'Waiting for the site to review'],
   ['changes', 'Needs changes', 'Sent back, expired, or a newer revision to submit'],
@@ -171,7 +171,7 @@ export async function openStudioForm(bpId, ctx = {}){
     + fields.map(f=>fieldHtml(f, values[f.id])).join('')
     +(ctx.reviseOf ? '<label class="field-label" for="sf_revisionNote">What changed?</label><input type="text" id="sf_revisionNote" placeholder="e.g. Annual review; updated emergency contacts">' : '')
     +(S.boot.features.ai ? '<label class="toggle-row" style="border:none;margin-top:8px;"><span>Research the site\'s published requirements<br><span class="site-card-sub">Uses web search; takes a little longer</span></span><input type="checkbox" id="sf_research"></label>' : '')
-    +'<div class="site-card-sub" style="margin-top:10px;">'+(S.boot.features.ai ? 'SiteGuard drafts the document from its safety templates, then AI tailors it to your answers.' : 'SiteGuard writes the document from its safety templates, tailored to the work you describe.')+' Your logo, colours and document numbering are applied automatically.</div>'
+    +'<div class="site-card-sub" style="margin-top:10px;">'+(S.boot.features.ai ? 'COMVERA drafts the document from its safety templates, then AI tailors it to your answers.' : 'COMVERA writes the document from its safety templates, tailored to the work you describe.')+' Your logo, colours and document numbering are applied automatically.</div>'
     +'<button class="btn primary block" style="margin-top:12px;" data-action="studio-generate" id="studioGo">'+(ctx.reviseOf?'Create revision':'Create document')+'</button>'
     +'<div id="studioOut"></div>');
 }

@@ -1,4 +1,4 @@
-// Platform overview for the people who run this SiteGuard service (PLATFORM_ADMIN_EMAILS).
+// Platform overview for the people who run this COMVERA service (PLATFORM_ADMIN_EMAILS).
 // The server decides who may see it; this screen only shows what it returns.
 
 import { api } from './api.js';
@@ -24,7 +24,7 @@ export function renderPlatform(){
   const c = cache, u = c.usage, h = c.health;
   const kinds = Object.fromEntries(c.organisations.map(o=>[o.kind, o]));
   const host = kinds.host || {total:0,last30:0}, con = kinds.contractor || {total:0,last30:0};
-  let html = '<div class="view-head"><h1>Platform</h1><p>Everyone on this SiteGuard service · demo accounts left out</p></div>';
+  let html = '<div class="view-head"><h1>Platform</h1><p>Everyone on this COMVERA service · demo accounts left out</p></div>';
   html += '<div class="section-title">Customers</div><div class="card">'
     + stat('Mines & principal employers', host.total+' ('+host.last30+' new in 30 days)')
     + stat('Contractor companies', con.total+' ('+con.last30+' new in 30 days)')

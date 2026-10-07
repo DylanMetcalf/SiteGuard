@@ -1,7 +1,7 @@
 /**
  * Site-sponsored contractor access.
  *
- * A mine or site that subscribes to SiteGuard sponsors each contractor's file on
+ * A mine or site that subscribes to COMVERA sponsors each contractor's file on
  * its own sites: the contractor can complete that site's requirements, documents
  * and safety file without paying. The sponsorship covers that one file only. Any
  * other safety file (another client's site, the contractor's own projects) needs

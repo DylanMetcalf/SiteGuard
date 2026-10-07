@@ -1,5 +1,5 @@
 // Safety files, contractor side: one place to start or continue a safety file
-// (for a site on SiteGuard or for a private client), and to upload a document
+// (for a site on COMVERA or for a private client), and to upload a document
 // into the company library or straight into a file.
 //
 // Every safety file belongs to one site or project; company documents are
@@ -30,8 +30,8 @@ on('sfb-start', ()=>{
   const admin = isOrgAdmin() && !readOnly();
   openSheet(sheetHead('Create a safety file', 'Who is it for?')
     +'<div class="card">'
-    +(admin ? '<button class="menu-row" data-action="sfb-join"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">A site on SiteGuard</div><div class="qa-sub">The site gave you a code. Its requirements load straight in, and the site sponsors this file.</div></div>'+ICONS.chevron+'</button>'
-      +'<button class="menu-row" data-action="sfb-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">A client who isn\'t on SiteGuard</div><div class="qa-sub">Pick the documents they need, file them from your library, send a PDF or a link.</div></div>'+ICONS.chevron+'</button>'
+    +(admin ? '<button class="menu-row" data-action="sfb-join"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">A site on COMVERA</div><div class="qa-sub">The site gave you a code. Its requirements load straight in, and the site sponsors this file.</div></div>'+ICONS.chevron+'</button>'
+      +'<button class="menu-row" data-action="sfb-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">A client who isn\'t on COMVERA</div><div class="qa-sub">Pick the documents they need, file them from your library, send a PDF or a link.</div></div>'+ICONS.chevron+'</button>'
       : '<div class="site-card-sub">Ask an owner or admin of your company to start a new safety file.</div>')
     +'</div>'
     +(mine.length ? '<div class="section-title">Or continue one you\'ve started</div><div class="card">'+mine.map(row).join('')+'</div>' : '')

@@ -39,7 +39,7 @@ async function sendRequest(db: Db, ctx: OrgCtx, site: { id: string; name: string
         `${ctx.user.name} (${ctx.org.name}) sent a ${body.type} request for ${site.name}${body.dueDate ? `, due ${body.dueDate}` : ''}:`,
         body.message || body.title,
       ],
-      action: { label: 'Respond in SiteGuard', url: appUrl('/') },
+      action: { label: 'Respond in COMVERA', url: appUrl('/') },
     }));
   }
   return r.id;

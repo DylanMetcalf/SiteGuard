@@ -1,11 +1,11 @@
 /**
  * Contractor projects: a contractor builds a safety file for a client or site
- * that isn't on SiteGuard (yet). The client is a private record the contractor
+ * that isn't on COMVERA (yet). The client is a private record the contractor
  * owns (an organisation with managed_by_org set, which nobody can sign in to),
  * and the project is an ordinary safety file for that client. Everything else
  * (the guide, Document Studio, the builder, workers, the bound PDF, revisions
  * and share links) works on it unchanged. Nobody reviews a project file inside
- * SiteGuard, so submissions are filed as they are and the file never shows
+ * COMVERA, so submissions are filed as they are and the file never shows
  * "Site Ready"; the contractor sends it to the client as a PDF or a share link.
  */
 import type { FastifyInstance } from 'fastify';

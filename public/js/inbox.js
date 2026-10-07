@@ -1,5 +1,5 @@
 // In-app inbox: notifications for review requests, feedback, approvals and
-// corrections, so everything can be handled without leaving SiteGuard.
+// corrections, so everything can be handled without leaving COMVERA.
 
 import { api } from './api.js';
 import { S, ICONS, on, actions, openSheet, closeSheet, sheetHead, render, timeAgo } from './core.js';

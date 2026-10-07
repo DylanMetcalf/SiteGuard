@@ -1,4 +1,4 @@
-// SiteGuard web app entry point: boot, render, event delegation and live sync.
+// COMVERA web app entry point: boot, render, event delegation and live sync.
 
 import { api } from './api.js';
 import { S, ICONS, actions, on, reload, setRender, showToast, closeSheet, consumeSkippedPop, afterPendingBack } from './core.js';
@@ -60,7 +60,7 @@ function render(){
   if(!b){ app.innerHTML = '<div class="empty"><p>Loading…</p></div>'; return; }
   if(S.guestReviewToken){
     // Someone opening a review link: no account needed, just the document.
-    app.innerHTML = '<div class="guest-top"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div><div class="brand-tag" style="display:block;">Document review</div></div></div></div><main class="view">'+renderReview()+'</main>';
+    app.innerHTML = '<div class="guest-top"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">COMVERA</div><div class="brand-tag" style="display:block;">Document review</div></div></div></div><main class="view">'+renderReview()+'</main>';
     return;
   }
   if(!b.authenticated || S.authView){
@@ -167,7 +167,7 @@ if('serviceWorker' in navigator && location.protocol !== 'file:'){
     await reload();
     if(S.pendingToast){ showToast(S.pendingToast); S.pendingToast = null; }
   }catch(e){
-    app.innerHTML = '<div class="empty"><h3>Can\'t reach SiteGuard</h3><p>'+(e.message||'')+'</p><p>Refresh the page to try again.</p></div>';
+    app.innerHTML = '<div class="empty"><h3>Can\'t reach COMVERA</h3><p>'+(e.message||'')+'</p><p>Refresh the page to try again.</p></div>';
   }
 })();
 

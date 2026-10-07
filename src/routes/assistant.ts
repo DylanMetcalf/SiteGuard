@@ -38,7 +38,7 @@ export default async function assistantRoutes(app: FastifyInstance) {
         return await runAssistantAI(ctx, history, abort.signal);
       } catch (err) {
         if (err instanceof HttpError && err.statusCode === 429) note = err.message;
-        else if (isTransientAiError(err)) note = 'The AI service is busy right now, so this answer comes from SiteGuard\'s built-in rules.';
+        else if (isTransientAiError(err)) note = 'The AI service is busy right now, so this answer comes from COMVERA\'s built-in rules.';
         else throw err;
         req.log.warn({ err: (err as Error).message }, 'assistant fell back to offline mode');
       }

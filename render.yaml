@@ -5,7 +5,7 @@
 # See docs/LAUNCH_GUIDE.md for a step-by-step walkthrough.
 services:
   - type: web
-    name: siteguard
+    name: comvera
     runtime: node
     # Frankfurt is Render's closest region to South Africa.
     region: frankfurt
@@ -26,7 +26,7 @@ services:
         value: "22"
       - key: DATABASE_URL
         fromDatabase:
-          name: siteguard-db
+          name: comvera-db
           property: connectionString
       - key: TRUST_PROXY
         value: "true"
@@ -36,14 +36,14 @@ services:
         value: /var/data/uploads
       - key: DEMO_SANDBOX_ENABLED
         value: "true"
-      # Your address once the domain is connected, e.g. https://app.siteguard.co.za.
+      # Your address once the domain is connected, e.g. https://app.comvera.co.za.
       # Until then Render's own onrender.com address is used automatically.
       - key: APP_URL
         sync: false
       # Email, e.g. smtps://resend:YOUR_RESEND_API_KEY@smtp.resend.com:465
       - key: SMTP_URL
         sync: false
-      # e.g. SiteGuard <no-reply@siteguard.co.za> (the domain must be verified with your email provider)
+      # e.g. COMVERA <no-reply@comvera.co.za> (the domain must be verified with your email provider)
       - key: EMAIL_FROM
         sync: false
       # Your own address: "Report a problem" messages from users are emailed here.
@@ -62,10 +62,10 @@ services:
         sync: false
 
 databases:
-  - name: siteguard-db
+  - name: comvera-db
     region: frankfurt
     # Smallest paid plan (0.1 CPU, 256 MB). The free plan expires after 30 days.
     plan: 0.1c-256mb
     postgresMajorVersion: "16"
-    databaseName: siteguard
-    user: siteguard
+    databaseName: comvera
+    user: comvera

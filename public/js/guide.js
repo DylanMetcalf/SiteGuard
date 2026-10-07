@@ -1,6 +1,6 @@
 // Safety file guide (contractor side): after joining a site, a step-by-step prompt
 // that walks the contractor through everything the site asked for — company
-// documents, people, documents SiteGuard writes, uploads, anything extra — so
+// documents, people, documents COMVERA writes, uploads, anything extra — so
 // nobody has to work out what to do next.
 
 import { api } from './api.js';
@@ -34,7 +34,7 @@ export function guideCard(siteId){
   if(!p.reqs.length) return '';
   const pct = p.reqs.length ? Math.round(100 * p.handedIn / p.reqs.length) : 0;
   const next = p.fromLibrary.length ? 'Submit '+p.fromLibrary.length+' from your company documents'
-    : p.write.length ? 'SiteGuard can write '+p.write.length+' document'+(p.write.length===1?'':'s')+' for you'
+    : p.write.length ? 'COMVERA can write '+p.write.length+' document'+(p.write.length===1?'':'s')+' for you'
     : p.uploads.length ? p.uploads.length+' certificate'+(p.uploads.length===1?'':'s')+' or record'+(p.uploads.length===1?'':'s')+' to upload'
     : pct===100 ? 'Everything is handed in' : 'Keep going';
   return '<div class="card builder-card"><div class="chat-card-title">'+ICONS.sparkle+' Safety file guide</div>'
@@ -68,8 +68,8 @@ function render(siteId, fresh){
   html += step(2, peopleDone, 'Your people on this site', p.assigned.length ? p.assigned.length+' worker'+(p.assigned.length===1?'':'s')+' assigned'+(p.noMedical.length?' · <strong style="color:var(--red);">'+p.noMedical.length+' without a valid medical</strong>':' · all with a valid medical') : 'Add the people who will work here, with their medical certificates, and assign them to the site.',
     ro ? '' : '<div class="row-actions" style="margin-top:8px;"><button class="btn secondary small" data-action="assign-worker" data-site="'+siteId+'">Assign workers</button><button class="btn secondary small" data-action="new-worker">Add a worker</button></div>');
 
-  // 3. Documents SiteGuard writes
-  html += step(3, !p.write.length, 'Documents SiteGuard writes for you', p.write.length ? p.write.length+' to write — risk assessments, plans, procedures, appointments and registers, branded and numbered' : 'All written and handed in.',
+  // 3. Documents COMVERA writes
+  html += step(3, !p.write.length, 'Documents COMVERA writes for you', p.write.length ? p.write.length+' to write — risk assessments, plans, procedures, appointments and registers, branded and numbered' : 'All written and handed in.',
     p.write.length && !ro ? '<button class="btn primary small" style="margin-top:8px;" data-action="builder-open" data-site="'+siteId+'">Write them now</button>' : '');
 
   // 4. Uploads
@@ -77,7 +77,7 @@ function render(siteId, fresh){
     p.uploads.map(reqLink).join(''));
 
   // 5. Anything else
-  html += step(5, false, 'Anything else to add?', 'Add a document the site didn\'t ask for, like a lift plan or traffic management plan. If SiteGuard can write it, it will offer to.',
+  html += step(5, false, 'Anything else to add?', 'Add a document the site didn\'t ask for, like a lift plan or traffic management plan. If COMVERA can write it, it will offer to.',
     ro ? '' : '<input type="text" id="guideOther" list="guideIdeas" maxlength="200" placeholder="e.g. Lift plan for the 50 t crane" style="margin-top:8px;"><datalist id="guideIdeas">'
       + ['Lift plan','Traffic management plan','Hot work procedure','Confined space entry procedure','Fall protection plan','Lock-out / isolation procedure','Toolbox talk record','Organogram and key contacts','Environmental management plan','Emergency response plan'].map(x=>'<option value="'+x+'">').join('')+'</datalist>'
       +'<button class="btn secondary small" style="margin-top:8px;" data-action="guide-add" data-site="'+siteId+'">Add to my safety file</button>');
@@ -125,7 +125,7 @@ on('guide-add', async (el)=>{
   const req = (S.state.requirements[siteId]||[]).find(x=>x.id===r.id);
   if(req && req.blueprint){
     closeSheet();
-    showToast('Added — SiteGuard can write this for you');
+    showToast('Added — COMVERA can write this for you');
     const m = await import('./studio.js');
     setTimeout(()=>m.openStudioForm(req.blueprint, { siteId, reqId: req.id, reqName: req.name }), 250);
   } else {

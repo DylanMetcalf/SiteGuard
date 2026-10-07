@@ -39,8 +39,8 @@ async function sendVerification(db: Db, userId: string, to: string, userName: st
   );
   await queueEmail(db, {
     to,
-    subject: 'Confirm your email for SiteGuard',
-    lines: [`Hi ${userName},`, 'Confirm your email address to finish setting up your SiteGuard account. This link expires in 3 days.'],
+    subject: 'Confirm your email for COMVERA',
+    lines: [`Hi ${userName},`, 'Confirm your email address to finish setting up your COMVERA account. This link expires in 3 days.'],
     action: { label: 'Confirm email', url: appUrl(`/verify-email?token=${token}`) },
   });
 }
@@ -209,10 +209,10 @@ export default async function authRoutes(app: FastifyInstance) {
         );
         await queueEmail(db, {
           to: body.email,
-          subject: 'Reset your SiteGuard password',
+          subject: 'Reset your COMVERA password',
           lines: [
             `Hi ${user.name},`,
-            'Someone asked to reset the password for this SiteGuard account. If that was you, use the link below — it expires in 1 hour and works once.',
+            'Someone asked to reset the password for this COMVERA account. If that was you, use the link below — it expires in 1 hour and works once.',
             "If it wasn't you, ignore this email; your password hasn't changed.",
           ],
           action: { label: 'Choose a new password', url: appUrl(`/reset-password?token=${token}`) },

@@ -24,10 +24,10 @@ export function topbar(){
   const highCount = computeTasks().filter(t=>t.priority==='high').length;
   const personas = S.boot.personas;
   return '<div class="topbar"><div class="brand-row">'
-    +'<div class="brand"><button class="brand-home" data-action="nav" data-nav="dashboard" aria-label="SiteGuard — go to your dashboard" title="Dashboard" style="display:flex;align-items:center;gap:10px;"><div class="brand-mark"></div></button><div class="brand-text"><div class="brand-name">SiteGuard'+(isDemoMode()?' <span class="demo-tag">DEMO</span>':'')+'</div>'
+    +'<div class="brand"><button class="brand-home" data-action="nav" data-nav="dashboard" aria-label="COMVERA — go to your dashboard" title="Dashboard" style="display:flex;align-items:center;gap:10px;"><div class="brand-mark"></div></button><div class="brand-text"><div class="brand-name">COMVERA'+(isDemoMode()?' <span class="demo-tag">DEMO</span>':'')+'</div>'
     +'<div class="brand-tag"><span class="live-dot'+(S.live?'':' off')+'" title="'+(S.live?'Live — changes from colleagues appear automatically':'Reconnecting…')+'"></span>'+org().name+'</div></div></div>'
     +'<div class="identity">'
-    +'<button class="identity-avatar" data-action="open-assistant" aria-label="Ask the SiteGuard Assistant" title="Ask the SiteGuard Assistant" style="background:var(--brand-bg); color:var(--brand-ink);">'+ICONS.sparkle+'</button>'
+    +'<button class="identity-avatar" data-action="open-assistant" aria-label="Ask the COMVERA Assistant" title="Ask the COMVERA Assistant" style="background:var(--brand-bg); color:var(--brand-ink);">'+ICONS.sparkle+'</button>'
     +'<button class="identity-avatar" data-action="open-search" aria-label="Search" style="background:var(--paper-raised); color:var(--ink);">'+ICONS.search+'</button>'
     +(()=>{ const unread = (S.boot.inbox||{}).unread||0; return '<button class="identity-avatar" data-action="open-inbox" aria-label="Inbox'+(unread?', '+unread+' new':'')+'" style="background:var(--paper-raised); color:var(--ink); position:relative;">'+ICONS.bell+(unread?'<span class="bell-count">'+(unread>9?'9+':unread)+'</span>':highCount?'<span class="bell-dot"></span>':'')+'</button>'; })()
     +(personas && personas.length ? '<select class="persona-select" id="personaSel" aria-label="Demo persona" title="Demo persona — switches to another sample user (their real permissions apply)">'
@@ -83,8 +83,8 @@ function greeting(){
 }
 
 export const DASHBOARD_WIDGETS = {
-  contractor: [['agent','Compliance agent'],['assistant','Ask SiteGuard'],['studio','Document Studio'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
-  host: [['agent','Compliance agent'],['assistant','Ask SiteGuard'],['studio','Document Studio'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
+  contractor: [['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
+  host: [['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
 };
 const DEFAULT_WIDGETS = {
   contractor: ['agent','assistant','studio','invitations','focus','allSites','workforce','company'],
@@ -135,7 +135,7 @@ function agentWidget(){
 function renderAgent(){
   const f = (S.boot.agent || { findings: [] }).findings;
   return '<div class="view-head"><h1>Compliance agent</h1><p>'+agentStatusLine()+'</p></div>'
-    +'<div class="card"><div class="site-card-sub">SiteGuard checks every site continuously, the way a careful SHE coordinator would, and lists what needs doing, most urgent first. Items clear themselves once they\'re dealt with.</div>'
+    +'<div class="card"><div class="site-card-sub">COMVERA checks every site continuously, the way a careful SHE coordinator would, and lists what needs doing, most urgent first. Items clear themselves once they\'re dealt with.</div>'
     +'<button class="btn secondary small" style="margin-top:8px;" data-action="agent-run">Check now</button></div>'
     +(f.length ? '<div class="card">'+f.map(findingRow).join('')+'</div>' : '<div class="empty"><h3>All clear</h3><p>Nothing needs attention right now.</p></div>');
 }
@@ -148,9 +148,9 @@ function studioWidget(){
 
 function assistantWidget(){
   const hint = isContractor() ? 'e.g. What do I need for welding inside a tank at a gold mine?' : 'e.g. Safety file for electrical work on a conveyor at a coal mine';
-  return '<div class="section-title">Ask SiteGuard</div><div class="card ask-hero">'
+  return '<div class="section-title">Ask COMVERA</div><div class="card ask-hero">'
     +'<div class="site-card-sub">'+(isContractor()?'Find out what a site or job needs, check your sites, or get a document drafted.':'Describe a site or job to get its safety-file requirements and start it in one tap, or ask how your sites are doing.')+'</div>'
-    +'<div class="ask-card"><input type="text" id="askDash" placeholder="'+hint+'" aria-label="Ask SiteGuard"><button class="btn primary small" data-action="ask-dashboard">Ask</button></div></div>';
+    +'<div class="ask-card"><input type="text" id="askDash" placeholder="'+hint+'" aria-label="Ask COMVERA"><button class="btn primary small" data-action="ask-dashboard">Ask</button></div></div>';
 }
 
 /** First-run checklist for site owners; disappears once the core loop has happened once. */
@@ -203,13 +203,13 @@ function welcomeCard(){
   let dismissed = false; try{ dismissed = localStorage.getItem('sg_welcome_done_'+org().id) === '1'; }catch{ /* private mode */ }
   if(dismissed) return '';
   const opt = (action, icon, title, sub, extra) => '<button class="qa-item welcome-opt" data-action="'+action+'"'+(extra||'')+'><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
-  return '<div class="welcome"><h2>Welcome to SiteGuard</h2><p class="greeting">What would you like to do first?</p>'
+  return '<div class="welcome"><h2>Welcome to COMVERA</h2><p class="greeting">What would you like to do first?</p>'
     + (isContractor()
-      ? opt('sfb-start', ICONS.passport, 'Build my first safety file', 'For a site on SiteGuard or for any client')
+      ? opt('sfb-start', ICONS.passport, 'Build my first safety file', 'For a site on COMVERA or for any client')
         + opt('join-site', ICONS.link, 'Join a site', 'You have a code from a mine or site')
       : opt('new-site', ICONS.sites, 'Set up my first site', 'Choose what every contractor\'s safety file must contain'))
     + opt('goto-more', ICONS.gear, 'Set up my company', 'Company details and logo for your documents', ' data-view="settings"')
-    + opt('start-tour', ICONS.sparkle, 'Explore SiteGuard', 'A two-minute guided tour of every page')
+    + opt('start-tour', ICONS.sparkle, 'Explore COMVERA', 'A two-minute guided tour of every page')
     + '<button class="linkish" style="margin-top:8px;" data-action="welcome-skip">Skip — show me the dashboard</button></div>';
 }
 on('welcome-skip', ()=>{ try{ localStorage.setItem('sg_welcome_done_'+org().id, '1'); }catch{ /* private mode */ } render(); });
@@ -359,7 +359,7 @@ function renderSitesList(){
   const nWp = Object.keys(S.state.workplaces||{}).length;
   let html = '<div class="view-head"><div class="flexbetween"><h1>'+(isContractor()?'Safety files':'Sites')+'</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')
     +(isContractor() ? buildButton('small') : '')+'</div>'
-    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : 'One safety file per site or client, built from your company documents · '+sites.length+' on SiteGuard sites · '+projectList.length+' for your own clients')+'</p></div>';
+    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : 'One safety file per site or client, built from your company documents · '+sites.length+' on COMVERA sites · '+projectList.length+' for your own clients')+'</p></div>';
   if(isHost() && nWp){
     html += ((nWp + sites.length) > 3 || searching('sites') ? searchBox('sites', 'Search sites, locations or contractors') : '')
       + '<div class="section-title">Sites contractors join with a code</div>' + (workplaceCards() || '<div class="list-empty">No site matches.</div>');
@@ -367,8 +367,8 @@ function renderSitesList(){
     html += '<div class="section-title">Single-contractor jobs</div>';
     return html + sites.filter(s=>matchSearch('sites', s.name, s.location, (contractorOf(s)||{}).name)).map(portfolioRow).join('');
   }
-  if(!sites.length && projectList.length) return html + '<div class="section-title">Sites on SiteGuard</div><div class="card"><div class="site-card-sub">When a site on SiteGuard gives you a code or invites you, its file appears here.</div>'+(isOrgAdmin()&&!readOnly()?'<button class="btn secondary small" style="margin-top:8px;" data-action="join-site">Join a site with a code</button>':'')+'</div>' + projectsHtml;
-  if(!sites.length) return html + (isContractor() ? '<div class="section-title">Sites on SiteGuard</div>' : '') + '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()&&!readOnly()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>' + projectsHtml;
+  if(!sites.length && projectList.length) return html + '<div class="section-title">Sites on COMVERA</div><div class="card"><div class="site-card-sub">When a site on COMVERA gives you a code or invites you, its file appears here.</div>'+(isOrgAdmin()&&!readOnly()?'<button class="btn secondary small" style="margin-top:8px;" data-action="join-site">Join a site with a code</button>':'')+'</div>' + projectsHtml;
+  if(!sites.length) return html + (isContractor() ? '<div class="section-title">Sites on COMVERA</div>' : '') + '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()&&!readOnly()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>' + projectsHtml;
   const kind = (s)=>s.status==='site_ready'?'ready':s.status==='invited'?'invited':s.status==='declined'?'declined':'progress';
   const attention = (s)=>{ if(s.status!=='in_progress') return false; const st = siteSubmissionStatus(s.id); return st==='changes_required' || (isHost() ? st==='under_review' || st==='ready_to_approve' : st!=='under_review'); };
   const base = sites.filter(s=>matchSearch('sites', s.name, s.location, s.hostName, (contractorOf(s)||{}).name));
@@ -378,7 +378,7 @@ function renderSitesList(){
   html += (sites.length > 3 || searching('sites') ? searchBox('sites', isHost()?'Search sites, locations or contractors':'Search sites, locations or mines') : '')
     + '<div class="filter-chips">'+chips.map(([k,l])=>'<button class="site-picker-chip'+(f===k?' active':'')+'" data-action="sites-filter" data-filter="'+k+'">'+l+'<b>'+base.filter(tests[k]).length+'</b></button>').join('')+'</div>';
   const shown = base.filter(tests[f]);
-  return html + (isContractor() ? '<div class="section-title">Sites on SiteGuard</div>' : '') + (shown.length ? shown.map(portfolioRow).join('') : '<div class="list-empty">'+(searching('sites') ? 'No site matches “'+escapeHtml(S.search.sites)+'”.' : 'No sites in this view.')+'</div>') + projectsHtml;
+  return html + (isContractor() ? '<div class="section-title">Sites on COMVERA</div>' : '') + (shown.length ? shown.map(portfolioRow).join('') : '<div class="list-empty">'+(searching('sites') ? 'No site matches “'+escapeHtml(S.search.sites)+'”.' : 'No sites in this view.')+'</div>') + projectsHtml;
 }
 on('passport-filter', (el)=>{ S.passportFilter = el.dataset.filter; S.keepScroll = true; render(); S.keepScroll = false; });
 on('sites-filter', (el)=>{ S.sitesFilter = el.dataset.filter; S.keepScroll = true; render(); S.keepScroll = false; });
@@ -761,7 +761,7 @@ function renderContractorsList(){
     : sort==='reliability' ? (a,b)=>b.c.reliability-a.c.reliability
     : (a,b)=>(b.sum.awaiting*2+b.sum.outstanding)-(a.sum.awaiting*2+a.sum.outstanding) || unescapeHtml(a.c.name).localeCompare(unescapeHtml(b.c.name)));
   html += searchBox('contractors', 'Search by name, trade, registration, contact or site');
-  html += '<div class="filter-chips">'+[['all','All'],['review','Awaiting your review'],['outstanding','Documents outstanding'],['joined','On SiteGuard'],['pending','Not yet joined']]
+  html += '<div class="filter-chips">'+[['all','All'],['review','Awaiting your review'],['outstanding','Documents outstanding'],['joined','On COMVERA'],['pending','Not yet joined']]
     .map(([k,l])=>'<button class="site-picker-chip'+(f===k?' active':'')+'" data-action="contractor-filter" data-filter="'+k+'">'+l+'<b>'+counts[k]+'</b></button>').join('')+'</div>';
   html += '<div class="list-tools">'
     +'<label>Trade <select class="field" data-action-change="contractor-trade"><option value="">All trades</option>'+trades.map(t=>'<option'+(t===trade?' selected':'')+'>'+t+'</option>').join('')+'</select></label>'
@@ -789,7 +789,7 @@ on('open-contractor', (el)=>{
   if(!c) return;
   const sum = contractorSummary(c);
   const row = (k, v)=>'<div class="kv"><span>'+k+'</span><strong>'+(v||'—')+'</strong></div>';
-  openSheet(sheetHead(c.name, c.linked ? 'On SiteGuard — details kept up to date by '+c.name : 'Not yet joined SiteGuard')
+  openSheet(sheetHead(c.name, c.linked ? 'On COMVERA — details kept up to date by '+c.name : 'Not yet joined COMVERA')
     +'<div class="card">'+row('Trade / specialisation', c.trade)+row('Registration no.', c.reg)+row('COID no.', c.coid)+row('Contact', c.contact)+row('Email', c.contactEmail && !/\.invalid$/.test(c.contactEmail) ? '<a href="mailto:'+c.contactEmail+'">'+c.contactEmail+'</a>' : '')+(c.address?row('Address', c.address):'')
       +row('Reliability', c.reliability>0 ? c.reliability+'% (first-time-right '+c.firstTimeRightRate+'%'+(c.onTimeRate?', on time '+c.onTimeRate+'%':'')+')' : 'Not enough submissions yet')
       +row('Workers on your sites', String(sum.workers))+'</div>'
@@ -798,7 +798,7 @@ on('open-contractor', (el)=>{
         return '<div class="reqrow" data-action="contractor-site" data-site="'+s.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main"><div class="reqrow-name">'+s.name+'</div><div class="reqrow-meta"><span class="badge '+(s.status==='site_ready'?'complete':s.status==='invited'?'grey':'awaiting_review')+'">'+(s.status==='site_ready'?'Site Ready':s.status==='invited'?'Invited':s.status==='declined'?'Declined':pct+'% ready')+'</span></div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>'; }).join('')+'</div>'
       : '<div class="list-empty">No sites yet.</div>')
     +(c.linked
-      ? '<div class="notice" style="margin-top:12px;">'+c.name+' manages its own company details in SiteGuard, so they can\'t be changed here. That keeps the record accurate and shows who is responsible for it.</div>'
+      ? '<div class="notice" style="margin-top:12px;">'+c.name+' manages its own company details in COMVERA, so they can\'t be changed here. That keeps the record accurate and shows who is responsible for it.</div>'
       : (isOrgAdmin() && !readOnly() ? '<button class="btn secondary block" style="margin-top:12px;" data-action="edit-contractor" data-id="'+c.id+'">Correct invitation details</button><div class="site-card-sub" style="margin-top:6px;">You can correct the name or email you invited them with until they join. After that, they keep their own details up to date.</div>' : ''))
     + suspendControls(c));
 });
@@ -811,13 +811,13 @@ function renderMore(){
   let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div>'
     +'<button class="tour-cta" data-action="start-tour"><span class="tour-cta-ic">'+ICONS.sparkle+'</span><span><strong>Walkthrough</strong><span class="site-card-sub">A guided tour of every page, with auto-play for demos</span></span>'+ICONS.chevron+'</button>'
     +'<div class="card">';
-  if(isContractor() && !readOnly()) html += '<button class="menu-row" data-action="sfb-start"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">Create a safety file</div><div class="qa-sub">For a site on SiteGuard or any client</div></div>'+ICONS.chevron+'</button>';
+  if(isContractor() && !readOnly()) html += '<button class="menu-row" data-action="sfb-start"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">Create a safety file</div><div class="qa-sub">For a site on COMVERA or any client</div></div>'+ICONS.chevron+'</button>';
   html += item('studio', ICONS.passport, 'Document Studio', 'Your documents, plus branded safety documents as PDF and Word');
-  if(isContractor() && isOrgAdmin() && !readOnly()) html += '<button class="menu-row" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">New project</div><div class="qa-sub">A safety file for a client who isn\'t on SiteGuard</div></div>'+ICONS.chevron+'</button>';
+  if(isContractor() && isOrgAdmin() && !readOnly()) html += '<button class="menu-row" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">New project</div><div class="qa-sub">A safety file for a client who isn\'t on COMVERA</div></div>'+ICONS.chevron+'</button>';
   if(isContractor() && isOrgAdmin()) html += '<button class="menu-row" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Join a site with a code</div><div class="qa-sub">Type the code the site gave you</div></div>'+ICONS.chevron+'</button>';
   const nf = (S.boot.agent||{findings:[]}).findings.length;
   html += item('agent', ICONS.verify, 'Compliance agent', nf ? nf+' item'+(nf===1?'':'s')+' need attention' : 'Continuous checks across every site');
-  html += '<button class="menu-row" data-action="open-assistant"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">SiteGuard Assistant</div><div class="qa-sub">Ask what a site or job needs, or how your sites are doing</div></div>'+ICONS.chevron+'</button>';
+  html += '<button class="menu-row" data-action="open-assistant"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">COMVERA Assistant</div><div class="qa-sub">Ask what a site or job needs, or how your sites are doing</div></div>'+ICONS.chevron+'</button>';
   if(isHost()) html += item('safety', ICONS.alert, 'Safety Centre', 'Open incidents and permits across every site');
   html += item('workforce', ICONS.hardhat, 'Workforce', isContractor()?'Your workers\' medicals, inductions and training':'Contractor workers assigned to your sites');
   html += item('appointments', ICONS.passport, 'Appointments register', 'Statutory appointments and their letters');
@@ -831,8 +831,8 @@ function renderMore(){
   if(S.boot.me.platformAdmin) html += item('platform', ICONS.dashboard, 'Platform', 'Sign-ups, plans, usage and health across the service');
   html += '</div><div class="section-title">Account</div><div class="card">'
     +'<button class="menu-row" data-action="open-profile"><div class="qa-icon">'+initials(myName())+'</div><div style="flex:1;"><div class="qa-title">'+myName()+'</div><div class="qa-sub">'+S.boot.me.email+'</div></div>'+ICONS.chevron+'</button>'
-    +'<button class="menu-row" data-action="open-feedback"><div class="qa-icon">'+ICONS.alert+'</div><div style="flex:1;"><div class="qa-title">Report a problem or suggest an idea</div><div class="qa-sub">Goes straight to the SiteGuard team</div></div>'+ICONS.chevron+'</button>'
-    +'<a class="menu-row" href="/privacy" target="_blank" rel="noopener"><div class="qa-icon">'+ICONS.verify+'</div><div style="flex:1;"><div class="qa-title">Privacy &amp; terms</div><div class="qa-sub">How SiteGuard handles your information</div></div>'+ICONS.chevron+'</a>'
+    +'<button class="menu-row" data-action="open-feedback"><div class="qa-icon">'+ICONS.alert+'</div><div style="flex:1;"><div class="qa-title">Report a problem or suggest an idea</div><div class="qa-sub">Goes straight to the COMVERA team</div></div>'+ICONS.chevron+'</button>'
+    +'<a class="menu-row" href="/privacy" target="_blank" rel="noopener"><div class="qa-icon">'+ICONS.verify+'</div><div style="flex:1;"><div class="qa-title">Privacy &amp; terms</div><div class="qa-sub">How COMVERA handles your information</div></div>'+ICONS.chevron+'</a>'
     +'<button class="menu-row" data-action="auth-signout"><div class="qa-icon">⎋</div><div><div class="qa-title">Sign out</div></div></button></div>';
   return html;
 }
@@ -911,7 +911,7 @@ function renderAppointments(){
   if(all.length > 3 || searching('appointments')) html += searchBox('appointments', 'Search by person, appointment or company');
   html += '<div class="section-title">'+org().name+'</div>' + (own.length ? '<div class="card">'+own.map(appointmentRow).join('')+'</div>' : '<div class="card"><div class="site-card-sub">No appointments recorded yet.</div></div>');
   if(others.length) html += '<div class="section-title">Other organisations on your sites</div><div class="card">'+others.map(appointmentRow).join('')+'</div>';
-  html += '<div class="notice" style="margin-top:12px;">SiteGuard records appointments; it doesn\'t decide which ones your operation legally needs. Confirm requirements with your legal or SHE advisor.</div>';
+  html += '<div class="notice" style="margin-top:12px;">COMVERA records appointments; it doesn\'t decide which ones your operation legally needs. Confirm requirements with your legal or SHE advisor.</div>';
   return html;
 }
 
@@ -957,7 +957,7 @@ function renderShareLinks(){
 /* ---- Verify ---- */
 function renderVerify(){
   const approved = Object.entries(S.state.approvals);
-  let html = '<div class="view-head"><h1>Verify</h1><p>Check a SiteGuard Site Ready record. Anyone can verify a code at /verify/&lt;code&gt; — no account needed.</p></div>'
+  let html = '<div class="view-head"><h1>Verify</h1><p>Check a COMVERA Site Ready record. Anyone can verify a code at /verify/&lt;code&gt; — no account needed.</p></div>'
     +'<div class="card"><label class="field-label" for="verifyCode">Verification code</label><input type="text" id="verifyCode" placeholder="e.g. SG-2026-7K4M2QXA">'
     +'<button class="btn primary block" style="margin-top:10px;" data-action="verify-code">Check code</button></div>';
   if(!approved.length) return html + '<div class="empty"><h3>No Site Ready records yet</h3><p>Approved sites will be listed here.</p></div>';
@@ -1029,7 +1029,7 @@ function renderBilling(){
   if(!b.enabled){
     return html + '<div class="card"><div class="site-card-sub">Billing isn\'t configured on this server (no Stripe keys), so every organisation has full access. Set STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and the plan price IDs to turn on plans, trials and seat limits.</div></div>';
   }
-  if(b.grant) html += '<div class="card checkpoint"><div class="site-card-title">'+escapeHtml(b.grant.plan)+' — given by SiteGuard</div><div class="site-card-sub">'+(b.grant.until ? 'Until '+escapeHtml(String(b.grant.until).slice(0,10))+'.' : 'No end date.')+' No payment needed while this lasts.</div></div>';
+  if(b.grant) html += '<div class="card checkpoint"><div class="site-card-title">'+escapeHtml(b.grant.plan)+' — given by COMVERA</div><div class="site-card-sub">'+(b.grant.until ? 'Until '+escapeHtml(String(b.grant.until).slice(0,10))+'.' : 'No end date.')+' No payment needed while this lasts.</div></div>';
   else if(isContractor() && !b.ownAccess) html += '<div class="notice">'+(b.sponsored ? 'You have no plan of your own. Sites that sponsor you are covered; your own projects and other clients need a contractor plan.' : 'You have no plan of your own and no site is sponsoring you right now. Everything stays readable; choose a plan to keep working.')+'</div>';
   if(b.coupon) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">Promo code '+escapeHtml(b.coupon)+' will be applied when you subscribe.</div>';
   const current = b.plans.find(p=>p.id===b.plan);
@@ -1075,18 +1075,18 @@ function renderSettings(){
     +(ro?'':'<button class="btn secondary small" style="margin-top:8px;" data-action="save-reminder-days">Save reminder days</button>')
     +'<div class="site-card-sub" style="margin-top:10px;">Invitations, correction requests, requests for information, permit requests and serious incidents are always emailed.</div></div>';
   if(isHost()){
-    html += '<div class="section-title">InspectX integration</div><div class="card"><div class="site-card-sub" style="margin-bottom:10px;">SiteGuard works fully without InspectX. Once enabled, inspections with an external reference link straight across.</div>'
+    html += '<div class="section-title">InspectX integration</div><div class="card"><div class="site-card-sub" style="margin-bottom:10px;">COMVERA works fully without InspectX. Once enabled, inspections with an external reference link straight across.</div>'
       +'<div class="toggle-row"><label for="inspectxToggle">Enable InspectX links</label><input type="checkbox" id="inspectxToggle" '+(s.inspectxEnabled?'checked':'')+'></div>'
       +'<label class="field-label" for="inspectxUrl">InspectX base URL</label><input type="url" id="inspectxUrl" value="'+(s.inspectxBaseUrl||'')+'" placeholder="https://app.inspectx.example/i/">'
       +(ro?'':'<button class="btn secondary block" style="margin-top:10px;" data-action="save-integration">Save</button>')+'</div>';
   }
-  html += '<div class="section-title">Your data</div><div class="card"><div class="site-card-sub">Download everything '+o.name+' can see in SiteGuard — company details, team, sites and files, document records and the audit trail — as one file you can keep or move elsewhere. Uploaded documents are listed, not included; download those from each file.</div>'
+  html += '<div class="section-title">Your data</div><div class="card"><div class="site-card-sub">Download everything '+o.name+' can see in COMVERA — company details, team, sites and files, document records and the audit trail — as one file you can keep or move elsewhere. Uploaded documents are listed, not included; download those from each file.</div>'
     +'<a class="btn secondary small" style="margin-top:10px;" href="/api/org/export" download>Download our data</a>'
     +'<div class="site-card-sub" style="margin-top:8px;"><a href="/privacy" target="_blank" rel="noopener">Privacy notice</a> · <a href="/terms" target="_blank" rel="noopener">Terms of use</a></div></div>';
   html += '<div class="section-title">AI drafting</div><div class="card"><div class="site-card-sub">'
-    +(S.boot.features.ai ? 'AI drafting and expiry-date detection are on. Requests go through SiteGuard\'s server — no API key is ever stored in your browser.'
+    +(S.boot.features.ai ? 'AI drafting and expiry-date detection are on. Requests go through COMVERA\'s server — no API key is ever stored in your browser.'
       : S.boot.features.aiConfigured ? 'AI drafting is included in '+(isContractor()?'Contractor Pro':'Site Professional')+'. Upgrade under Plan &amp; billing to turn it on.'
-      : 'No AI key is configured, so drafting and the assistant use SiteGuard\'s built-in templates and rules. Add ANTHROPIC_API_KEY on the server to switch on AI.')+'</div></div>';
+      : 'No AI key is configured, so drafting and the assistant use COMVERA\'s built-in templates and rules. Add ANTHROPIC_API_KEY on the server to switch on AI.')+'</div></div>';
   return html;
 }
 
@@ -1157,7 +1157,7 @@ export function exportSafetyFile(siteId){
     siteAudit.forEach(a=>{ html += '<tr><td>'+dateTime(a.ts)+'</td><td>'+a.actor+' ('+a.role+')</td><td>'+a.action+'</td><td>'+a.detail+'</td></tr>'; });
     html += '</table>';
   }
-  html += '<div class="p-foot">Generated by SiteGuard. This export reflects the digital record at the time of export; the platform record is the source of truth. This document does not itself constitute a guarantee of legal compliance.</div>';
+  html += '<div class="p-foot">Generated by COMVERA. This export reflects the digital record at the time of export; the platform record is the source of truth. This document does not itself constitute a guarantee of legal compliance.</div>';
   printHtml(html);
 }
 
@@ -1240,7 +1240,7 @@ on('export-bundle', (el)=>{
     +(site.project && isOrgAdmin() && !readOnly() ? arrangeHtml(siteId) : '')
     +'<div class="row-actions" style="margin-top:12px;"><button class="btn primary" style="flex:1;" data-action="safety-file-download" data-site="'+siteId+'">'+(gaps?'Download with the gaps listed':'Download the safety file')+'</button>'
     +'<button class="btn secondary" data-action="safety-file-download" data-preview="1" data-site="'+siteId+'">Preview</button></div>'
-    +(!readOnly() && (isContractor() ? isOrgAdmin() : canReview()) ? '<button class="btn secondary block" style="margin-top:8px;" data-action="'+(site.project?'project-send':'new-share-link')+'" data-site="'+siteId+'">'+(site.project?'Send to '+site.hostName:'Share with someone outside SiteGuard')+'</button>' : '')
+    +(!readOnly() && (isContractor() ? isOrgAdmin() : canReview()) ? '<button class="btn secondary block" style="margin-top:8px;" data-action="'+(site.project?'project-send':'new-share-link')+'" data-site="'+siteId+'">'+(site.project?'Send to '+site.hostName:'Share with someone outside COMVERA')+'</button>' : '')
     +(gaps && isContractor() ? '<button class="btn secondary block" style="margin-top:8px;" data-action="guide-open" data-site="'+siteId+'">Fill the gaps first</button>' : ''));
 });
 /** Your own project file: the order documents appear in the PDF. */
@@ -1305,11 +1305,11 @@ on('audit-export', async ()=>{
     const rows = deepEscape((await api.get('/api/audit?'+q)).events);
     const rangeLabel = (f.from||f.to) ? (f.from||'earliest')+' to '+(f.to||'now') : 'complete history';
     const siteLabel = f.siteId && S.state.sites[f.siteId] ? S.state.sites[f.siteId].name : 'all sites';
-    printHtml('<h1>SiteGuard Audit Trail</h1><div class="p-sub">'+org().name+' · '+siteLabel+' · '+rangeLabel+'</div>'
+    printHtml('<h1>COMVERA Audit Trail</h1><div class="p-sub">'+org().name+' · '+siteLabel+' · '+rangeLabel+'</div>'
       +'<div class="p-sub">Exported '+new Date().toLocaleString('en-ZA')+' by '+myName()+', '+S.boot.me.roleLabel+'</div>'
       +'<table><tr><th>Date</th><th>Actor</th><th>Role</th><th>Action</th><th>Detail</th></tr>'
       + rows.map(a=>'<tr><td>'+dateTime(a.ts)+'</td><td>'+a.actor+'</td><td>'+a.role+'</td><td>'+a.action+'</td><td>'+a.detail+'</td></tr>').join('')
-      +'</table><div class="p-foot">Generated by SiteGuard — this export reflects the audit record at the time of export; the platform record remains the source of truth.</div>');
+      +'</table><div class="p-foot">Generated by COMVERA — this export reflects the audit record at the time of export; the platform record remains the source of truth.</div>');
   }catch(e){ showToast(e.message); }
 });
 on('invite-user', async (el)=>{

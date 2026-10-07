@@ -32,7 +32,7 @@ describe('organisation data export', () => {
   it('gives an admin their own organisation only, without secrets, and records it', async () => {
     const r = await host.req('GET', '/api/org/export');
     assert.equal(r.status, 200);
-    assert.match(String(r.raw.headers['content-disposition']), /siteguard-export-\d{4}-\d{2}-\d{2}\.json/);
+    assert.match(String(r.raw.headers['content-disposition']), /comvera-export-\d{4}-\d{2}-\d{2}\.json/);
     const text = r.raw.body;
     const data = JSON.parse(text);
     assert.equal(data.organisation.name, 'Omicron Mining');

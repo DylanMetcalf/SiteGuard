@@ -408,7 +408,7 @@ function renderReportIncidentSheet(siteId){
     +'<label class="field-label" for="incDescription">What happened?</label><textarea id="incDescription" placeholder="Describe what happened, where, and how it was discovered"></textarea>'
     +'<label class="field-label" for="incActions">Immediate actions taken</label><textarea id="incActions" placeholder="First aid given, area isolated, work stopped, etc."></textarea>'
     +'<button class="btn danger block" style="margin-top:12px;" data-action="save-incident" data-site="'+siteId+'">Report incident</button>'
-    +'<div class="notice" style="margin-top:10px;">Serious incidents (lost time injury, fatality) may carry statutory reporting obligations (e.g. Section 11/24 under the MHSA) outside of SiteGuard — this logs your internal record and alerts the site team, it doesn\'t submit anything to a regulator.</div>';
+    +'<div class="notice" style="margin-top:10px;">Serious incidents (lost time injury, fatality) may carry statutory reporting obligations (e.g. Section 11/24 under the MHSA) outside of COMVERA — this logs your internal record and alerts the site team, it doesn\'t submit anything to a regulator.</div>';
 }
 on('report-incident', (el)=>openSheet(renderReportIncidentSheet(el.dataset.site)));
 on('save-incident', async (el)=>{
@@ -526,8 +526,8 @@ on('close-permit', async (el)=>{
 /* ============ AI DRAFTING (via the server proxy) ============ */
 const DRAFT_TYPES = ['Site-specific risk assessment','Method statement','Toolbox talk record','Emergency response plan','Daily site diary template'];
 function draftModeNote(){
-  if(S.boot.features.ai) return 'Your company details from Organisation settings go into the header. Drafting runs on SiteGuard\'s server — no API key in your browser.';
-  return 'Template mode: SiteGuard builds a structured draft from your description, with hazards and controls for the work you describe. '
+  if(S.boot.features.ai) return 'Your company details from Organisation settings go into the header. Drafting runs on COMVERA\'s server — no API key in your browser.';
+  return 'Template mode: COMVERA builds a structured draft from your description, with hazards and controls for the work you describe. '
     +(S.boot.features.aiConfigured
       ? 'AI-written drafts are included in '+(isContractor()?'Contractor Pro':'Site Professional')+'.'
       : 'AI-written drafts switch on once your administrator adds an AI key.');
@@ -785,7 +785,7 @@ on('save-reassign', async (el)=>{
 });
 on('edit-contractor', (el)=>{
   const c = S.state.contractors[el.dataset.id];
-  openSheet(sheetHead('Contractor details', c.linked?'This company is on SiteGuard':'Not yet joined')
+  openSheet(sheetHead('Contractor details', c.linked?'This company is on COMVERA':'Not yet joined')
     +'<label class="field-label" for="ecName">Company name</label><input type="text" id="ecName" value="'+c.name+'">'
     +'<label class="field-label" for="ecTrade">Trade</label><input type="text" id="ecTrade" value="'+(c.trade||'')+'">'
     +'<label class="field-label" for="ecContact">Contact person</label><input type="text" id="ecContact" value="'+(c.contact||'')+'">'
@@ -866,7 +866,7 @@ function workerForm(w){
     +'<label class="field-label" for="wOcc">Occupation</label><input type="text" id="wOcc" value="'+(w.occupation||'')+'" placeholder="e.g. Electrician, Rigger, Safety officer">'
     +'<label class="field-label" for="wEmp">Employee number (optional)</label><input type="text" id="wEmp" value="'+(w.employeeNo||'')+'">'
     +'<label class="field-label" for="wId">Last 4 characters of ID / passport (optional)</label><input type="text" id="wId" maxlength="4" value="'+(w.idLast4||'')+'" inputmode="text">'
-    +'<div class="site-card-sub" style="margin-top:4px;">SiteGuard deliberately doesn\'t store full ID numbers (POPIA) — the last 4 are enough to match someone at the gate.</div>'
+    +'<div class="site-card-sub" style="margin-top:4px;">COMVERA deliberately doesn\'t store full ID numbers (POPIA) — the last 4 are enough to match someone at the gate.</div>'
     +'<label class="field-label" for="wPhone">Phone (optional)</label><input type="tel" id="wPhone" value="'+(w.phone||'')+'">';
 }
 const readWorker = () => ({ fullName: (val('wName')), occupation: (val('wOcc')), employeeNo: (val('wEmp')), idLast4: val('wId'), phone: val('wPhone') });
@@ -1162,7 +1162,7 @@ on('send-feedback', async (el)=>{
   const message = val('fbMessage');
   if(message.length < 3){ document.getElementById('fbMessage').focus(); return; }
   const view = [S.nav, S.moreView, S.siteTab].filter(Boolean).join('/');
-  if(await act(()=>api.post('/api/feedback', { kind: val('fbKind'), message, context: { view, userAgent: navigator.userAgent.slice(0,400) } }), 'Thanks — sent to the SiteGuard team', el)) closeSheet();
+  if(await act(()=>api.post('/api/feedback', { kind: val('fbKind'), message, context: { view, userAgent: navigator.userAgent.slice(0,400) } }), 'Thanks — sent to the COMVERA team', el)) closeSheet();
 });
 
 /* ============ JOIN CODES ============ */
@@ -1172,7 +1172,7 @@ on('join-code', async (el)=>{
     const r = await api.post('/api/sites/'+el.dataset.site+'/join-code');
     openSheet(sheetHead('Join code', escapeHtml(r.siteName))
       +'<div class="join-code" aria-label="Join code">'+escapeHtml(r.code)+'</div>'
-      +'<p class="site-card-sub" style="text-align:center;">Give this to the contractor. In SiteGuard they tap <strong>Join a site with a code</strong> and type it in — they\'re connected straight away. It works for '+r.expiresInDays+' days, and making a new code cancels this one.</p>'
+      +'<p class="site-card-sub" style="text-align:center;">Give this to the contractor. In COMVERA they tap <strong>Join a site with a code</strong> and type it in — they\'re connected straight away. It works for '+r.expiresInDays+' days, and making a new code cancels this one.</p>'
       +'<button class="btn secondary block" style="margin-top:12px;" data-action="copy-join-code" data-code="'+escapeHtml(r.code)+'">Copy code</button>');
   }catch(e){ showToast(e.message); }
   el.disabled = false;

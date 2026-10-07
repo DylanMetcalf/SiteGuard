@@ -11,7 +11,7 @@ let ops: Agent, con: Agent, con2: Agent, mine: Agent, conOrg: string;
 
 before(async () => {
   app = await setup();
-  ops = (await signup(app, { orgName: 'SiteGuard Ops', orgKind: 'host', email: 'ops@siteguard.test' })).agent;
+  ops = (await signup(app, { orgName: 'COMVERA Ops', orgKind: 'host', email: 'ops@comvera.test' })).agent;
   con = (await signup(app, { orgName: 'Psi Electrical', orgKind: 'contractor' })).agent;
   con2 = (await signup(app, { orgName: 'Omega Welding', orgKind: 'contractor' })).agent;
   mine = (await signup(app, { orgName: 'Alpha Mining', orgKind: 'host' })).agent;
@@ -69,8 +69,8 @@ describe('plans given by the platform admin', () => {
     assert.equal((await ops.post(`/api/admin/orgs/${mineId}/grant`, { plan: 'host_enterprise', until: '2030-12-31', note: 'Pilot' })).status, 200);
     const s = await mine.state();
     assert.equal(s.org.planName, 'Enterprise');
-    const a = await pool.query(`select actor_role from audit_events where org_id = $1 and action = 'Plan given by SiteGuard'`, [mineId]);
-    assert.equal(a.rows[0].actor_role, 'SiteGuard platform');
+    const a = await pool.query(`select actor_role from audit_events where org_id = $1 and action = 'Plan given by COMVERA'`, [mineId]);
+    assert.equal(a.rows[0].actor_role, 'COMVERA platform');
   });
 });
 

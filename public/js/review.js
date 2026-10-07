@@ -317,7 +317,7 @@ on('rv-share', ()=>{
   const d = R().data; if(!d) return;
   const links = (d.links||[]).filter(l=>!l.revokedAt && new Date(l.expiresAt) > new Date());
   openSheet(sheetHead('Share for review', escapeHtml(d.doc.title))
-    +'<div class="site-card-sub">Anyone with the link can read this document, approve sections and comment — no SiteGuard account needed. It always shows the latest revision. Their feedback lands in your inbox.</div>'
+    +'<div class="site-card-sub">Anyone with the link can read this document, approve sections and comment — no COMVERA account needed. It always shows the latest revision. Their feedback lands in your inbox.</div>'
     +'<label class="field-label" for="rvLinkLabel">Who is it for?</label><input type="text" id="rvLinkLabel" maxlength="120" placeholder="e.g. Naledi, SHE Manager at Leeuwpan">'
     +'<label class="field-label" for="rvLinkDays">Link works for</label><select id="rvLinkDays" class="field"><option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option></select>'
     +'<button class="btn primary block" style="margin-top:12px;" data-action="rv-link-create">Create review link</button><div id="rvLinkOut"></div>'

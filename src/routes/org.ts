@@ -120,10 +120,10 @@ export default async function orgRoutes(app: FastifyInstance) {
       await queueEmail(db, {
         orgId: ctx.org.id,
         to: body.email,
-        subject: `${ctx.user.name} invited you to ${ctx.org.name} on SiteGuard`,
+        subject: `${ctx.user.name} invited you to ${ctx.org.name} on COMVERA`,
         lines: [
-          `${ctx.user.name} has invited you to join ${ctx.org.name} on SiteGuard as ${roleLabel(ctx.org.kind, body.role)}.`,
-          'SiteGuard keeps contractor safety files, permits, incidents and site readiness in one place. The link below expires in 7 days.',
+          `${ctx.user.name} has invited you to join ${ctx.org.name} on COMVERA as ${roleLabel(ctx.org.kind, body.role)}.`,
+          'COMVERA keeps contractor safety files, permits, incidents and site readiness in one place. The link below expires in 7 days.',
         ],
         action: { label: 'Accept invitation', url: appUrl(`/invite?token=${token}`) },
       });
@@ -228,7 +228,7 @@ export default async function orgRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Everything the organisation can see in SiteGuard, as one JSON file: its own
+   * Everything the organisation can see in COMVERA, as one JSON file: its own
    * records and the files it is a party to (the same view as the app), its
    * team and the audit trail. Uploaded files stay in storage; the export lists
    * them. No passwords, tokens or billing identifiers.
@@ -249,7 +249,7 @@ export default async function orgRoutes(app: FastifyInstance) {
     const day = new Date().toISOString().slice(0, 10);
     return reply
       .header('cache-control', 'no-store')
-      .header('content-disposition', `attachment; filename="siteguard-export-${day}.json"`)
+      .header('content-disposition', `attachment; filename="comvera-export-${day}.json"`)
       .type('application/json')
       .send(JSON.stringify(data, null, 2));
   });

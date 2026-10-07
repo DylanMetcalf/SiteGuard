@@ -1,4 +1,4 @@
-# SiteGuard — notes for Claude sessions
+# COMVERA — notes for Claude sessions
 
 Multi-tenant contractor compliance and site-safety SaaS for South African mines. Read
 `README.md`, `docs/ARCHITECTURE.md` (tenancy, permission matrix, security) and
@@ -11,7 +11,7 @@ haven't built.
 - `npm test` — integration tests against real Postgres (`siteguard_test`, schema is dropped and recreated)
 - `npm run typecheck`, `for f in public/js/*.js; do node --check "$f"; done` — what CI runs besides tests and build
 - `npm run test:e2e` — two-browser Playwright flow against a running server (`BASE_URL`, `PLAYWRIGHT_CHROMIUM_PATH`)
-- `SITEGUARD_URL=… npm run smoke` — synthetic check of a deployed app
+- `COMVERA_URL=… npm run smoke` — synthetic check of a deployed app
 
 ## Rules that matter here
 

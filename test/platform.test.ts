@@ -10,7 +10,7 @@ let ops: Agent, customer: Agent;
 
 before(async () => {
   app = await setup();
-  ops = (await signup(app, { orgName: 'SiteGuard Ops', orgKind: 'contractor', email: 'ops@siteguard.test' })).agent;
+  ops = (await signup(app, { orgName: 'COMVERA Ops', orgKind: 'contractor', email: 'ops@comvera.test' })).agent;
   customer = (await signup(app, { orgName: 'Rho Mining', orgKind: 'host' })).agent;
   assert.equal((await customer.post('/api/feedback', { kind: 'idea', message: 'Please add a dark mode toggle' })).status, 200);
 });
@@ -18,10 +18,10 @@ after(teardown);
 
 describe('platform overview', () => {
   it('stays hidden until the admin address is confirmed', async () => {
-    await pool.query(`update users set email_verified_at = null where email = 'ops@siteguard.test'`);
+    await pool.query(`update users set email_verified_at = null where email = 'ops@comvera.test'`);
     assert.equal((await ops.req('GET', '/api/admin/overview')).status, 404);
     assert.equal((await ops.state()).me.platformAdmin, false);
-    const token = await lastEmailToken('ops@siteguard.test', '/verify-email');
+    const token = await lastEmailToken('ops@comvera.test', '/verify-email');
     assert.equal((await ops.post('/api/auth/verify-email', { token })).status, 200);
     assert.equal((await ops.state()).me.platformAdmin, true);
   });

@@ -1,4 +1,4 @@
--- Every time a safety file is compiled with different contents, SiteGuard keeps
+-- Every time a safety file is compiled with different contents, COMVERA keeps
 -- a revision: what was in it (document versions, expiries, statuses), when and
 -- by whom. Compiling again with nothing changed does not create a new revision.
 create table safety_file_versions (

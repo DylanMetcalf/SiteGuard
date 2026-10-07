@@ -10,7 +10,7 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default('0.0.0.0'),
-  /** Public base URL, used in emails and share links, e.g. https://app.siteguard.co.za */
+  /** Public base URL, used in emails and share links, e.g. https://app.comvera.co.za */
   // On Render, the service's own URL is used until a custom domain is set.
   APP_URL: z.string().url().default(process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'),
   DATABASE_URL: z.string().default('postgres://siteguard:siteguard@localhost:5432/siteguard'),
@@ -36,7 +36,7 @@ const schema = z.object({
   // Email: SMTP connection URL, e.g. smtps://user:pass@smtp.postmarkapp.com:465.
   // Unset → emails are written to the log (and still recorded in the outbox).
   SMTP_URL: z.string().optional(),
-  EMAIL_FROM: z.string().default('SiteGuard <no-reply@siteguard.local>'),
+  EMAIL_FROM: z.string().default('COMVERA <no-reply@comvera.local>'),
   /** Where "Report a problem" messages are emailed (e.g. your own address). Unset → logged only. */
   SUPPORT_EMAIL: z.string().email().optional(),
   /** Shown on the public contact page, e.g. +27 82 000 0000. Unset → email and form only. */

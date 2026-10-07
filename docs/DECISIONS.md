@@ -6,7 +6,7 @@ Newest first.
 ---
 
 **DECISION** Contractors pay for their own company; a mine's subscription sponsors only the contractor's file on that mine's site (`sponsorships`). Without its own plan a contractor can change only sponsored files; its own projects and other clients need a plan. Everyone starts with a 14-day trial of the full product; nothing is deleted when it ends.
-**REASON** "Free for contractors, always" gave away the product the contractor gets most value from. Sponsorship keeps the mine's workflow free for its contractors without making SiteGuard free for every other client.
+**REASON** "Free for contractors, always" gave away the product the contractor gets most value from. Sponsorship keeps the mine's workflow free for its contractors without making COMVERA free for every other client.
 **DATE** 2026-10-02
 
 **DECISION** Promo codes and enterprise deals are grants on the organisation (plan + optional end date), not database edits or hidden prices. A 100% code needs no Stripe; a partial one applies its Stripe coupon at checkout.
@@ -42,18 +42,18 @@ Newest first.
 **DATE** 2026-09-30
 
 **DECISION** Documents filed to a project count straight away, and a project never shows "Site Ready"; the PDF cover and share page say it was prepared by the contractor and not reviewed by the client.
-**REASON** Nobody reviews a project inside SiteGuard, so a review status would be invented. The wording avoids overstating compliance.
+**REASON** Nobody reviews a project inside COMVERA, so a review status would be invented. The wording avoids overstating compliance.
 **DATE** 2026-09-30
 
 **DECISION** Projects are archived, not deleted.
 **REASON** The audit trail is append-only, and what was prepared and sent to a client is a record worth keeping.
 **DATE** 2026-09-30
 
-**DECISION** Free contractors get 2 active projects when billing is on; Contractor Pro is unlimited. Work for sites on SiteGuard stays free.
+**DECISION** Free contractors get 2 active projects when billing is on; Contractor Pro is unlimited. Work for sites on COMVERA stays free.
 **REASON** Projects are value the contractor gets for itself, so it's the natural upgrade; answering a mine's requirements must never cost the contractor.
 **DATE** 2026-09-30
 
-**DECISION** People who aren't signed in see a landing page (what SiteGuard is, for whom, how it works) with sign-up, sign-in, and a demo that opens straight into the auto-playing walkthrough.
+**DECISION** People who aren't signed in see a landing page (what COMVERA is, for whom, how it works) with sign-up, sign-in, and a demo that opens straight into the auto-playing walkthrough.
 **REASON** The owner is sharing the link with testers; the first screen has to explain the product and invite sign-up, not ask for a password.
 **DATE** 2026-09-30
 
@@ -193,6 +193,6 @@ Newest first.
 **REASON** One contractor company serves many mines and must see only its own sites at each.
 **DATE** 2026-09-23
 
-**DECISION** Contractors use SiteGuard free; mines pay per seat after a 14-day trial.
+**DECISION** Contractors use COMVERA free; mines pay per seat after a 14-day trial.
 **REASON** Contractor adoption is what makes the product useful to the paying mine. (Pricing to be validated in the pilot.)
 **DATE** 2026-09-23

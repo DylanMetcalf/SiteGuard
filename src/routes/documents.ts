@@ -177,7 +177,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (doc.status === 'awaiting_review') throw conflict('This document is waiting on review. You can replace it if the reviewer asks for a correction.');
       await db.query('update documents set pending_file_id = $2 where id = $1', [doc.id, g.pdf_file_id]);
       await publishChange(db, [ctx.org.id]);
-      return { fileId: g.pdf_file_id, note: `${g.doc_number} Rev ${g.revision}, prepared in SiteGuard Document Studio`, reviewDue: g.review_due };
+      return { fileId: g.pdf_file_id, note: `${g.doc_number} Rev ${g.revision}, prepared in COMVERA Document Studio`, reviewDue: g.review_due };
     });
   });
 
@@ -231,7 +231,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (expiry && expiry < new Date().toISOString().slice(0, 10)) throw badRequest('That expiry date has already passed — check the date (especially the year) and try again.', 'expired_date');
       if (expiry && expiry > `${new Date().getFullYear() + 25}-12-31`) throw badRequest('That expiry date is too far in the future — check the year.', 'bad_date');
       // Documents that lapse must carry their date, or nobody gets warned before they do.
-      if (!expiry && MUST_EXPIRE.test(s.name)) throw badRequest(`Add the expiry (valid-until) date printed on the ${s.name} — without it SiteGuard can't warn anyone before it lapses.`, 'expiry_required');
+      if (!expiry && MUST_EXPIRE.test(s.name)) throw badRequest(`Add the expiry (valid-until) date printed on the ${s.name} — without it COMVERA can't warn anyone before it lapses.`, 'expiry_required');
       // The mine's validity rule: it accepts this kind of document for at most N months from today.
       let ruleNote = '';
       if (s.kind === 'site' && s.hostOrgId) {
@@ -248,7 +248,7 @@ export default async function documentRoutes(app: FastifyInstance) {
         [doc.id, version, doc.pending_file_id, [body.note, ruleNote].filter(Boolean).join(' '), expiry, body.aiDrafted, ctx.user.id, ctx.user.name],
       );
       // Company library documents have no reviewer — they are the contractor's own record.
-      // A project file is the contractor's own: there is no client reviewer in SiteGuard, so it is filed as is.
+      // A project file is the contractor's own: there is no client reviewer in COMVERA, so it is filed as is.
       const status = s.kind === 'library' || s.project ? 'complete' : 'awaiting_review';
       await db.query(
         `update documents set status = $2, version = $3, current_file_id = pending_file_id, pending_file_id = null,
@@ -317,7 +317,7 @@ export default async function documentRoutes(app: FastifyInstance) {
       await audit(db, ctx, 'Requested correction', `${s.name} — "${clip(text)}"`, s.siteId);
       if (s.siteId) await recheckSiteReady(db, s.siteId, `${s.name} sent back`);
       if (s.contractorOrgId) {
-        // A document written in SiteGuard opens straight in the review workspace, where the notes and highlights are.
+        // A document written in COMVERA opens straight in the review workspace, where the notes and highlights are.
         const studio = doc.current_file_id
           ? await one<{ id: string }>(db, 'select id from generated_documents where pdf_file_id = $1 and org_id = $2', [doc.current_file_id, s.contractorOrgId])
           : null;
@@ -329,7 +329,7 @@ export default async function documentRoutes(app: FastifyInstance) {
           to: to.email,
           subject: `Correction requested: ${s.name}`,
           lines: [`${ctx.user.name} (${ctx.org.name}) asked for a correction to "${s.name}" on ${s.siteName}:`, `"${text}"`],
-          action: { label: 'Open SiteGuard', url: appUrl('/') },
+          action: { label: 'Open COMVERA', url: appUrl('/') },
         }));
       }
       await publishChange(db, s.parties);

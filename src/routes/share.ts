@@ -31,9 +31,9 @@ const STATUS_COLOR: Record<string, string> = {
   complete: '#2C6B44', missing: '#A23A2D', expiring: '#8E6410', expired: '#A23A2D', awaiting_review: '#2A4E62', correction_required: '#A23A2D',
 };
 
-export function page(title: string, body: string, foot = 'Shared from SiteGuard. This view reflects the live record at the time you opened it and is read-only. It does not itself constitute a guarantee of legal compliance.'): string {
+export function page(title: string, body: string, foot = 'Shared from COMVERA. This view reflects the live record at the time you opened it and is read-only. It does not itself constitute a guarantee of legal compliance.'): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>${esc(title)} · SiteGuard</title>
+<meta name="robots" content="noindex,nofollow"><title>${esc(title)} · COMVERA</title>
 <link rel="icon" type="image/png" href="/icons/icon-32.png">
 <style>
 :root{--ink:#0E1A2B;--grey:#5E6A7A;--line:#E2E7E4;--paper:#F3F6F4;--raised:#FFFFFF;--brand:#16325C;--sage:#6E9C80;--green:#12805A;--red:#C0362C}
@@ -48,7 +48,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey
 .stamp{display:inline-block;border:2px solid var(--green);color:var(--green);padding:4px 12px;font-size:11px;letter-spacing:.08em;border-radius:999px;font-weight:700}
 .warn{border-color:var(--red);color:var(--red)}a{color:var(--brand)}.foot{font-size:11px;color:var(--grey);margin-top:18px}
 .scroll{overflow-x:auto}
-</style></head><body><div class="wrap"><div class="brand"><span></span>SiteGuard</div>${body}
+</style></head><body><div class="wrap"><div class="brand"><span></span>COMVERA</div>${body}
 <div class="foot">${foot}</div></div></body></html>`;
 }
 
@@ -279,7 +279,7 @@ export default async function shareRoutes(app: FastifyInstance) {
         <table><tr><td>Host</td><td>${esc(a.host_name)}</td></tr><tr><td>Contractor</td><td>${esc(a.contractor_name)}</td></tr>
         <tr><td>Approved</td><td>${fmtDate(a.approved_on)} by ${esc(a.approver_name)}, ${esc(a.approver_role)}</td></tr>
         <tr><td>Version</td><td>${esc(a.version)}</td></tr><tr><td>Verification ID</td><td style="font-family:ui-monospace,monospace">${esc(a.verification_id)}</td></tr></table>
-        <p class="sub">Verification confirms this approval record exists in SiteGuard. It does not display private documents or personal information.</p></div>`,
+        <p class="sub">Verification confirms this approval record exists in COMVERA. It does not display private documents or personal information.</p></div>`,
       ),
     );
   });

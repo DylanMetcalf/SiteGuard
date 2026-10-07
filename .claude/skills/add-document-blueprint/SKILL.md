@@ -1,6 +1,6 @@
 ---
 name: add-document-blueprint
-description: Add or improve a Document Studio blueprint (a professional safety document type such as a procedure, plan, register or appointment letter). Use when someone asks SiteGuard to produce a new kind of document, or to improve the content of an existing one.
+description: Add or improve a Document Studio blueprint (a professional safety document type such as a procedure, plan, register or appointment letter). Use when someone asks COMVERA to produce a new kind of document, or to improve the content of an existing one.
 ---
 
 # Adding a Document Studio blueprint

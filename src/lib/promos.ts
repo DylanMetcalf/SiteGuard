@@ -53,7 +53,7 @@ export async function redeemPromo(db: Db, ctx: OrgCtx, code: string) {
     await db.query('update organisations set grant_plan = $2, grant_until = $3, grant_source = $4 where id = $1', [ctx.org.id, p.plan, grantUntil, `promo:${p.code}`]);
     return { kind: 'grant' as const, plan: plan.name, until: grantUntil };
   }
-  if (!p.stripe_coupon) throw conflict('This code is not set up yet. Contact SiteGuard.');
+  if (!p.stripe_coupon) throw conflict('This code is not set up yet. Contact COMVERA.');
   await db.query(`update organisations set settings = settings || jsonb_build_object('checkoutCoupon', $2::text, 'checkoutCouponCode', $3::text) where id = $1`, [ctx.org.id, p.stripe_coupon, p.code]);
   return { kind: 'discount' as const, plan: plan.name, percentOff: p.percent_off };
 }

@@ -36,7 +36,7 @@ export async function recheckSiteReady(db: Db, siteId: string, trigger: string):
   if (!why) return false;
   await db.query(`update sites set status = 'in_progress' where id = $1`, [siteId]);
   await db.query(
-    `insert into audit_events (org_id, site_id, actor_id, actor_name, actor_role, action, detail) values ($1, $2, null, 'SiteGuard', 'system', $3, $4)`,
+    `insert into audit_events (org_id, site_id, actor_id, actor_name, actor_role, action, detail) values ($1, $2, null, 'COMVERA', 'system', $3, $4)`,
     [s.org_id, siteId, 'Site Ready withdrawn', `${s.name}: ${why} (${trigger})`.slice(0, 500)],
   );
   const note = { kind: 'correction', title: `Site Ready withdrawn: ${s.name}`, body: `${why}. The site must be approved again once everything is back in order.`, link: { kind: 'site' as const, siteId } };

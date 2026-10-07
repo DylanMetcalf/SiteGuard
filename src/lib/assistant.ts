@@ -1,5 +1,5 @@
 /**
- * The SiteGuard Assistant. With an AI key it runs a Claude tool-use loop over
+ * The COMVERA Assistant. With an AI key it runs a Claude tool-use loop over
  * a small set of read-only tools (starter packs, the caller's own sites) plus
  * web search for site-specific research. Without a key it answers from
  * built-in rules. Either way it never writes: it returns "cards" (a proposed
@@ -169,7 +169,7 @@ function tools(ctx: OrgCtx): Anthropic.Beta.BetaToolUnion[] {
   const list: Anthropic.Beta.BetaToolUnion[] = [
     {
       name: 'list_starter_packs',
-      description: "Lists SiteGuard's requirement starter packs (id, name, description and every requirement item). Call before recommending what a safety file needs.",
+      description: "Lists COMVERA's requirement starter packs (id, name, description and every requirement item). Call before recommending what a safety file needs.",
       input_schema: { type: 'object', properties: {} },
     },
     {
@@ -189,7 +189,7 @@ function tools(ctx: OrgCtx): Anthropic.Beta.BetaToolUnion[] {
     },
     {
       name: 'suggest_draft',
-      description: 'Shows the user a button to draft a document (SiteGuard drafts it). Use when a document is missing or the user asks for one.',
+      description: 'Shows the user a button to draft a document (COMVERA drafts it). Use when a document is missing or the user asks for one.',
       input_schema: {
         type: 'object',
         properties: {
@@ -203,7 +203,7 @@ function tools(ctx: OrgCtx): Anthropic.Beta.BetaToolUnion[] {
       ? {
           name: 'propose_site',
           description:
-            'Shows the user a card to start a new site in SiteGuard with the chosen starter packs and extra requirements. The user reviews it, adds the contractor and confirms; nothing is created until they do.',
+            'Shows the user a card to start a new site in COMVERA with the chosen starter packs and extra requirements. The user reviews it, adds the contractor and confirms; nothing is created until they do.',
           input_schema: {
             type: 'object',
             properties: {
@@ -237,7 +237,7 @@ function tools(ctx: OrgCtx): Anthropic.Beta.BetaToolUnion[] {
 function systemPrompt(ctx: OrgCtx): string {
   const host = isHost(ctx);
   const create = canCreateSites(ctx);
-  return `You are the SiteGuard Assistant, built into SiteGuard, a contractor compliance and site safety platform for South African mines and industrial sites.
+  return `You are the COMVERA Assistant, built into COMVERA, a contractor compliance and site safety platform for South African mines and industrial sites.
 You are talking to ${ctx.user.name} (${roleLabel(ctx.org.kind, ctx.role)}) at ${ctx.org.name}, ${host ? 'a site owner (host) that invites contractors onto its sites' : 'a contractor company that works on other companies\' sites'}. Today is ${new Date().toISOString().slice(0, 10)}.
 
 What you help with:
@@ -436,7 +436,7 @@ function guessLocation(text: string): string {
 
 function help(ctx: OrgCtx): string {
   return [
-    "I'm the SiteGuard Assistant. Try asking:",
+    "I'm the COMVERA Assistant. Try asking:",
     `- "What do I need for a safety file for electrical work at Shaft 3?"`,
     `- "Which of my sites are behind?"`,
     `- "What needs my attention today?"`,
@@ -511,7 +511,7 @@ export async function runAssistantOffline(ctx: OrgCtx, history: ChatMessage[]): 
   if (permits.length) parts.push(`**Permits to expect**\n${permits.map((p) => `- ${p}`).join('\n')}`);
   if (profiles.length) parts.push(`**Main hazards to cover in the risk assessment**\n${hazards.slice(0, 6).map((h) => `- ${h}`).join('\n')}`);
   parts.push(
-    `Based on SiteGuard's starter packs (${packNames.join(', ')}). The site's SHE department has the definitive list — ask them for their contractor requirements and add anything extra.` +
+    `Based on COMVERA's starter packs (${packNames.join(', ')}). The site's SHE department has the definitive list — ask them for their contractor requirements and add anything extra.` +
       (profiles.length ? '' : ' Tell me the type of work (e.g. electrical, welding, working at heights, excavation) for a more specific list.'),
   );
   if (canCreateSites(ctx)) {

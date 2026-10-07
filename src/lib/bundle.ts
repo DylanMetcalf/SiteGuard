@@ -276,7 +276,7 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, se
     coverRows: [
       ['Contractor', site.contractor_name],
       ...(site.project
-        ? ([['Client', [site.host_name, site.client_contact].filter(Boolean).join(' — ')], ['Status', 'Prepared by the contractor for the client; not reviewed by the client in SiteGuard']] as [string, string][])
+        ? ([['Client', [site.host_name, site.client_contact].filter(Boolean).join(' — ')], ['Status', 'Prepared by the contractor for the client; not reviewed by the client in COMVERA']] as [string, string][])
         : ([['Client (host)', site.host_name], ['Site status', ready ? `Site ready — approved ${fmt(site.approved_on)} by ${site.approver_name}` : 'Not yet approved']] as [string, string][])),
       ...(ready ? ([['Verification code', site.verification_id]] as [string, string][]) : []),
       ['Requirements', site.project
@@ -380,8 +380,8 @@ async function renderBundle(_db: Db, spec: BundleSpec): Promise<Buffer> {
     if (!it.file) { docs.push(null); continue; }
     let buf: Buffer | null = null;
     try { buf = await storage.read(it.file.storage_key); } catch { /* reported below */ }
-    if (!buf) { docs.push(await notice(it, 'The file could not be read from storage. Open it in SiteGuard.')); continue; }
-    if (total + buf.length > MAX_TOTAL_BYTES) { docs.push(await notice(it, 'This file is too large to include here. Open it in SiteGuard.')); continue; }
+    if (!buf) { docs.push(await notice(it, 'The file could not be read from storage. Open it in COMVERA.')); continue; }
+    if (total + buf.length > MAX_TOTAL_BYTES) { docs.push(await notice(it, 'This file is too large to include here. Open it in COMVERA.')); continue; }
     total += buf.length;
     docs.push(await asPdf(it, buf));
   }
@@ -432,7 +432,7 @@ async function renderBundle(_db: Db, spec: BundleSpec): Promise<Buffer> {
         table: { widths: ['32%', '*'], body: spec.coverRows.map(([k, v]) => [{ text: t(k), bold: true, fillColor: tint(brand, 0.92) }, t(v)]) },
         layout: { hLineWidth: () => 0.5, vLineWidth: () => 0, hLineColor: () => '#D5DBE3', paddingTop: () => 6, paddingBottom: () => 6, paddingLeft: () => 8 },
       },
-      { text: 'Compiled from the digital record in SiteGuard. The platform record is the source of truth; printed copies are uncontrolled.', fontSize: 8, color: MUTED, italics: true, margin: [0, 18, 0, 0], pageBreak: 'after' },
+      { text: 'Compiled from the digital record in COMVERA. The platform record is the source of truth; printed copies are uncontrolled.', fontSize: 8, color: MUTED, italics: true, margin: [0, 18, 0, 0], pageBreak: 'after' },
       ...contents(pages, regPage),
     ], true);
 
@@ -445,7 +445,7 @@ async function renderBundle(_db: Db, spec: BundleSpec): Promise<Buffer> {
   for (const d of docs) if (d) { starts.push(next); next += d.getPageCount(); }
   const out = await PDFDocument.load(await pdfFromDefinition(front(starts, regPage)));
   out.setTitle(latin(`${spec.eyebrow === 'SAFETY FILE' ? 'Safety file' : 'Document pack'} — ${spec.title}`));
-  out.setCreator('SiteGuard');
+  out.setCreator('COMVERA');
   for (const d of [regPdf, ...docs]) {
     if (!d) continue;
     for (const pg of await out.copyPages(d, d.getPageIndices())) out.addPage(pg);
@@ -470,7 +470,7 @@ function base(spec: BundleSpec, content: unknown[], cover = false) {
   return {
     pageSize: 'A4',
     pageMargins: [48, 60, 48, 58],
-    info: { title: t(spec.title), author: t(spec.author), creator: 'SiteGuard' },
+    info: { title: t(spec.title), author: t(spec.author), creator: 'COMVERA' },
     images: spec.logo ? { logo: spec.logo } : {},
     defaultStyle: { font: 'Helvetica', fontSize: 9.5, lineHeight: 1.3, color: INK },
     background: (page: number, size: { width: number; height: number }) =>
@@ -497,9 +497,9 @@ async function asPdf(it: BundleItem, buf: Buffer): Promise<PDFDocument> {
       return doc;
     }
   } catch {
-    return notice(it, 'This PDF is password-protected or damaged, so it could not be merged. Open it in SiteGuard.');
+    return notice(it, 'This PDF is password-protected or damaged, so it could not be merged. Open it in COMVERA.');
   }
-  return notice(it, `This is a ${it.file?.filename?.split('.').pop()?.toUpperCase() ?? 'non-PDF'} file, so it is not merged here. Open or download it in SiteGuard.`);
+  return notice(it, `This is a ${it.file?.filename?.split('.').pop()?.toUpperCase() ?? 'non-PDF'} file, so it is not merged here. Open or download it in COMVERA.`);
 }
 
 async function notice(it: BundleItem, message: string): Promise<PDFDocument> {

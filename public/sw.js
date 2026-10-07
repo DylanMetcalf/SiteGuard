@@ -1,8 +1,8 @@
-// SiteGuard service worker: lets the app install to a phone's home screen and
+// COMVERA service worker: lets the app install to a phone's home screen and
 // shows a friendly page when there's no signal. Always network-first, so a
 // deploy is picked up on the next load; data (/api) is never cached, so no
 // records are kept on the device.
-const CACHE = 'siteguard-shell-v1';
+const CACHE = 'comvera-shell-v2';
 const SHELL = ['/offline.html', '/app.css', '/fonts/fonts.css', '/icons/icon-192.png'];
 const STATIC = /^\/(js\/|fonts\/|icons\/|app\.css$|manifest\.json$|offline\.html$)/;
 

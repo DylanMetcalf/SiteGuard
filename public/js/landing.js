@@ -1,4 +1,4 @@
-// The signed-out front page: what SiteGuard is, who it's for, how it works, and a
+// The signed-out front page: what COMVERA is, who it's for, how it works, and a
 // clear way in (create an account, sign in, or try the demo with a guided tour).
 // Static content only; every button is a data-action handled in auth.js.
 
@@ -43,14 +43,14 @@ const go = (page, label, cls) => '<a href="'+PUBLIC_PAGES[page]+'" class="'+(cls
 const trial = (label, kind) => '<button class="btn primary" data-action="auth-go" data-view="signup"'+(kind?' data-kind="'+kind+'"':'')+'>'+(label||'Start free trial')+'</button>';
 
 function header(current){
-  return '<header class="lp-top"><a href="/" class="brand lp-brand" data-action="public-go" data-page="landing" aria-label="SiteGuard home"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div></div></a>'
+  return '<header class="lp-top"><a href="/" class="brand lp-brand" data-action="public-go" data-page="landing" aria-label="COMVERA home"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">COMVERA</div></div></a>'
     +'<div class="lp-actions"><button class="linkish" data-action="auth-go" data-view="signin">Sign in</button>'+trial('Start free trial')+'</div>'
     +'<nav class="lp-nav" aria-label="Main">'+NAV.map(([k,l])=>go(k, l, 'lp-link'+(current===k?' active':''))).join('')+'</nav></header>';
 }
 function footer(){
-  return '<footer class="lp-foot"><span>SiteGuard</span>'
+  return '<footer class="lp-foot"><span>COMVERA</span>'
     +'<span class="lp-foot-links">'+NAV.map(([k,l])=>go(k,l)).join(' · ')+' · '+go('how','How it works')+' · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>'
-    +'<span>Requirement lists are a starting point, not legal advice. SiteGuard shows the status held in its records; it does not certify legal compliance.</span></footer>';
+    +'<span>Requirement lists are a starting point, not legal advice. COMVERA shows the status held in its records; it does not certify legal compliance.</span></footer>';
 }
 const page = (current, body) => '<div class="lp">'+header(current)+body+footer()+'</div>';
 const intro = (eyebrow, title, lead) => '<section class="lp-page-head"><p class="lp-eyebrow">'+eyebrow+'</p><h1>'+title+'</h1>'+(lead?'<p class="lp-lead">'+lead+'</p>':'')+'</section>';
@@ -86,33 +86,33 @@ function featureGrid(){
 }
 
 function featuresPage(){
-  return intro('Features', 'Everything a safety file needs, in one place.', 'SiteGuard covers the whole life of a safety file: what is required, the documents themselves, review, the people on site, and keeping it all current.')
+  return intro('Features', 'Everything a safety file needs, in one place.', 'COMVERA covers the whole life of a safety file: what is required, the documents themselves, review, the people on site, and keeping it all current.')
     + '<section class="lp-feats">'+featureGrid()+'</section>'
     + '<section class="lp-sides"><div class="lp-side"><h2>On site</h2>'+list(['Toolbox talks, inductions and training signed on one phone or tablet', 'Tools and equipment that add their hazards, checks and PPE to talks and risk assessments', 'Permits to work, incidents, a site diary and inspections', 'Monthly contractor audits with findings tracked to closure'])+'</div>'
-    + '<div class="lp-side"><h2>In the office</h2>'+list(['A document library you file once and reuse on every safety file', 'SiteGuard Assistant answers questions from your own records', 'An append-only audit trail of who did what, and when', 'Download all your data at any time'])+'</div></section>'
+    + '<div class="lp-side"><h2>In the office</h2>'+list(['A document library you file once and reuse on every safety file', 'COMVERA Assistant answers questions from your own records', 'An append-only audit trail of who did what, and when', 'Download all your data at any time'])+'</div></section>'
     + closing('See it with your own files.', 'Every account starts with 14 days of the full product. No card needed.');
 }
 
 function builderPage(){
   const steps = [
-    ['Choose the site or client', 'A site on SiteGuard (type its code) or a client who isn\'t. Each safety file belongs to one site or project.'],
+    ['Choose the site or client', 'A site on COMVERA (type its code) or a client who isn\'t. Each safety file belongs to one site or project.'],
     ['See what it needs', 'Every required and optional document, grouped and explained. Sites set their own lists; starter lists help you begin.'],
-    ['Reuse what you already have', 'Company documents are filed once. SiteGuard offers them to every file, so nothing is uploaded twice.'],
+    ['Reuse what you already have', 'Company documents are filed once. COMVERA offers them to every file, so nothing is uploaded twice.'],
     ['Create what is missing', 'Document Studio drafts risk assessments, method statements, plans and appointment letters from your answers, with AI help where it is switched on.'],
     ['Review and edit', 'Every draft is yours to check, change and sign. Nothing is treated as final until a person approves it.'],
-    ['Check readiness', 'Before you build the PDF, SiteGuard shows what is present, what is waiting for review, what expires soon and what is missing.'],
+    ['Check readiness', 'Before you build the PDF, COMVERA shows what is present, what is waiting for review, what expires soon and what is missing.'],
     ['Preview, build and share', 'One bound PDF with a cover, contents, section dividers and page numbers. Download it, send a secure link, or submit it to the site.'],
   ];
   return intro('Safety File Builder', 'From blank page to a professional safety file.', 'The Safety File Builder walks you through every document a site or client needs — and tells you exactly what is still outstanding.')
     + '<section class="lp-how"><ol class="lp-steps">'+steps.map((x,i)=>'<li><b>'+(i+1)+'</b><div><h3>'+x[0]+'</h3><p>'+x[1]+'</p></div></li>').join('')+'</ol></section>'
-    + '<section class="lp-note"><h2>What SiteGuard does not do</h2><p>SiteGuard does not certify that a file is legally compliant, and it is not legal advice. Requirement lists show whether each item is a legal, site or best-practice requirement so you can check them with your SHE advisor. Drafts must be reviewed and signed by a competent person.</p></section>'
+    + '<section class="lp-note"><h2>What COMVERA does not do</h2><p>COMVERA does not certify that a file is legally compliant, and it is not legal advice. Requirement lists show whether each item is a legal, site or best-practice requirement so you can check them with your SHE advisor. Drafts must be reviewed and signed by a competent person.</p></section>'
     + closing('Build your first safety file.', 'Start a 14-day trial, choose a site or client, and follow the steps.');
 }
 
 function contractorsPage(){
-  return intro('For contractors', 'Your documents, your safety files, every site.', 'SiteGuard is your company\'s own document and safety file platform. Build files for every client — mines, construction companies and private clients — from one library.')
+  return intro('For contractors', 'Your documents, your safety files, every site.', 'COMVERA is your company\'s own document and safety file platform. Build files for every client — mines, construction companies and private clients — from one library.')
     + '<section class="lp-sides"><div class="lp-side"><h2>What you can create</h2>'+list(['Site-specific risk assessments and method statements, with the tools you use', 'Health and safety plans, policies and safe work procedures', 'Statutory appointment letters and registers', 'Toolbox talk, induction and training records signed on site', 'Complete, bound safety files for each site or client'])+'</div>'
-    + '<div class="lp-side"><h2>Who pays?</h2><p class="lp-p">You subscribe to SiteGuard for your own company. That covers every safety file you build, for any client.</p><p class="lp-p">When a mine or site on SiteGuard invites you, it may <strong>sponsor</strong> your file for its site. A sponsorship covers that one site\'s requirements and safety file. Files for other clients need your own plan.</p>'+go('pricing','See contractor plans','btn secondary small')+'</div></section>'
+    + '<div class="lp-side"><h2>Who pays?</h2><p class="lp-p">You subscribe to COMVERA for your own company. That covers every safety file you build, for any client.</p><p class="lp-p">When a mine or site on COMVERA invites you, it may <strong>sponsor</strong> your file for its site. A sponsorship covers that one site\'s requirements and safety file. Files for other clients need your own plan.</p>'+go('pricing','See contractor plans','btn secondary small')+'</div></section>'
     + closing('Start building today.', 'Every account starts with 14 days of the full product. No card needed.');
 }
 
@@ -152,7 +152,7 @@ function pricingPage(pricing){
 }
 
 function contactPage(c, ctx){
-  return intro('Contact', 'Talk to the SiteGuard team.', 'Most people get going on their own with the trial. If you have a question, need help, or want SiteGuard for a group of sites, get in touch.')
+  return intro('Contact', 'Talk to the COMVERA team.', 'Most people get going on their own with the trial. If you have a question, need help, or want COMVERA for a group of sites, get in touch.')
     + '<section class="lp-sides"><div class="lp-side"><h2>Reach us</h2>'
     + (c.email ? '<p class="lp-p">Email: <a href="mailto:'+c.email+'">'+c.email+'</a></p>' : '')
     + (c.phone ? '<p class="lp-p">Phone: <a href="tel:'+c.phone.replace(/[^+0-9]/g,'')+'">'+c.phone+'</a></p>' : '')
@@ -165,7 +165,7 @@ function contactPage(c, ctx){
       + '<label class="field-label" for="ctEmail">Email</label><input type="email" id="ctEmail" maxlength="200" autocomplete="email">'
       + '<label class="field-label" for="ctPhone">Phone (optional)</label><input type="tel" id="ctPhone" maxlength="40" autocomplete="tel">'
       + '<label class="field-label" for="ctCompany">Company (optional)</label><input type="text" id="ctCompany" maxlength="200" autocomplete="organization">'
-      + '<label class="field-label" for="ctTopic">About</label><select id="ctTopic"><option value="general">A general question</option><option value="help">Help using SiteGuard</option><option value="sales">Plans for my company or sites</option><option value="enterprise">Enterprise / group of sites</option><option value="partnership">Partnership</option></select>'
+      + '<label class="field-label" for="ctTopic">About</label><select id="ctTopic"><option value="general">A general question</option><option value="help">Help using COMVERA</option><option value="sales">Plans for my company or sites</option><option value="enterprise">Enterprise / group of sites</option><option value="partnership">Partnership</option></select>'
       + '<label class="field-label" for="ctMessage">Message</label><textarea id="ctMessage" maxlength="4000" style="min-height:120px;"></textarea>'
       + '<div class="hp" aria-hidden="true"><label for="ctWebsite">Leave this empty</label><input type="text" id="ctWebsite" tabindex="-1" autocomplete="off"></div>'
       + '<button class="btn primary block" style="margin-top:12px;" data-action="contact-send">Send</button>')+'</div></section>';
@@ -177,21 +177,21 @@ export function renderLanding(features){
     +'<section class="lp-hero"><div class="lp-hero-text">'
     +'<p class="lp-eyebrow">Safety files and contractor compliance · South Africa</p>'
     +'<h1>Build, manage and prove your safety files — for every site.</h1>'
-    +'<p class="lp-lead">SiteGuard is where contractors keep their safety documents, create what is missing and build a professional safety file for each site or client. Mines and sites use it to set requirements, review files and see who is cleared to work.</p>'
+    +'<p class="lp-lead">COMVERA is where contractors keep their safety documents, create what is missing and build a professional safety file for each site or client. Mines and sites use it to set requirements, review files and see who is cleared to work.</p>'
     +'<div class="lp-cta">'+trial('Start free trial')+'<button class="btn secondary" data-action="auth-go" data-view="signup" data-kind="contractor">Build a safety file</button>'
     +(demo?'<button class="btn secondary" data-action="start-demo" data-tour="1">Watch the 2-minute tour</button>':'')+'</div>'
     +'<p class="lp-sub-links">'+go('how','See how it works')+' · '+go('pricing','View pricing')+' · '+go('contact','Contact us')+'</p>'
     +'<ul class="lp-proof"><li>'+tick+'14-day trial of everything, no card</li><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li></ul>'
     +'</div>'+mock()+'</section>'
     +'<section class="lp-sides"><div class="lp-side"><p class="lp-eyebrow">For contractors</p><h2>Build a professional safety file in minutes.</h2>'
-      +list(['Keep your company documents once and reuse them on every site', 'Document Studio drafts the risk assessments, method statements and policies you don\'t have yet', 'One bound PDF with a cover, contents and page numbers, versioned as it changes', 'Files for mines on SiteGuard and for any other client'])
+      +list(['Keep your company documents once and reuse them on every site', 'Document Studio drafts the risk assessments, method statements and policies you don\'t have yet', 'One bound PDF with a cover, contents and page numbers, versioned as it changes', 'Files for mines on COMVERA and for any other client'])
       +'<div class="lp-cta">'+go('contractors','For contractors','btn secondary small')+go('builder','How the builder works','linkish')+'</div></div>'
     +'<div class="lp-side"><p class="lp-eyebrow">For mines and sites</p><h2>Know who is ready to work, today.</h2>'
       +list(['Set what every safety file must contain, from researched South African starter lists', 'Share one site code; every contractor gets its own file for your site', 'Review section by section, then mark Site Ready with a verification code', 'Gate clearance with QR cards, inductions, audits, permits and incidents'])
       +'<div class="lp-cta">'+go('sites','For sites and mines','btn secondary small')+'</div></div></section>'
     +'<section class="lp-how"><h2>How the Safety File Builder works</h2><ol>'
-      +'<li><b>1</b><div><h3>Choose the site or client</h3><p>Type a site\'s code, or start a file for a client who isn\'t on SiteGuard.</p></div></li>'
-      +'<li><b>2</b><div><h3>Fill the gaps</h3><p>Reuse your company documents, upload certificates, and let SiteGuard draft the rest for you to check.</p></div></li>'
+      +'<li><b>1</b><div><h3>Choose the site or client</h3><p>Type a site\'s code, or start a file for a client who isn\'t on COMVERA.</p></div></li>'
+      +'<li><b>2</b><div><h3>Fill the gaps</h3><p>Reuse your company documents, upload certificates, and let COMVERA draft the rest for you to check.</p></div></li>'
       +'<li><b>3</b><div><h3>Check, build, send</h3><p>See exactly what is outstanding, preview the file, then download it, share a link or submit it.</p></div></li></ol></section>'
     +'<section class="lp-note"><h2>Who pays?</h2><p><strong>Contractors</strong> subscribe for their own company and every safety file they build. <strong>Sites and mines</strong> subscribe to manage contractor compliance, and can sponsor their contractors\' files for their own sites. A sponsorship covers that site only.</p><div class="lp-cta">'+go('pricing','View pricing','btn secondary small')+'</div></section>'
     +'<section class="lp-feats"><h2>Everything a safety file needs</h2>'+featureGrid()+'</section>'

@@ -26,7 +26,7 @@ export default async function supportRoutes(app: FastifyInstance) {
       if (config.SUPPORT_EMAIL) {
         await queueEmail(db, {
           to: config.SUPPORT_EMAIL,
-          subject: `SiteGuard ${body.kind === 'problem' ? 'problem report' : 'idea'} from ${clip(orgName, 60)}`,
+          subject: `COMVERA ${body.kind === 'problem' ? 'problem report' : 'idea'} from ${clip(orgName, 60)}`,
           lines: [
             `From: ${ctx.user.name} <${ctx.user.email}>, ${orgName}`,
             `Where: ${body.context.view ?? 'unknown'}`,
@@ -61,7 +61,7 @@ export default async function supportRoutes(app: FastifyInstance) {
       if (config.SUPPORT_EMAIL) {
         await queueEmail(db, {
           to: config.SUPPORT_EMAIL,
-          subject: `SiteGuard enquiry (${body.topic}) from ${clip(body.name, 60)}`,
+          subject: `COMVERA enquiry (${body.topic}) from ${clip(body.name, 60)}`,
           lines: [`From: ${body.name} <${body.email}>${body.phone ? ', ' + body.phone : ''}`, body.company ? `Company: ${body.company}` : '', '', body.message].filter((x, i) => i !== 1 || x),
         });
       }

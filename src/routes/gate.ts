@@ -100,7 +100,7 @@ export default async function gateRoutes(app: FastifyInstance) {
         <div style="margin-top:10px">${esc(row.company)}</div><div class="sub">${esc(row.siteName)}</div></div>
       ${row.cleared
         ? `<div class="card"><div class="sub">Cleared for this site${row.until ? ` until ${esc(row.until)}` : ''}: medical, induction and the contractor's safety file are in order.</div></div>`
-        : `<div class="card"><strong>Why not</strong><ul>${publicReasons(row.reasons).map((r) => `<li>${esc(r)}</li>`).join('')}</ul><div class="sub">Refer the worker to their supervisor or the site's safety office. The details are in SiteGuard.</div></div>`}
+        : `<div class="card"><strong>Why not</strong><ul>${publicReasons(row.reasons).map((r) => `<li>${esc(r)}</li>`).join('')}</ul><div class="sub">Refer the worker to their supervisor or the site's safety office. The details are in COMVERA.</div></div>`}
       <div class="sub" style="text-align:center">Checked ${esc(checked)}</div>`;
     return reply.type('text/html').send(page('Gate check', body));
   });

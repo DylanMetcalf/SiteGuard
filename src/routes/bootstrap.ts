@@ -150,7 +150,7 @@ export async function buildState(db: Db, ctx: OrgCtx) {
       hostName: s.host_name, status: s.status, createdAt: d(s.created_at)?.slice(0, 10),
       emergency: { musterPoint: '', contact: '', hospital: '', ...s.emergency },
       workplaceId: s.workplace_id ?? null,
-      // The contractor's own project: hostName is the client, nobody reviews it in SiteGuard.
+      // The contractor's own project: hostName is the client, nobody reviews it in COMVERA.
       project: !!s.project, clientContact: s.project ? s.client_contact : '',
     };
     state.requirements[s.id] = [];

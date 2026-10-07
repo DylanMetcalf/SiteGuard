@@ -179,9 +179,9 @@ export async function runReminders(): Promise<number> {
       await queueEmail(db, {
         orgId,
         to: email,
-        subject: `SiteGuard: ${list.length} item${list.length === 1 ? '' : 's'} need${list.length === 1 ? 's' : ''} attention`,
+        subject: `COMVERA: ${list.length} item${list.length === 1 ? '' : 's'} need${list.length === 1 ? 's' : ''} attention`,
         lines: [`Hi ${name},`, 'These need attention:', ...list.map((l) => `• ${l}`)],
-        action: { label: 'Open SiteGuard', url: appUrl('/') },
+        action: { label: 'Open COMVERA', url: appUrl('/') },
         dedupeKey: `digest:${email}:${stamp}`,
         footer: 'Admins can turn these digests off under Admin → Notifications.',
       });

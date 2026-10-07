@@ -4,10 +4,10 @@ import { api } from './api.js';
 import { S, on, reload, render, showToast, escapeHtml, val } from './core.js';
 import { renderLanding, renderPublic, PUBLIC_PAGES, publicPageFor } from './landing.js';
 
-const brand = '<div class="auth-hero"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">SiteGuard</div></div></div>'
+const brand = '<div class="auth-hero"><div class="brand"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">COMVERA</div></div></div>'
   +'<p class="auth-tagline">Safety files, contractor compliance and site safety — in one place.</p>'
   +'<div class="auth-points"><span>Starter packs for SA mines</span><span>Live contractor readiness</span><span>Branded documents in minutes</span></div></div>';
-const home = () => (S.boot && S.boot.authenticated) || S.authView === 'invite' || S.authView === 'site-invite' || S.authView === 'reset' ? '' : '<button class="linkish auth-home" data-action="auth-go" data-view="landing">← About SiteGuard</button>';
+const home = () => (S.boot && S.boot.authenticated) || S.authView === 'invite' || S.authView === 'site-invite' || S.authView === 'reset' ? '' : '<button class="linkish auth-home" data-action="auth-go" data-view="landing">← About COMVERA</button>';
 const wrap = (inner) => '<div class="auth-shell">'+brand+'<div class="onboard-wrap">'+home()+inner+'</div></div>';
 const errorBox = () => S.authContext.error ? '<div class="form-error" role="alert">'+escapeHtml(S.authContext.error)+'</div>' : '';
 const okBox = () => S.authContext.ok ? '<div class="form-ok" role="status">'+escapeHtml(S.authContext.ok)+'</div>' : '';
@@ -125,9 +125,9 @@ export function renderAuth(){
     }
     if(S.authContext.showSignin){
       return wrap(head+signInCard('Sign in to your contractor account to respond.', si.email||'')
-        +'<button class="linkish" style="margin-top:6px;" data-action="auth-show-signin" data-show="0">New to SiteGuard? Create an account</button>');
+        +'<button class="linkish" style="margin-top:6px;" data-action="auth-show-signin" data-show="0">New to COMVERA? Create an account</button>');
     }
-    return wrap(head+'<div class="card"><div class="site-card-title" style="font-size:14px;">New to SiteGuard?</div>'
+    return wrap(head+'<div class="card"><div class="site-card-title" style="font-size:14px;">New to COMVERA?</div>'
       +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name">'
       +'<label class="field-label" for="suOrgName">Company name</label><input type="text" id="suOrgName" value="'+escapeHtml(si.contractor_name)+'">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email" value="'+escapeHtml(si.email||'')+'">'
@@ -190,7 +190,7 @@ function signInCard(note, email){
 function demoCard(features){
   if(!features.demo) return '';
   return '<div class="card" style="margin-top:10px;text-align:center;">'
-    +'<div class="site-card-sub" style="margin-bottom:8px;">Not ready to enter real information? Explore SiteGuard in a private sandbox with realistic sample data — an example mine, contractors and safety files. It\'s separate from any real account and deleted after a few days.</div>'
+    +'<div class="site-card-sub" style="margin-bottom:8px;">Not ready to enter real information? Explore COMVERA in a private sandbox with realistic sample data — an example mine, contractors and safety files. It\'s separate from any real account and deleted after a few days.</div>'
     +'<button class="btn secondary block" data-action="start-demo">Explore the demo</button>'
     + (S.authContext.cleanForm
       ? '<div style="text-align:left;margin-top:16px;border-top:1px solid var(--grey-line);padding-top:14px;"><div class="site-card-title">Start fresh</div>'
@@ -269,7 +269,7 @@ on('signup', async (el)=>{
       const site = Object.values(S.state.sites).find(x=>x.name===invitedSite);
       if(site){ S.nav='sites'; S.activeSiteId=site.id; S.siteTab='compliance'; render(); }
     }
-    showToast(mode === 'new' ? 'Welcome to SiteGuard — check your email to confirm your address.' : 'Welcome to SiteGuard');
+    showToast(mode === 'new' ? 'Welcome to COMVERA — check your email to confirm your address.' : 'Welcome to COMVERA');
   }catch(e){ fail(e); }
 });
 

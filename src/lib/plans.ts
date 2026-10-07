@@ -8,7 +8,7 @@ export interface Plan {
   kind: OrgKind;
   /** Maximum active sites (host plans). null = unlimited. */
   siteLimit: number | null;
-  /** Contractor projects (safety files for clients not on SiteGuard). null = unlimited. Only enforced with billing on. */
+  /** Contractor projects (safety files for clients not on COMVERA). null = unlimited. Only enforced with billing on. */
   projectLimit: number | null;
   /** Seats given on a fresh org / free plan. Paid plans bill per seat. */
   defaultSeats: number;
@@ -95,7 +95,7 @@ export const PLANS: Record<string, Plan> = {
     maxSeats: 5000,
     ai: true,
     paid: true,
-    blurb: 'For mining groups: every site, sponsored contractor access, onboarding and an agreed contract. Set up by SiteGuard.',
+    blurb: 'For mining groups: every site, sponsored contractor access, onboarding and an agreed contract. Set up by COMVERA.',
   },
 };
 

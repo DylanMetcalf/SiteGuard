@@ -62,7 +62,7 @@ export function renderWorkplace(wid){
       +(w.joinOpen?'':'<span class="badge missing">Closed</span>')+'<button class="btn secondary small" data-action="wp-share" data-id="'+wid+'">Share</button><button class="linkish" data-action="wp-code-more">More</button></div>';
   else if(w.code) html += '<div class="card wp-code-card"><div><div class="hero-eyebrow" style="color:var(--grey);">Site code</div>'
       +'<div class="wp-code mono" aria-label="Site code">'+w.code+'</div>'
-      +'<div class="site-card-sub">'+(w.joinOpen ? 'Give this to every contractor working here. They type it in SiteGuard under <strong>Join a site with a code</strong> and their safety file for this site starts straight away.' : '<strong style="color:var(--red);">Closed</strong> — contractors can\'t join with this code until you open it again.')+'</div></div>'
+      +'<div class="site-card-sub">'+(w.joinOpen ? 'Give this to every contractor working here. They type it in COMVERA under <strong>Join a site with a code</strong> and their safety file for this site starts straight away.' : '<strong style="color:var(--red);">Closed</strong> — contractors can\'t join with this code until you open it again.')+'</div></div>'
       +'<div class="row-actions"><button class="btn primary small" data-action="wp-share" data-id="'+wid+'">Share code</button><button class="btn secondary small" data-action="wp-copy" data-id="'+wid+'">Copy</button>'
       +(admin?'<button class="btn secondary small" data-action="wp-open" data-id="'+wid+'" data-open="'+(w.joinOpen?'0':'1')+'">'+(w.joinOpen?'Close to new contractors':'Open to contractors')+'</button><button class="btn secondary small" data-action="wp-newcode" data-id="'+wid+'">New code</button>':'')+'</div></div>';
   html += '<div class="attn-grid" style="margin:12px 0;">'
@@ -113,11 +113,11 @@ function queueHtml(files){
     return { f, c, items };
   }).filter(g=>g.items.length);
   if(!groups.length) return '<div class="empty"><h3>Nothing waiting</h3><p>Documents contractors submit for this site appear here, so you can vet them one after another.</p></div>';
-  return '<div class="site-card-sub" style="margin:4px 2px 10px;">Tap a document to read it and approve it or send it back. Documents written in SiteGuard open section by section, so you can approve each part and highlight what needs changing.</div>'
+  return '<div class="site-card-sub" style="margin:4px 2px 10px;">Tap a document to read it and approve it or send it back. Documents written in COMVERA open section by section, so you can approve each part and highlight what needs changing.</div>'
     + groups.map(({ f, c, items })=>'<div class="section-title">'+c.name+' · '+items.length+'</div><div class="card">'+items.map(r=>{
       const d = S.state.documents[r.id]||{};
       return '<div class="reqrow" data-action="'+(d.studioDocId?'open-review':'open-req')+'" '+(d.studioDocId?'data-id="'+d.studioDocId+'" data-req="'+r.id+'"':'data-req="'+r.id+'"')+' role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main"><div class="reqrow-name">'+r.name+'</div>'
-        +'<div class="reqrow-meta">'+badge('awaiting_review')+'<span class="srctag">'+r.category+'</span>'+(d.version?'<span class="srctag">'+d.version+'</span>':'')+(d.studioDocId?'<span class="srctag">Written in SiteGuard</span>':'')+'</div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
+        +'<div class="reqrow-meta">'+badge('awaiting_review')+'<span class="srctag">'+r.category+'</span>'+(d.version?'<span class="srctag">'+d.version+'</span>':'')+(d.studioDocId?'<span class="srctag">Written in COMVERA</span>':'')+'</div></div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
     }).join('')+'</div>').join('');
 }
 
@@ -182,7 +182,7 @@ on('open-workplace', (el)=>{ S.nav='sites'; S.activeSiteId=null; S.activeWorkpla
 on('wp-tab', (el)=>{ S.wpTab = el.dataset.tab; render(); });
 on('wp-code-more', ()=>{ S.wpCodeOpen = true; S.keepScroll = true; render(); S.keepScroll = false; });
 on('wp-trade', (el)=>{ S.wpTrade = el.dataset.trade; S.keepScroll = true; render(); S.keepScroll = false; });
-const shareText = (w)=>'Join '+unescapeHtml(w.name)+' on SiteGuard: open '+location.origin+' , sign in as your contractor company and tap "Join a site with a code". Site code: '+w.code;
+const shareText = (w)=>'Join '+unescapeHtml(w.name)+' on COMVERA: open '+location.origin+' , sign in as your contractor company and tap "Join a site with a code". Site code: '+w.code;
 on('wp-copy', async (el)=>{ const w = W()[el.dataset.id]; try{ await navigator.clipboard.writeText(w.code); showToast('Site code copied'); }catch{ showToast('Site code: '+w.code); } });
 on('wp-share', async (el)=>{
   const w = W()[el.dataset.id];

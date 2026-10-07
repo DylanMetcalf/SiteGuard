@@ -154,10 +154,10 @@ on('print-gate-cards', async (el)=>{
   try{ list = (await api.get('/api/sites/'+encodeURIComponent(siteId)+'/gate')).workers; }catch(e){ showToast(e.message); return; }
   if(!list.length){ showToast('Nobody is assigned to this site yet'); return; }
   const company = isContractor() ? org().name : contractorOf(site).name;
-  printWhenLoaded('<div class="gate-cards">'+list.map(w=>'<div class="gate-card"><div class="gc-head"><span>SITEGUARD GATE CARD</span><span>'+site.name+'</span></div>'
+  printWhenLoaded('<div class="gate-cards">'+list.map(w=>'<div class="gate-card"><div class="gc-head"><span>COMVERA GATE CARD</span><span>'+site.name+'</span></div>'
     +'<img class="gc-qr" alt="QR code" src="/api/sites/'+encodeURIComponent(siteId)+'/gate/'+encodeURIComponent(w.workerId)+'/qr.svg">'
     +'<div class="gc-name">'+esc(w.name)+'</div><div class="gc-sub">'+esc([w.occupation, w.employeeNo ? 'No. '+w.employeeNo : ''].filter(Boolean).join(' · '))+'</div>'
-    +'<div class="gc-sub">'+company+'</div><div class="gc-foot">Scan for today\'s clearance. This card shows status held in SiteGuard; it is not a permit or proof of legal compliance.</div></div>').join('')+'</div>');
+    +'<div class="gc-sub">'+company+'</div><div class="gc-foot">Scan for today\'s clearance. This card shows status held in COMVERA; it is not a permit or proof of legal compliance.</div></div>').join('')+'</div>');
 });
 on('print-gate-list', async (el)=>{
   const w = (S.state.workplaces||{})[el.dataset.wp];
@@ -305,7 +305,7 @@ on('open-revisions', async (el)=>{
     +(r.revisions.length ? (ch.length
         ? '<div class="notice"><strong>'+ch.length+' change'+(ch.length===1?'':'s')+' since Rev '+r.revisions[0].number+'.</strong> Download the file again to issue Rev '+(r.revisions[0].number+1)+'.</div><div class="card">'+ch.map(c=>'<div class="kv"><span>'+esc(c.name)+'<div class="site-card-sub">'+esc(c.section)+'</div></span><strong class="chg '+c.kind+'">'+label[c.kind]+'<div class="site-card-sub" style="font-weight:400;">'+esc(c.detail)+'</div></strong></div>').join('')+'</div>'
         : '<div class="notice alert-green">Rev '+r.revisions[0].number+' is up to date — nothing has changed since it was compiled.</div>')
-      : '<div class="notice">No revision yet. The first time the safety file is downloaded, SiteGuard records it as Rev 1.</div>')
+      : '<div class="notice">No revision yet. The first time the safety file is downloaded, COMVERA records it as Rev 1.</div>')
     +(r.revisions.length ? '<div class="section-title">History</div><div class="card">'+r.revisions.map(v=>'<div class="kv"><span>Rev '+v.number+'<div class="site-card-sub">'+esc(v.by)+'</div></span><strong>'+new Date(v.at).toLocaleString('en-ZA')+'<div class="site-card-sub" style="font-weight:400;">'+v.documents+' document'+(v.documents===1?'':'s')+(v.changes!==null?' · '+v.changes+' change'+(v.changes===1?'':'s'):'')+'</div></strong></div>').join('')+'</div>' : '')
     +'<a class="btn primary block" href="/api/sites/'+encodeURIComponent(siteId)+'/safety-file.pdf" download>Download the current safety file</a>'
     +'<div class="site-card-sub" style="margin-top:6px;">A new revision is recorded only when something in the file changed, so downloading twice doesn\'t create a new revision.</div>');

@@ -281,7 +281,7 @@ export function showToast(msg){
 }
 /*
  * Phone back button: an open sheet has its own history entry, so Back closes
- * the sheet instead of leaving SiteGuard. Screens get entries too (app.js).
+ * the sheet instead of leaving COMVERA. Screens get entries too (app.js).
  */
 let skipPops = 0;
 let afterBack = [];
