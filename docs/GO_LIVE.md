@@ -16,7 +16,7 @@ a few clicks by you · **[NEEDS DECISION]** your choice · **[OPTIONAL]** can wa
 
 | Item | Status | What it is | Provider |
 |---|---|---|---|
-| Application code | [READY] | COMVERA itself, 170 automated tests passing | this repository |
+| Application code | [READY] | COMVERA itself, 195 automated tests passing | this repository |
 | Hosting | [ALREADY CONFIGURED] + [NEEDS ACCOUNT] | The computer that runs COMVERA | Render (`render.yaml` describes everything) |
 | Database | [ALREADY CONFIGURED] | Where records live (Postgres, created by Render) | Render |
 | File storage | [ALREADY CONFIGURED] | Uploaded documents (a 5 GB disk, created by Render) | Render |

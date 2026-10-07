@@ -50,6 +50,16 @@ const click = async (page, sel) => { await page.click(sel); await page.waitForTi
 const anon = await (await browser.newContext({ viewport: { width: 1280, height: 820 } })).newPage();
 await anon.goto(B + '/'); await anon.waitForSelector('.lp-hero');
 await shot(anon, 'home', 'The public home page: what COMVERA is, who it is for, and Start free trial.', { section: 'The website' });
+for (const [url, name, caption] of [
+  ['/features', 'features', 'Features: everything COMVERA does, in plain language.'],
+  ['/for-contractors', 'for-contractors', 'For contractors: build a safety file once and reuse it for every site and client.'],
+  ['/for-sites', 'for-sites', 'For mines and sites: one site code, many contractors, one review queue, gate clearance.'],
+  ['/safety-file-builder', 'safety-file-builder', 'The Safety File Builder: the guided way to put a complete safety file together.'],
+  ['/how-it-works', 'how-it-works', 'How it works, step by step, for both sides.'],
+]) {
+  await anon.goto(B + url); await anon.waitForSelector('.lp-page-head, .lp-hero');
+  await shot(anon, name, caption);
+}
 await anon.goto(B + '/pricing'); await anon.waitForSelector('.lp-price');
 await shot(anon, 'pricing', 'Pricing for contractors and for sites. Prices are set by you under Platform.');
 await anon.goto(B + '/?code=COMVERA-LIFETIME'); await anon.waitForTimeout(800);
@@ -58,6 +68,50 @@ if (roleCard) await roleCard.click();
 await anon.waitForTimeout(400);
 await anon.evaluate(() => { const e = document.getElementById('suPromo'); if (e) e.scrollIntoView({ block: 'center' }); });
 await shot(anon, 'signup-code', 'Sign-up with a promo code filled in from the link (?code=…). Each person has their own account and password.');
+
+await anon.goto(B + '/contact'); await anon.waitForSelector('.lp-page-head');
+await shot(anon, 'contact', 'Contact: how people reach you. Questions and sales enquiries come to your support email.');
+
+// ---------- The demo ----------
+const demoCtx = await browser.newContext({ viewport: { width: 1280, height: 820 } });
+await demoCtx.addInitScript(() => { try { localStorage.setItem('sg_tutorial_seen', '1'); } catch {} });
+const demo = await demoCtx.newPage();
+await demo.goto(B + '/'); await demo.waitForSelector('.lp-hero');
+await demo.click('[data-action="auth-go"][data-view="signin"]'); await demo.waitForSelector('[data-action="start-demo"]');
+await demo.evaluate(() => document.querySelector('[data-action="start-demo"]').scrollIntoView({ block: 'center' }));
+await shot(demo, 'demo-start', 'Anyone can try COMVERA without signing up: Explore the demo makes a private practice copy with sample data, deleted after a few days.', { section: 'The demo' });
+await demo.click('[data-action="start-demo"]');
+await demo.waitForSelector('.topbar', { timeout: 30000 }); await demo.waitForTimeout(1500);
+await shot(demo, 'demo-mine', 'The demo opens as a mine\'s SHE manager, with sample sites, contractors, documents waiting for review and findings from the compliance agent.');
+await demo.evaluate(() => { const b = document.querySelector('[data-action="nav"][data-nav="sites"]'); b && b.click(); });
+await demo.waitForTimeout(900);
+await shot(demo, 'demo-sites', 'The mine\'s sites in the demo, each with its contractors and how ready they are.');
+const persona = await demo.$('#personaSel');
+if (persona) {
+  await persona.evaluate((el) => { el.style.outline = '3px solid #6E9C80'; el.style.outlineOffset = '2px'; });
+  await shot(demo, 'demo-personas', 'The menu at the top switches between the sample people (mine manager, reviewer, contractor…), so you can show both sides of every step.');
+  const contractorOpt = await persona.evaluate((el) => { const o = [...el.options].find((x) => /contractor/i.test(x.textContent)); return o ? o.value : null; });
+  if (contractorOpt) {
+    await persona.selectOption(contractorOpt);
+    await demo.waitForTimeout(2000);
+    await shot(demo, 'demo-contractor', 'The same demo as the contractor: their safety files, documents and what they still need to do.');
+  }
+}
+
+// ---------- The in-app walkthrough ----------
+await demo.goto(B + '/?tour=1'); await demo.waitForSelector('.tour-card h2', { timeout: 15000 });
+await shot(demo, 'tour-1', 'The built-in Walkthrough: a guided tour of the real screens, with Back, Next and Auto-play (hands-free, for presenting). Start it from More → Walkthrough.', { section: 'The in-app walkthrough' });
+const tourCaptions = [
+  'Each step highlights one part of the screen and says what it is for.',
+  'It moves through the screens by itself — nothing is changed.',
+  'The progress bar shows how far along you are; Auto-play turns pages every few seconds.',
+];
+for (let i = 0, step = 1; i < tourCaptions.length; i++) {
+  for (let k = 0; k < 2; k++) { const n = await demo.$('[data-tour="next"]'); if (n) { await n.click(); step++; await demo.waitForTimeout(700); } }
+  await shot(demo, `tour-${step}`, tourCaptions[i]);
+}
+const x = await demo.$('[data-tour="close"]'); if (x) await x.click();
+await demoCtx.close();
 
 // ---------- Mine ----------
 const mine = await account('host', 'Kathu Mining', `walk-mine-${stamp}@example.com`);
@@ -164,6 +218,30 @@ for (const s of shots) {
   if (s.section) body += `<h2>${esc(s.section)}</h2>`;
   body += `<figure><img src="img/${s.file}" alt=""><figcaption>${esc(s.caption)}</figcaption></figure>`;
 }
+// What's left before launch (kept in step with docs/GO_LIVE.md).
+const LAUNCH = `<h2>What's left to launch</h2>
+<p>The software is finished and tested (195 automated tests). What remains are accounts and settings only the owner can create — about 2 hours, plus waiting for the domain and email checks. Full click-by-click instructions are in <strong>docs/GO_LIVE.md</strong>.</p>
+<ol class="todo">
+<li><strong>Merge the work on GitHub.</strong> Open the pull request and click <em>Merge pull request</em>.</li>
+<li><strong>Create a Render account</strong> (render.com, sign up with GitHub) and add a card.</li>
+<li><strong>Create COMVERA on Render in one click:</strong> New → Blueprint → choose the repository. Enter your email for <code>PLATFORM_ADMIN_EMAILS</code> and <code>SUPPORT_EMAIL</code>. Wait until it shows <em>Live</em>.</li>
+<li><strong>Sign up as yourself</strong> and confirm your email (from Render's log until email is set up). Check that <em>More → Platform</em> appears.</li>
+<li><strong>Make the lifetime promo code</strong> for family and friends: More → Platform → Promo codes (100% off, no end date, limited uses).</li>
+<li><strong>Buy the domain</strong> (e.g. comvera.co.za, about R99/year), add it in Render, add the CNAME record at the registrar, then set <code>APP_URL</code>.</li>
+<li><strong>Set up email with Resend:</strong> verify the domain, create an API key, set <code>SMTP_URL</code> and <code>EMAIL_FROM</code> in Render. Needed for confirmations, resets, invitations, reminders and Exchanges.</li>
+<li><strong>Optional — AI:</strong> buy $10–$20 credit at console.anthropic.com and set <code>ANTHROPIC_API_KEY</code>. Everything works without it.</li>
+<li><strong>Uptime check:</strong> add the GitHub variable <code>COMVERA_URL</code> so you are emailed if the site goes down.</li>
+<li><strong>Backups:</strong> confirm Render's daily database backups and disk snapshots; do the monthly restore test.</li>
+<li><strong>First real test:</strong> sign up your parents with the promo link, build a safety file, try an Exchange (see GO_LIVE §7).</li>
+</ol>
+<h3>Before charging anyone (not needed for the beta)</h3>
+<ul class="todo">
+<li>An attorney finishes the draft <em>Privacy</em> and <em>Terms</em> pages.</li>
+<li>Decide on card payments (Stripe is built in; check it pays out to your South African business) and set real prices under Platform → Pricing.</li>
+<li>Add virus scanning for uploads before opening sign-ups to the public.</li>
+</ul>
+<h3>Running cost</h3>
+<p>About <strong>R265 per month</strong> for the beta: Render web service ≈ R126, database ≈ R108, document storage ≈ R23, domain ≈ R8, email R0 (free tier), monitoring R0. AI is optional, roughly R50–R400 a month for a small beta.</p>`;
 const symbol = readFileSync('public/brand/comvera-logo-light.svg', 'utf8');
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>COMVERA — Walkthrough</title><style>
@@ -172,12 +250,12 @@ body{margin:0;background:#F3F6F4;color:#0E1A2B;font:15px/1.55 system-ui,-apple-s
 h1{font-size:30px;margin:18px 0 6px}h2{margin:40px 0 12px;font-size:21px;border-top:1px solid #E2E7E4;padding-top:24px}
 p.lead{color:#3E4A5A;font-size:16px}figure{margin:0 0 26px;background:#fff;border:1px solid #E2E7E4;border-radius:14px;overflow:hidden;break-inside:avoid}
 figure img{display:block;max-width:100%;margin:0 auto}figcaption{padding:12px 16px;font-size:14px;color:#3E4A5A;border-top:1px solid #E2E7E4}
+.todo li{margin:0 0 10px}.todo{padding-left:22px}code{background:#E6EFE9;padding:1px 5px;border-radius:5px;font-size:13px}h3{margin:24px 0 8px;font-size:17px}
 .note{background:#E6EFE9;border-radius:12px;padding:14px 16px;font-size:14px}
 @media print{body{background:#fff}h2{break-before:page}figure img{max-height:640px;width:auto}}
 </style></head><body><div class="wrap"><div class="logo">${symbol}</div>
-<h1>Walkthrough</h1><p class="lead">What COMVERA looks like for a contractor, for a mine or site, and for you as the owner. Every picture is a screenshot of the real app.</p>
-<div class="note">Going live? The step-by-step checklist is <strong>docs/GO_LIVE.md</strong> (what to click, what to copy, what it costs, and the first test with your parents).</div>
-${body}<p style="color:#5E6A7A;font-size:12px;margin-top:30px">Generated ${new Date().toISOString().slice(0, 10)} by scripts/walkthrough.mjs from a test database.</p></div></body></html>`;
+<h1>Walkthrough</h1><p class="lead">Everything in COMVERA, in pictures: the public website, the demo anyone can try, the built-in guided walkthrough, what it looks like for a mine or site and for a contractor, Exchanges, and the owner's tools. Every picture is a screenshot of the real app. At the end is the list of what is still needed to launch.</p>
+${body}${LAUNCH}<p style="color:#5E6A7A;font-size:12px;margin-top:30px">Generated ${new Date().toISOString().slice(0, 10)} by scripts/walkthrough.mjs from a test database.</p></div></body></html>`;
 writeFileSync(path.join(OUT, 'index.html'), html);
 
 const b2 = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined });
