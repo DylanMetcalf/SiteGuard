@@ -369,7 +369,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
   app.get('/api/bootstrap', async (req, reply) => {
     reply.header('cache-control', 'no-store');
     const ctx = req.ctx;
-    const baseFeatures = { demo: features.demo, billing: features.billing, email: features.email, aiConfigured: features.ai, contact: { email: config.SUPPORT_EMAIL ?? null, phone: config.CONTACT_PHONE ?? null } };
+    const baseFeatures = { demo: features.demo, billing: features.billing, payments: features.payments, email: features.email, aiConfigured: features.ai, contact: { email: config.SUPPORT_EMAIL ?? null, phone: config.CONTACT_PHONE ?? null } };
     if (!ctx) return { authenticated: false, features: baseFeatures };
 
     const orgs = await many(

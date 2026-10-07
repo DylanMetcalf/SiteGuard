@@ -23,7 +23,7 @@ import { seatsUsed } from './org.js';
 
 let stripe: Stripe | null = null;
 function getStripe(): Stripe {
-  if (!features.billing) throw unavailable('Billing is not configured on this server.');
+  if (!features.payments) throw unavailable('Online card payments aren\'t switched on yet. Contact us to subscribe, or use a promo code.');
   stripe ??= new Stripe(config.STRIPE_SECRET_KEY!);
   return stripe;
 }
@@ -110,6 +110,7 @@ export default async function billingRoutes(app: FastifyInstance) {
     const plan = planOf(ctx.org);
     return {
       enabled: features.billing,
+      payments: features.payments,
       plan: plan.id,
       status: ctx.org.subscription_status,
       standing: standing(ctx.org),
@@ -126,7 +127,7 @@ export default async function billingRoutes(app: FastifyInstance) {
       hasCustomer: !!ctx.org.stripe_customer_id,
       plans: plansFor(ctx.org.kind).map((p) => ({
         id: p.id, name: p.name, blurb: p.blurb, siteLimit: p.siteLimit, maxSeats: p.maxSeats, ai: p.ai, paid: p.paid,
-        purchasable: !p.paid || !!p.stripePrice,
+        purchasable: !p.paid || (features.payments && !!p.stripePrice),
       })),
     };
   });
@@ -134,6 +135,7 @@ export default async function billingRoutes(app: FastifyInstance) {
   app.post('/api/billing/checkout', async (req) => {
     const ctx = requireOrg(req.ctx);
     requireAdmin(ctx);
+    getStripe(); // explains clearly when online payment isn't switched on
     const b = z.object({ plan: z.string(), seats: z.coerce.number().int().min(1).max(500) }).parse(req.body);
     const plan = PLANS[b.plan];
     if (!plan || plan.kind !== ctx.org.kind || !plan.paid || !plan.stripePrice) throw badRequest('That plan is not available.');
@@ -208,7 +210,7 @@ export default async function billingRoutes(app: FastifyInstance) {
   await app.register(async (scope) => {
     scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => done(null, body));
     scope.post('/api/billing/webhook', async (req, reply) => {
-      if (!features.billing || !config.STRIPE_WEBHOOK_SECRET) return reply.status(404).send();
+      if (!features.payments || !config.STRIPE_WEBHOOK_SECRET) return reply.status(404).send();
       let event: Stripe.Event;
       try {
         event = getStripe().webhooks.constructEvent(req.body as Buffer, String(req.headers['stripe-signature'] ?? ''), config.STRIPE_WEBHOOK_SECRET);

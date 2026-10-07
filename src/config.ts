@@ -53,6 +53,12 @@ const schema = z.object({
   AI_WEB_SEARCH: bool(true),
 
   // Billing. Unset → billing is disabled and every organisation is treated as in good standing.
+  /**
+   * Turn on trials, plans, promo codes and sponsorship limits without a payment provider
+   * (e.g. for a beta). Card payments still need STRIPE_SECRET_KEY; until then customers on a
+   * paid plan are invoiced by hand or given a plan in Platform.
+   */
+  ENFORCE_PLANS: bool(false),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_HOST_STARTER: z.string().optional(),
@@ -98,7 +104,10 @@ if (isProd) {
 }
 export const features = {
   ai: !!config.ANTHROPIC_API_KEY,
-  billing: !!config.STRIPE_SECRET_KEY,
+  /** Plans, trials and limits are enforced. */
+  billing: !!config.STRIPE_SECRET_KEY || config.ENFORCE_PLANS,
+  /** Card payments through Stripe are available. */
+  payments: !!config.STRIPE_SECRET_KEY,
   email: !!config.SMTP_URL,
   demo: config.DEMO_SANDBOX_ENABLED,
   devRoleSwitcher: config.DEV_ROLE_SWITCHER && !isProd,

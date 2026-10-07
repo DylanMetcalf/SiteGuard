@@ -23,7 +23,7 @@ function privacy(): string {
     'Hosting and database provider (where the service runs).',
     'File storage provider for uploaded documents.',
     features.email ? 'Email delivery provider for invitations, reminders and notifications.' : null,
-    features.billing ? 'Stripe, for subscriptions and card payments. COMVERA never sees or stores card numbers.' : null,
+    features.payments ? 'Stripe, for subscriptions and card payments. COMVERA never sees or stores card numbers.' : null,
     features.ai ? 'Anthropic, for AI drafting and reading expiry dates, called from the server only, when someone uses an AI feature. API keys are never sent to the browser.' : null,
   ].filter(Boolean);
   return `${DRAFT}
@@ -66,7 +66,7 @@ function terms(): string {
 <h3>Your responsibilities</h3>
 <ul><li>Keep your sign-in details private and invite only people who should have access.</li><li>Upload only information you are entitled to share, and keep it accurate.</li><li>Use share links with care: anyone with the link can view what it shows until it expires or is revoked.</li></ul>
 <h3>Plans and payment</h3>
-<p>${features.billing ? 'Paid plans are billed through Stripe. You can change or cancel your plan under Plan &amp; billing.' : 'Billing is not switched on for this service.'}</p>
+<p>${features.payments ? 'Paid plans are billed through Stripe. You can change or cancel your plan under Plan &amp; billing.' : features.billing ? 'Every account starts with a 14-day trial. Paid plans are arranged with the operator of this service.' : 'Billing is not switched on for this service.'}</p>
 <h3>To be completed by the operator</h3>
 <ul><li>Legal entity, governing law and dispute resolution.</li><li>Service levels, liability limits and termination.</li><li>Fees, refunds and notice periods.</li></ul>
 </div>`;
