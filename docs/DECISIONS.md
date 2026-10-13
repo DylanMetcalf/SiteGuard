@@ -5,6 +5,10 @@ Newest first.
 
 ---
 
+**DECISION** The interactive walkthrough is a static public page inside the app (`/walkthrough`) with fictional data that runs only in the browser, rather than a separate site or a live sandbox.
+**REASON** One link that works without an account, goes online with COMVERA at no extra cost, can never touch real records, and can't drift into claiming features that don't exist (its test checks it never calls the API).
+**DATE** 2026-10-13
+
 **DECISION** COMVERA Exchange: documents are requested or shared through a scoped, time-limited exchange reached by an emailed link plus a one-time code, not through accounts or attachments. Relationships and contacts are records, never permissions; the recipient gets no user, organisation, password or trial.
 **REASON** Most contractors (and many clients) have no COMVERA workspace and won't create one just to send a certificate. Email attachments can't be tracked, revoked or kept as a clean compliance record.
 **DATE** 2026-10-07

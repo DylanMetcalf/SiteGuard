@@ -53,6 +53,9 @@ haven't built.
   organisations or trials and sees one exchange only. Requested uploads are the requester's own files; shares point at
   the sender's file (revoke never changes it). Claiming needs a verified email, an admin and explicit confirmation;
   never auto-link or merge. Log every step with `exchangeAudit`; never block a recipient's submission over billing.
+- The interactive walkthrough (`/walkthrough`: `public/walkthrough.html`, `walkthrough.css`, `js/walkthrough-page.js`) is
+  fictional data in the browser only: never call the API from it, and keep every claim matched to a real feature
+  (`docs/INTERACTIVE_WALKTHROUGH.md`).
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and

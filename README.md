@@ -50,6 +50,11 @@ requirement that a blueprint can produce shows **Create it in Document Studio**,
 attached and submitted for review in one step. Documents due for review are flagged by the
 compliance agent. See `src/lib/studio/`.
 
+**Interactive walkthrough** (`/walkthrough`): a public, single-page demo for prospects. It tells
+the story of one fictional contractor safety file, from scattered emails and folders to a
+tracked file, and lets the visitor work the file themselves. It runs only in the browser with
+fictional data. See `docs/INTERACTIVE_WALKTHROUGH.md`.
+
 **COMVERA Exchange**: request or share specific documents with anyone, even people without a
 COMVERA account. A mine opens a contractor and chooses **Request documents** (or **Bulk request**
 to search its records, e.g. every "Working at Heights" certificate, and send one request per
