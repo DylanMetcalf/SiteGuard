@@ -16,7 +16,7 @@ a few clicks by you · **[NEEDS DECISION]** your choice · **[OPTIONAL]** can wa
 
 | Item | Status | What it is | Provider |
 |---|---|---|---|
-| Application code | [READY] | COMVERA itself, 195 automated tests passing | this repository |
+| Application code | [READY] | COMVERA itself, 197 automated tests passing | this repository |
 | Hosting | [ALREADY CONFIGURED] + [NEEDS ACCOUNT] | The computer that runs COMVERA | Render (`render.yaml` describes everything) |
 | Database | [ALREADY CONFIGURED] | Where records live (Postgres, created by Render) | Render |
 | File storage | [ALREADY CONFIGURED] | Uploaded documents (a 5 GB disk, created by Render) | Render |
@@ -189,7 +189,14 @@ browser.
 - **Exchanges depend on email.** The secure link and the one-time code both arrive by email, so
   Exchanges only work for outside people once Step 7 is done.
 
-## 7. First test with your parents
+## 7. Showing COMVERA to someone
+
+Send them `https://app.comvera.co.za/walkthrough` (your own address + `/walkthrough`): a
+six-minute interactive walkthrough with fictional data. It needs no account and works on a phone.
+Its **Let's discuss your requirements** button opens your contact page, which emails
+`SUPPORT_EMAIL` (needs Step 7).
+
+## 8. First test with your parents
 
 Do this yourself first on your phone, then sit with them.
 

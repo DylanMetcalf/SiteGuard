@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>COMVERA Walkthrough</title>
+<meta name="description" content="An interactive walkthrough of COMVERA: from scattered safety documents to a clear, tracked safety file. Fictional companies and data.">
+<meta name="theme-color" content="#0E1E36">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="COMVERA">
+<meta property="og:title" content="COMVERA — interactive walkthrough">
+<meta property="og:description" content="See how a contractor's safety file goes from scattered emails and folders to one clear, tracked file.">
+<meta property="og:image" content="/brand/og-image.png">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+<link rel="preload" href="/fonts/Onest-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/walkthrough.css">
+</head>
+<body>
+<!--WT-BODY-START-->
+<!-- Where the closing buttons lead. Leave a value empty to show the owner a "not set yet" note instead of a broken link. -->
+<div id="wt-config" hidden data-contact-url="/contact" data-contact-email="" data-explore-url="/"></div>
+
+<a class="wt-skip" href="#problem">Skip to the walkthrough</a>
+
+<header class="wt-bar" id="wtBar">
+  <div class="wt-bar-in">
+    <a class="wt-brand" href="#top" data-act="goto" data-ch="0" aria-label="COMVERA walkthrough, back to the start">
+      <img src="/brand/comvera-symbol.svg" alt="" width="28" height="28" class="wt-mark-light">
+      <img src="/brand/comvera-symbol-dark.svg" alt="" width="28" height="28" class="wt-mark-dark">
+      <span class="wt-brand-name">COMVERA</span>
+    </a>
+    <span class="wt-bar-label">Interactive walkthrough</span>
+    <div class="wt-where" aria-live="polite"><span class="wt-where-n" id="wtWhereN">Intro</span><span class="wt-where-t" id="wtWhereT">Start here</span></div>
+    <nav class="wt-steps" aria-label="Walkthrough chapters" id="wtSteps"></nav>
+    <div class="wt-bar-actions">
+      <button class="wt-icon" data-act="prev" aria-label="Previous chapter" title="Previous chapter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button class="wt-icon" data-act="next" aria-label="Next chapter" title="Next chapter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+      <button class="wt-restart" data-act="restart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span>Restart</span></button>
+    </div>
+  </div>
+  <div class="wt-progress" aria-hidden="true"><span id="wtProgress"></span></div>
+</header>
+
+<main id="top">
+
+<!-- ============ OPENING ============ -->
+<section class="ch ch-intro" id="intro" data-ch="0" aria-labelledby="introTitle">
+  <div class="wrap intro-grid">
+    <div class="intro-copy">
+      <p class="eyebrow">A contractor safety file, start to finish</p>
+      <h1 id="introTitle">How much time does it take to get a clear picture of your safety documentation?</h1>
+      <p class="lead">When information is spread across people, messages, folders and documents, understanding what is complete, what is missing and what needs attention can become a process of its own.</p>
+      <div class="cta-row">
+        <button class="btn btn-primary" data-act="goto" data-ch="1">Experience the difference</button>
+        <button class="btn btn-quiet" data-act="goto" data-ch="3">Skip to the solution</button>
+      </div>
+      <p class="fine">About 6 minutes · works on a phone · fictional companies and data</p>
+    </div>
+
+    <div class="desk" aria-label="An illustration of one contractor safety file scattered across email, WhatsApp, a shared folder and a spreadsheet">
+      <div class="frag frag-mail">
+        <div class="frag-head"><span class="dot-ic ic-mail" aria-hidden="true"></span>Email · Highveld Mining Group</div>
+        <p class="frag-sub">RE: RE: FW: Safety file — Shaft 3 conveyor</p>
+        <p class="frag-text">Hi Johan, we still need the updated Working at Heights records and the method statement before Monday's induction…</p>
+      </div>
+      <div class="frag frag-chat">
+        <div class="frag-head"><span class="dot-ic ic-chat" aria-hidden="true"></span>WhatsApp · Site office</div>
+        <p class="bubble bubble-in">Is Sipho's medical the new one? Gate won't let him in</p>
+        <p class="bubble bubble-out">Sent it last week I think 🤔</p>
+      </div>
+      <div class="frag frag-folder">
+        <div class="frag-head"><span class="dot-ic ic-folder" aria-hidden="true"></span>Shared folder · Safety file 2026</div>
+        <ul class="files">
+          <li><span>Risk_Assessment_FINAL.pdf</span><time>12 Feb</time></li>
+          <li><span>Risk_Assessment_FINAL_v2 (1).pdf</span><time>3 Mar</time></li>
+          <li><span>WAH_certs_scan.jpg</span><time>2025</time></li>
+          <li><span>Medical_Sipho_old?.pdf</span><time>Aug 2025</time></li>
+        </ul>
+      </div>
+      <div class="frag frag-sheet">
+        <div class="frag-head"><span class="dot-ic ic-sheet" aria-hidden="true"></span>Tracker.xlsx</div>
+        <table>
+          <thead><tr><th>Document</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>COID letter</td><td>✓</td></tr>
+            <tr><td>Method statement</td><td>asked Thabo?</td></tr>
+            <tr><td>Heights training</td><td>??</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="frag frag-alert" role="presentation">
+        <span class="alert-ic" aria-hidden="true">!</span>
+        <span><strong>Expired:</strong> Working at Heights · L. Nkosi</span>
+      </div>
+      <div class="frag frag-think">Which version did the mine actually approve?</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 01 PROBLEM ============ -->
+<section class="ch" id="problem" data-ch="1" aria-labelledby="problemTitle">
+  <div class="wrap">
+    <header class="ch-head">
+      <p class="ch-num">01 · Recognise the problem</p>
+      <h2 id="problemTitle">One safety file, five places to look</h2>
+      <p class="ch-lead">Voltrix Electrical is preparing its safety file for a conveyor job at Highveld Mining's Shaft 3. Open each place the information lives.</p>
+    </header>
+    <div class="explore">
+      <div class="explore-list" role="tablist" aria-label="Where the information lives" id="exploreTabs"></div>
+      <div class="explore-view" id="exploreView" role="tabpanel" aria-live="polite"></div>
+    </div>
+    <div class="summary" id="problemSummary">
+      <p class="summary-count" id="exploreCount"></p>
+      <ul class="summary-list">
+        <li>Information is distributed.</li>
+        <li>Status is difficult to confirm.</li>
+        <li>Responsibilities can become unclear.</li>
+        <li>Follow-ups consume time.</li>
+        <li>Important details can be overlooked.</li>
+      </ul>
+      <p class="fine">These are common challenges, illustrated with a fictional example. Not every operation has all of them.</p>
+      <button class="btn btn-primary" data-act="goto" data-ch="2">Show me a better way</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 CURRENT PROCESS ============ -->
+<section class="ch ch-tint" id="process" data-ch="2" aria-labelledby="processTitle">
+  <div class="wrap">
+    <header class="ch-head">
+      <p class="ch-num">02 · See the current process</p>
+      <h2 id="processTitle">The work isn't the problem. Keeping it aligned is.</h2>
+      <p class="ch-lead">A typical way a safety file comes together by email and folders. Select a stage to see what happens there, or play the process.</p>
+    </header>
+    <div class="flow">
+      <div class="flow-col">
+        <ol class="flow-list" id="flowList"></ol>
+        <div class="flow-controls">
+          <button class="btn btn-secondary" data-act="flow-play" id="flowPlay">Play the process</button>
+          <p class="flow-tally" id="flowTally" aria-live="polite"></p>
+        </div>
+      </div>
+      <aside class="flow-detail" id="flowDetail" aria-live="polite"></aside>
+    </div>
+    <p class="bridge">What if the process were easier to see and manage?</p>
+    <div class="cta-row"><button class="btn btn-primary" data-act="goto" data-ch="3">Meet COMVERA</button></div>
+  </div>
+</section>
+
+<!-- ============ 03 MEET COMVERA ============ -->
+<section class="ch" id="meet" data-ch="3" aria-labelledby="meetTitle">
+  <div class="wrap">
+    <header class="ch-head">
+      <p class="ch-num">03 · Introduce COMVERA</p>
+      <h2 id="meetTitle">Meet COMVERA</h2>
+      <p class="ch-lead">A more organised way to manage safety information, documentation and the steps needed to move a process forward.</p>
+    </header>
+    <div class="sorter" id="sorter">
+      <div class="sorter-stage" id="sorterStage" aria-hidden="true"></div>
+      <div class="sorter-side">
+        <p id="sorterText">The same pieces from the email, the chat, the folder and the tracker…</p>
+        <button class="btn btn-secondary" data-act="sort" id="sortBtn">Organise them</button>
+      </div>
+    </div>
+
+    <div class="app" aria-label="Illustration of COMVERA's safety file overview with fictional data">
+      <div class="app-top">
+        <span class="app-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="app-title">COMVERA · Highveld Mining Group</span>
+        <span class="app-tag">Illustration</span>
+      </div>
+      <div class="app-body meet-grid">
+        <div class="meet-q"><span class="q-n">1</span><div><h3>What am I looking at?</h3><p>One safety file: Voltrix Electrical on Shaft 3 Conveyor Rewire, with every document the site requires.</p></div></div>
+        <div class="meet-q"><span class="q-n">2</span><div><h3>What needs attention?</h3><p>The items that are missing, expired or waiting for review, listed in one place.</p></div></div>
+        <div class="meet-q"><span class="q-n">3</span><div><h3>What should happen next?</h3><p>Each item says whose move it is: the contractor uploads, the site reviews.</p></div></div>
+        <div class="meet-overview" id="meetOverview"></div>
+      </div>
+    </div>
+    <div class="cta-row"><button class="btn btn-primary" data-act="goto" data-ch="4">Try the workflow</button></div>
+  </div>
+</section>
+
+<!-- ============ 04 WORKFLOW ============ -->
+<section class="ch ch-tint" id="workflow" data-ch="4" aria-labelledby="workflowTitle">
+  <div class="wrap">
+    <header class="ch-head">
+      <p class="ch-num">04 · Experience the workflow</p>
+      <h2 id="workflowTitle">Work the file the way the site's reviewer would</h2>
+      <p class="ch-lead">You're Naledi Khumalo, SHE reviewer at Highveld Mining. Voltrix starts on Monday. Follow the six steps, or jump between them.</p>
+    </header>
+    <ol class="stepper" id="stepper" aria-label="Workflow steps"></ol>
+    <div class="app app-demo">
+      <div class="app-top">
+        <span class="app-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="app-title" id="demoCrumb">COMVERA · Sites</span>
+        <span class="app-tag">Runs in your browser only</span>
+      </div>
+      <div class="app-body" id="demoBody"></div>
+    </div>
+    <div class="coach" id="demoCoach" aria-live="polite"></div>
+    <p class="toast-line" id="demoToast" role="status" aria-live="polite"></p>
+  </div>
+</section>
+
+<!-- ============ 05 ISSUE ============ -->
+<section class="ch" id="issue" data-ch="5" aria-labelledby="issueTitle">
+  <div class="wrap">
+    <header class="ch-head">
+      <p class="ch-num">05 · Handle an issue</p>
+      <h2 id="issueTitle">A document arrives, but it's out of date</h2>
+      <p class="ch-lead">In the review queue: Sipho Dlamini's medical certificate of fitness. It was issued 14 months ago. Highveld's rule for this site accepts medicals for 12 months from the date of issue.</p>
+    </header>
+    <div class="issue">
+      <div class="issue-main" id="issueMain"></div>
+      <aside class="issue-side">
+        <h3>Outstanding work <span class="count" id="outCount"></span></h3>
+        <ul class="out-list" id="outList"></ul>
+      </aside>
+    </div>
+    <p class="lesson">Finding an issue is useful. Knowing what needs attention, and being able to track the next step, is what moves the process forward.</p>
+  </div>
+</section>
+
+<!-- ============ 06 OUTCOME ============ -->
+<section class="ch ch-tint" id="outcome" data-ch="6" aria-labelledby="outcomeTitle">
+  <div class="wrap">
+    <header class="ch-head">
+      <p class="ch-num">06 · See the improved outcome</p>
+      <h2 id="outcomeTitle">The same file, before and after</h2>
+      <p class="ch-lead">Same documents, same people, same site. What changes is where the information lives and how easy it is to see its state.</p>
+    </header>
+    <div class="seg" role="group" aria-label="Compare">
+      <button class="seg-btn" data-act="compare" data-v="before" aria-pressed="true">Before</button>
+      <button class="seg-btn" data-act="compare" data-v="after" aria-pressed="false">With COMVERA</button>
+    </div>
+    <div class="compare" id="compare">
+      <div class="compare-stage" id="compareStage" aria-hidden="true"></div>
+      <div class="compare-lists">
+        <div class="clist clist-before">
+          <h3>Before</h3>
+          <ul>
+            <li>Information spread across inboxes, chats and folders.</li>
+            <li>Status difficult to confirm.</li>
+            <li>Outstanding items discovered late.</li>
+            <li>Repeated manual follow-ups.</li>
+            <li>Uncertainty about what happens next.</li>
+          </ul>
+        </div>
+        <div class="clist clist-after">
+          <h3>With COMVERA</h3>
+          <ul>
+            <li>Each document filed against the requirement it answers.</li>
+            <li>Clear statuses: missing, waiting for review, approved, expiring.</li>
+            <li>Expiries and gaps flagged by the compliance agent before the gate.</li>
+            <li>Requests and notes recorded on the item, not in someone's inbox.</li>
+            <li>Every item shows whose move it is next.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 07 VALUE ============ -->
+<section class="ch" id="value" data-ch="7" aria-labelledby="valueTitle">
+  <div class="wrap">
+    <header class="ch-head">
+      <p class="ch-num">07 · Explore the business value</p>
+      <h2 id="valueTitle">Four things that get easier</h2>
+      <p class="ch-lead">Select one to see where it shows up in the file you just worked on.</p>
+    </header>
+    <div class="value">
+      <div class="value-tabs" role="tablist" aria-label="Business value" id="valueTabs"></div>
+      <div class="value-view" id="valueView" role="tabpanel" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 NEXT STEP ============ -->
+<section class="ch ch-close" id="next" data-ch="8" aria-labelledby="nextTitle">
+  <div class="wrap close-grid">
+    <div>
+      <p class="ch-num">08 · Take the next step</p>
+      <h2 id="nextTitle">Your process. A clearer picture.</h2>
+      <p class="lead">Every operation has its own requirements, people and challenges. The next step is to understand your current process and see where COMVERA can help.</p>
+      <div class="cta-row">
+        <a class="btn btn-light" id="ctaContact" href="/contact">Let's discuss your requirements</a>
+        <button class="btn btn-ghost-light" data-act="restart">Restart the walkthrough</button>
+        <a class="btn btn-ghost-light" id="ctaExplore" href="/">Explore COMVERA</a>
+      </div>
+      <div class="owner-note" id="ownerNote" hidden></div>
+    </div>
+    <div class="done-card" id="doneCard"></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="wt-foot">
+  <div class="wrap">
+    <p><strong>About this walkthrough.</strong> Highveld Mining Group, Voltrix Electrical Contractors and everyone named here are fictional. The screens are simplified illustrations of COMVERA's real workflow: requirements per site, document statuses, review and send-back, requests, expiry tracking and the activity history. Everything you click runs only in your browser and changes no real records.</p>
+    <p>COMVERA helps organise, track and review safety documentation. It does not by itself make an operation compliant; the requirements that apply depend on the work, the client, the site and the law.</p>
+  </div>
+</footer>
+<!--WT-BODY-END-->
+<script type="module" src="/js/walkthrough-page.js"></script>
+</body>
+</html>

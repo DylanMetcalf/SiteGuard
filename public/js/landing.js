@@ -49,7 +49,7 @@ function header(current){
 }
 function footer(){
   return '<footer class="lp-foot"><span>COMVERA</span>'
-    +'<span class="lp-foot-links">'+NAV.map(([k,l])=>go(k,l)).join(' · ')+' · '+go('how','How it works')+' · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>'
+    +'<span class="lp-foot-links">'+NAV.map(([k,l])=>go(k,l)).join(' · ')+' · '+go('how','How it works')+' · <a href="/walkthrough">Interactive walkthrough</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>'
     +'<span>Requirement lists are a starting point, not legal advice. COMVERA shows the status held in its records; it does not certify legal compliance.</span></footer>';
 }
 const page = (current, body) => '<div class="lp">'+header(current)+body+footer()+'</div>';
@@ -180,7 +180,7 @@ export function renderLanding(features){
     +'<p class="lp-lead">COMVERA is where contractors keep their safety documents, create what is missing and build a professional safety file for each site or client. Mines and sites use it to set requirements, review files and see who is cleared to work.</p>'
     +'<div class="lp-cta">'+trial('Start free trial')+'<button class="btn secondary" data-action="auth-go" data-view="signup" data-kind="contractor">Build a safety file</button>'
     +(demo?'<button class="btn secondary" data-action="start-demo" data-tour="1">Watch the 2-minute tour</button>':'')+'</div>'
-    +'<p class="lp-sub-links">'+go('how','See how it works')+' · '+go('pricing','View pricing')+' · '+go('contact','Contact us')+'</p>'
+    +'<p class="lp-sub-links"><a href="/walkthrough">Try the interactive walkthrough</a> · '+go('how','See how it works')+' · '+go('pricing','View pricing')+' · '+go('contact','Contact us')+'</p>'
     +'<ul class="lp-proof"><li>'+tick+'14-day trial of everything, no card</li><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li></ul>'
     +'</div>'+mock()+'</section>'
     +'<section class="lp-sides"><div class="lp-side"><p class="lp-eyebrow">For contractors</p><h2>Build a professional safety file in minutes.</h2>'

@@ -259,6 +259,11 @@ covers.
 
 ## Sharing COMVERA with testers
 
+**To show someone what COMVERA does without signing them up**, send them
+`https://YOUR-ADDRESS/walkthrough`: an interactive, six-minute walkthrough with fictional data
+that works on a phone. Its contact button goes to the contact page (see
+`docs/INTERACTIVE_WALKTHROUGH.md` to change that).
+
 Send people your app's address (for example `https://comvera.onrender.com`). They land on a page
 that explains COMVERA, with three ways in:
 

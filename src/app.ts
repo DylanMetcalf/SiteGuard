@@ -201,6 +201,11 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     return reply.sendFile('index.html');
   };
   app.get('/', sendShell);
+  // The interactive walkthrough: a standalone public page with fictional data (public/walkthrough.html).
+  app.get('/walkthrough', async (_req, reply) => {
+    reply.header('cache-control', 'no-cache');
+    return reply.sendFile('walkthrough.html', { cacheControl: false });
+  });
   app.setNotFoundHandler(async (req, reply) => {
     if (req.url.startsWith('/api/') || req.method !== 'GET') {
       return reply.status(404).send({ error: 'not_found', message: 'Not found.' });
