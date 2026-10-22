@@ -10,7 +10,7 @@ import {
   S, ICONS, actions, on, act, render, showToast, openSheet, closeSheet, sheetHead, escapeHtml, val,
   org, isContractor, isOrgAdmin, readOnly, computeReadiness, SOURCE_LABEL,
 } from './core.js';
-import { loadPacks, packPicker, PACK_NOTE } from './sheets.js';
+import { loadPacks, packPicker, checkedPacks, excludedItems, PACK_NOTE } from './sheets.js';
 
 export const isProject = (site) => !!(site && site.project);
 export const projects = () => Object.values(S.state.sites).filter(isProject);
@@ -75,7 +75,7 @@ on('new-project', async ()=>{
     +'<label class="field-label" for="pjLoc">Location (optional)</label><input type="text" id="pjLoc" maxlength="300" placeholder="e.g. 12 Main Road, Midrand">'
     +'<div class="section-title">What the safety file must contain</div>'
     +(mine.length?'<label class="field-label" for="pjCopy">Start from one of your files (optional)</label><select id="pjCopy" class="field"><option value="">Don\'t copy</option>'+mine.map(s=>'<option value="'+s.id+'">'+s.name+' — '+s.hostName+' ('+(S.state.requirements[s.id]||[]).length+')</option>').join('')+'</select>':'')
-    +'<div class="site-card-sub" style="margin:8px 0 6px;">Tick the lists that fit the job. The general construction list suits most clients outside mining. You can add or remove individual documents afterwards.</div>'
+    +'<div class="site-card-sub" style="margin:8px 0 6px;">Tick the lists that fit the job, then open <b>What\'s included — choose documents</b> to untick anything you don\'t need. The general construction list suits most clients outside mining. You can still add or remove documents afterwards.</div>'
     + packPicker(packs, ['general-construction'], []) + PACK_NOTE
     +'<button class="btn primary block" style="margin-top:12px;" data-action="new-project-go">Create project</button>');
 });
@@ -83,10 +83,10 @@ on('new-project-go', async (el)=>{
   const clientName = val('pjClient'), name = val('pjName');
   if(!clientName){ showToast('Who is the client?'); document.getElementById('pjClient').focus(); return; }
   if(!name){ showToast('Name the project or site'); document.getElementById('pjName').focus(); return; }
-  const packIds = [...document.querySelectorAll('.pack-box:checked')].map(x=>x.value);
+  const packIds = checkedPacks(), excludeItems = excludedItems();
   const copyFromSiteId = val('pjCopy') || undefined;
   if(!packIds.length && !copyFromSiteId && !confirm('Start with an empty requirement list? You can add documents afterwards.')) return;
-  const r = await act(()=>api.post('/api/projects', { clientName, clientContact: val('pjContact'), name, location: val('pjLoc'), packIds, copyFromSiteId }), null, el);
+  const r = await act(()=>api.post('/api/projects', { clientName, clientContact: val('pjContact'), name, location: val('pjLoc'), packIds, excludeItems, copyFromSiteId }), null, el);
   if(r){
     closeSheet();
     S.nav = 'sites'; S.activeSiteId = r.id; S.siteTab = 'compliance'; render(); window.scrollTo(0,0);
@@ -154,9 +154,9 @@ on('project-req-add', async (el)=>{
   if(ok) refreshReqSheet(el.dataset.site);
 });
 on('project-pack-add', async (el)=>{
-  const packIds = [...document.querySelectorAll('.pack-box:checked')].map(x=>x.value);
+  const packIds = checkedPacks();
   if(!packIds.length){ showToast('Tick a list first'); return; }
-  const r = await act(()=>api.post('/api/projects/'+el.dataset.site+'/requirements', { packIds }), null, el);
+  const r = await act(()=>api.post('/api/projects/'+el.dataset.site+'/requirements', { packIds, excludeItems: excludedItems() }), null, el);
   if(r){ showToast(r.added+' document'+(r.added===1?'':'s')+' added'); refreshReqSheet(el.dataset.site); }
 });
 

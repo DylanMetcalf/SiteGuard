@@ -675,23 +675,62 @@ export async function loadPacks(){
   if(!packsCache) packsCache = deepEscape((await api.get('/api/requirement-templates')).packs);
   return packsCache;
 }
-/** Checkbox list of starter packs; counts show only requirements the site doesn't already have. */
+/**
+ * Checkbox list of starter packs; counts show only requirements the site doesn't already have.
+ * "Choose documents" opens each pack's list with a tick box per document, so a pack can be
+ * trimmed before it's added (unticked documents go to the server as excludeItems).
+ */
 const JURISDICTIONS = { ZA: 'South Africa' };
 export function packPicker(packs, checked, existingNames){
   const have = new Set((existingNames||[]).map(n=>n.toLowerCase()));
   return packs.map(p=>{
     const fresh = p.items.filter(i=>!have.has(i.name.toLowerCase()));
+    const on = checked.includes(p.id) && fresh.length > 0;
     return '<div class="plan-card" style="padding:10px 12px;"><label class="flexbetween" style="gap:10px;cursor:pointer;">'
       +'<span><span class="site-card-title" style="font-size:14px;">'+p.name+'</span>'
-      +'<span class="site-card-sub" style="display:block;">'+p.description+' · '+(fresh.length===p.items.length?p.items.length+' documents':fresh.length+' new of '+p.items.length)+'</span></span>'
-      +'<input type="checkbox" class="pack-box" value="'+p.id+'"'+(checked.includes(p.id)?' checked':'')+(fresh.length?'':' disabled')+' aria-label="'+p.name+'"></label>'
-      +'<details style="margin-top:6px;"><summary class="site-card-sub" style="cursor:pointer;">What\'s included</summary>'
-      + p.items.map(i=>'<div class="site-card-sub" style="padding:3px 0;'+(have.has(i.name.toLowerCase())?'text-decoration:line-through;':'')+'">'+i.category+' — '+i.name+(i.optional?' (optional)':'')+'</div>').join('')
+      +'<span class="site-card-sub" style="display:block;">'+p.description+' · <span class="pack-count" data-pack="'+p.id+'">'+packCountText(on ? fresh.length : 0, fresh.length, p.items.length)+'</span></span></span>'
+      +'<input type="checkbox" class="pack-box" data-action="pack-toggle" value="'+p.id+'"'+(on?' checked':'')+(fresh.length?'':' disabled')+' aria-label="'+p.name+'"></label>'
+      +'<details style="margin-top:6px;"><summary class="site-card-sub" style="cursor:pointer;">What\'s included — choose documents</summary>'
+      +'<div class="flexbetween" style="gap:8px;margin:6px 0 2px;"><span class="site-card-sub">Untick anything this job doesn\'t need.</span>'
+      +(fresh.length ? '<span style="display:flex;gap:4px;"><button class="btn small ghost" data-action="pack-all" data-pack="'+p.id+'" data-on="1">All</button><button class="btn small ghost" data-action="pack-all" data-pack="'+p.id+'" data-on="0">None</button></span>' : '')+'</div>'
+      + p.items.map(i=>{
+          const already = have.has(i.name.toLowerCase());
+          return '<label style="display:flex;gap:10px;align-items:flex-start;padding:5px 0;cursor:'+(already?'default':'pointer')+';">'
+            +'<input type="checkbox" class="item-box" data-action="pack-item" data-pack="'+p.id+'" value="'+i.name+'"'+(already?' disabled':on?' checked':'')+' style="margin-top:2px;">'
+            +'<span class="site-card-sub" style="'+(already?'text-decoration:line-through;':'')+'"><span style="color:var(--ink);">'+i.name+'</span>'+(i.optional?' (optional)':'')+' · '+i.category+(already?' · already in the file':'')+'</span></label>';
+        }).join('')
       +(p.jurisdiction ? '<div class="site-card-sub" style="padding-top:6px;">'+escapeHtml(JURISDICTIONS[p.jurisdiction]||p.jurisdiction)+' · '+(p.verification==='researched'?'researched':escapeHtml(p.verification||''))+(p.reviewedOn?' '+escapeHtml(p.reviewedOn.slice(0,7)):'')+' · confirm with your SHE advisor</div>' : '')
       +'</details></div>';
   }).join('');
 }
+function packCountText(selected, fresh, total){
+  if(!fresh) return 'already in the file';
+  if(!selected) return (fresh===total ? total+' documents' : fresh+' new of '+total);
+  return selected+' of '+fresh+(fresh===total ? '' : ' new')+' documents selected';
+}
+const itemBoxes = (packId) => [...document.querySelectorAll('.item-box[data-pack="'+packId+'"]:not(:disabled)')];
+function syncPack(packId){
+  const boxes = itemBoxes(packId);
+  const n = boxes.filter(b=>b.checked).length;
+  const pack = document.querySelector('.pack-box[value="'+packId+'"]');
+  if(pack && !pack.disabled) pack.checked = n > 0;
+  const count = document.querySelector('.pack-count[data-pack="'+packId+'"]');
+  if(count){
+    const total = document.querySelectorAll('.item-box[data-pack="'+packId+'"]').length;
+    count.textContent = packCountText(n, boxes.length, total);
+  }
+}
+on('pack-toggle', (el)=>{ itemBoxes(el.value).forEach(b=>{ b.checked = el.checked; }); syncPack(el.value); });
+on('pack-item', (el)=>syncPack(el.dataset.pack));
+on('pack-all', (el)=>{ itemBoxes(el.dataset.pack).forEach(b=>{ b.checked = el.dataset.on === '1'; }); syncPack(el.dataset.pack); });
 export const checkedPacks = () => [...document.querySelectorAll('.pack-box:checked')].map(b=>b.value);
+/** Documents unticked inside ticked packs (and not ticked in another ticked pack), sent as excludeItems. */
+export function excludedItems(){
+  const packs = new Set(checkedPacks());
+  const boxes = [...document.querySelectorAll('.item-box:not(:disabled)')].filter(b=>packs.has(b.dataset.pack));
+  const kept = new Set(boxes.filter(b=>b.checked).map(b=>b.value.toLowerCase()));
+  return [...new Set(boxes.filter(b=>!b.checked && !kept.has(b.value.toLowerCase())).map(b=>b.value))];
+}
 export const PACK_NOTE = '<div class="site-card-sub" style="margin:6px 0 2px;">South African lists, researched from published legislation and guidance (September 2026). A starting point, not legal advice: every item stays editable, and each can be made optional. Confirm the final list with your SHE advisor.</div>';
 
 function renderNewSiteSheet(packs, prefill){
@@ -726,7 +765,7 @@ on('save-site', async (el)=>{
   const c = readContractor('ns'); if(!c) return;
   const extras = [...document.querySelectorAll('.extra-req-box:checked')].map(b=>(S.newSiteExtras||[])[Number(b.value)]).filter(Boolean)
     .map(x=>({ category:x.category, name:x.name, source:x.source||'site', why:x.why||'' }));
-  const r = await act(()=>api.post('/api/sites', { name, location: val('newSiteLocation'), templateSiteId: val('newSiteTemplate') || undefined, templatePackIds: checkedPacks(), requirements: extras.length ? extras : undefined, ...c }), 'Site created — invitation sent', el);
+  const r = await act(()=>api.post('/api/sites', { name, location: val('newSiteLocation'), templateSiteId: val('newSiteTemplate') || undefined, templatePackIds: checkedPacks(), excludeItems: excludedItems(), requirements: extras.length ? extras : undefined, ...c }), 'Site created — invitation sent', el);
   if(r){ closeSheet(); S.activeSiteId = r.id; S.nav='sites'; S.siteTab='compliance'; render(); }
 });
 on('apply-packs', async (el)=>{
@@ -741,7 +780,7 @@ on('apply-packs', async (el)=>{
 on('save-packs', async (el)=>{
   const packIds = checkedPacks();
   if(!packIds.length){ showToast('Choose at least one pack'); return; }
-  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/requirements/apply-packs', { packIds }), null, el);
+  const r = await act(()=>api.post('/api/sites/'+el.dataset.site+'/requirements/apply-packs', { packIds, excludeItems: excludedItems() }), null, el);
   if(r){ closeSheet(); showToast(r.added ? r.added+' requirement'+(r.added===1?'':'s')+' added' : 'Nothing new to add — the site already has those'); }
 });
 on('edit-site', (el)=>{

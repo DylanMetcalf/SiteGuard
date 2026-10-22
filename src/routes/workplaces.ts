@@ -21,7 +21,7 @@ import { publishChange } from '../lib/realtime.js';
 import { planOf } from '../lib/plans.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
 import { itemsFromPacks } from '../lib/templates.js';
-import { emergencySchema, packIdsSchema, requirementSchema, text } from './sites.js';
+import { emergencySchema, excludeItemsSchema, packIdsSchema, requirementSchema, text } from './sites.js';
 import { rl } from './auth.js';
 
 // No 0/O, 1/I/L: easy to read out loud and type on a phone.
@@ -118,12 +118,13 @@ export default async function workplaceRoutes(app: FastifyInstance) {
         name: text(300).min(1, 'Give the site a name.'),
         location: text(300).default(''),
         packIds: packIdsSchema.default([]),
+        excludeItems: excludeItemsSchema,
         requirements: z.array(requirementSchema).max(200).default([]),
         emergency: emergencySchema.default({}),
       })
       .parse(req.body);
     return withTx(async (db) => {
-      const items = body.requirements.concat(itemsFromPacks(body.packIds, body.requirements.map((r) => r.name)));
+      const items = body.requirements.concat(itemsFromPacks(body.packIds, [...body.requirements.map((r) => r.name), ...body.excludeItems]));
       const w = await createWorkplace(db, ctx, { name: body.name, location: body.location, emergency: body.emergency, requirements: items });
       await audit(db, ctx, 'Created site', `${body.name} — open to contractors with a site code, ${items.length} requirements`);
       await publishChange(db, [ctx.org.id]);
@@ -204,12 +205,12 @@ export default async function workplaceRoutes(app: FastifyInstance) {
     const ctx = requireOrg(req.ctx);
     requireHostAdmin(ctx);
     requireWritable(ctx);
-    const body = z.object({ packIds: packIdsSchema.default([]), requirements: z.array(requirementSchema).max(200).default([]) }).parse(req.body);
+    const body = z.object({ packIds: packIdsSchema.default([]), excludeItems: excludeItemsSchema, requirements: z.array(requirementSchema).max(200).default([]) }).parse(req.body);
     return withTx(async (db) => {
       const w = await loadWorkplace(db, ctx, (req.params as { id: string }).id, true);
       const have = w.requirements.map((r) => r.name);
       const fresh = body.requirements.filter((r) => !have.some((h) => h.toLowerCase() === r.name.toLowerCase()));
-      const items = fresh.concat(itemsFromPacks(body.packIds, have.concat(fresh.map((r) => r.name))));
+      const items = fresh.concat(itemsFromPacks(body.packIds, [...have, ...fresh.map((r) => r.name), ...body.excludeItems]));
       if (!items.length) throw conflict('Those requirements are already on this site.');
       await db.query('update workplaces set requirements = requirements || $2::jsonb where id = $1', [w.id, JSON.stringify(items)]);
       const touched = await addToFiles(db, w.id, items);
