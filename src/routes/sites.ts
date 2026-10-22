@@ -28,6 +28,8 @@ export const requirementSchema = z.object({
   optional: z.boolean().default(false),
 });
 export const packIdsSchema = z.array(z.enum(TEMPLATE_PACKS.map((p) => p.id) as [string, ...string[]])).max(TEMPLATE_PACKS.length);
+/** Documents in the ticked starter packs that the user unticked: they are left out. */
+export const excludeItemsSchema = z.array(text(200)).max(500).default([]);
 const newContractorSchema = z.object({
   name: text(200).min(1),
   trade: text(120).default(''),
@@ -129,6 +131,7 @@ export default async function siteRoutes(app: FastifyInstance) {
         newContractor: newContractorSchema.optional(),
         templateSiteId: z.string().optional(),
         templatePackIds: packIdsSchema.optional(),
+        excludeItems: excludeItemsSchema,
         requirements: z.array(requirementSchema).max(200).optional(),
         emergency: emergencySchema.optional(),
       })
@@ -158,7 +161,7 @@ export default async function siteRoutes(app: FastifyInstance) {
         );
       }
       // Starter packs add to whatever was copied, skipping names already present.
-      if (body.templatePackIds?.length) reqs = reqs.concat(itemsFromPacks(body.templatePackIds, reqs.map((r) => r.name)));
+      if (body.templatePackIds?.length) reqs = reqs.concat(itemsFromPacks(body.templatePackIds, [...reqs.map((r) => r.name), ...body.excludeItems]));
       for (const [i, r] of reqs.entries()) {
         await db.query(
           `insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`,
@@ -292,13 +295,13 @@ export default async function siteRoutes(app: FastifyInstance) {
     requireHostAdmin(ctx);
     requireWritable(ctx);
     const { id } = req.params as { id: string };
-    const { packIds } = z.object({ packIds: packIdsSchema.min(1) }).parse(req.body);
+    const { packIds, excludeItems } = z.object({ packIds: packIdsSchema.min(1), excludeItems: excludeItemsSchema }).parse(req.body);
     return withTx(async (db) => {
       const { site, side, parties } = await loadSite(db, ctx, id);
       if (side !== 'host') throw forbidden();
       await db.query('select id from sites where id = $1 for update', [site.id]);
       const existing = await many<{ name: string }>(db, 'select name from requirements where site_id = $1', [site.id]);
-      const items = itemsFromPacks(packIds, existing.map((r) => r.name));
+      const items = itemsFromPacks(packIds, [...existing.map((r) => r.name), ...excludeItems]);
       const start = Number((await one<{ n: number }>(db, 'select coalesce(max(position) + 1, 0) as n from requirements where site_id = $1', [site.id]))!.n);
       for (const [i, r] of items.entries()) {
         await db.query(

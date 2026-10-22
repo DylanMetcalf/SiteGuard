@@ -29,8 +29,9 @@ that MVP. What's new is the backend underneath them.
 
 Onboarding: a new site owner gets a short **Getting started** checklist. Sites are created from
 **requirement starter packs**: a contractor baseline plus electrical, heights & lifting, hot work &
-confined space, and civil & plant add-ons, defined in `src/lib/templates.ts`. Every item stays
-editable per site.
+confined space, and civil & plant add-ons, defined in `src/lib/templates.ts`. Before a list is
+added, **What's included — choose documents** lets you untick any document the job doesn't need
+(sent as `excludeItems`); every item stays editable per site afterwards.
 
 **COMVERA Assistant**: a chat that answers "what does the safety file need for this site or
 job?", checks how your sites are doing, and offers to **start the site** with the right starter

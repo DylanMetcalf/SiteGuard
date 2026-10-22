@@ -30,6 +30,20 @@ describe('contractor projects', () => {
     assert.equal(s.clientContact, 'Jane Dube, jane@acme.example');
   });
 
+  it('leaves out documents unticked inside a starter list', async () => {
+    const { itemsFromPacks } = await import('../src/lib/templates.js');
+    const all = itemsFromPacks(['baseline']).map((i) => i.name);
+    const drop = all.slice(0, 2);
+    const r = await con.post('/api/projects', { clientName: 'Trim Test Client', name: 'Trimmed file', packIds: ['baseline'], excludeItems: drop });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.requirements, all.length - 2);
+    const names = (await con.state()).state.requirements[r.body.id].map((q: { name: string }) => q.name);
+    for (const d of drop) assert.ok(!names.includes(d), `${d} left out`);
+    // Adding the same list later brings back only what was left out.
+    const add = await con.post(`/api/projects/${r.body.id}/requirements`, { packIds: ['baseline'], excludeItems: [drop[0]] });
+    assert.equal(add.body.added, 1);
+  });
+
   it('keeps projects private to the contractor that made them', async () => {
     assert.equal((await other.state()).state.sites[pid], undefined);
     assert.equal((await mine.state()).state.sites[pid], undefined);

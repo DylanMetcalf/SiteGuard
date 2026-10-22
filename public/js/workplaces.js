@@ -9,7 +9,7 @@ import {
   S, ICONS, SOURCE_LABEL, on, act, render, showToast, openSheet, closeSheet, sheetHead, escapeHtml, unescapeHtml, val,
   isOrgAdmin, canReview, readOnly, computeReadiness, effectiveStatus, badge, initials, searchBox, matchSearch, searching,
 } from './core.js';
-import { loadPacks, packPicker, checkedPacks, PACK_NOTE, openNewSite } from './sheets.js';
+import { loadPacks, packPicker, checkedPacks, excludedItems, PACK_NOTE, openNewSite } from './sheets.js';
 import { workplaceGateHtml } from './oversight.js';
 
 const W = () => S.state.workplaces || {};
@@ -170,7 +170,7 @@ on('save-workplace', async (el)=>{
     .map(x=>({ category:x.category, name:x.name, source:x.source||'site', why:x.why||'' }));
   const packIds = checkedPacks();
   if(!packIds.length && !extras.length && !confirm('No requirements ticked. Create the site with an empty list and add requirements later?')) return;
-  const r = await act(()=>api.post('/api/workplaces', { name, location: val('wpLocation'), packIds, requirements: extras, emergency: { musterPoint: val('wpMuster'), contact: val('wpContact'), hospital: val('wpHospital') } }), null, el);
+  const r = await act(()=>api.post('/api/workplaces', { name, location: val('wpLocation'), packIds, excludeItems: excludedItems(), requirements: extras, emergency: { musterPoint: val('wpMuster'), contact: val('wpContact'), hospital: val('wpHospital') } }), null, el);
   if(!r) return;
   closeSheet();
   S.nav = 'sites'; S.activeSiteId = null; S.activeWorkplaceId = r.id; S.wpTab = 'contractors'; render(); window.scrollTo(0,0);
@@ -218,7 +218,7 @@ on('wp-add-list', async (el)=>{
 on('wp-save-list', async (el)=>{
   const packIds = checkedPacks();
   if(!packIds.length){ showToast('Tick at least one list'); return; }
-  const r = await act(()=>api.post('/api/workplaces/'+el.dataset.id+'/requirements', { packIds }), null, el);
+  const r = await act(()=>api.post('/api/workplaces/'+el.dataset.id+'/requirements', { packIds, excludeItems: excludedItems() }), null, el);
   if(r){ closeSheet(); showToast(r.added+' added'+(r.contractorsUpdated?' — '+r.contractorsUpdated+' contractor'+(r.contractorsUpdated===1?'\'s file':'s\' files')+' updated':'')); }
 });
 const CATS = ['Company Documents','Legal Appointments','Personnel','Plans & Procedures','Site-Specific','Equipment','Registers & Records'];

@@ -18,7 +18,7 @@ import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { itemsFromPacks } from '../lib/templates.js';
 import { planOf } from '../lib/plans.js';
-import { emergencySchema, packIdsSchema, requirementSchema, text } from './sites.js';
+import { emergencySchema, excludeItemsSchema, packIdsSchema, requirementSchema, text } from './sites.js';
 
 function requireContractorAdmin(ctx: OrgCtx) {
   if (!isContractor(ctx) || !canAdminOrg(ctx)) throw forbidden('Only contractor owners and admins can set up projects.');
@@ -69,6 +69,7 @@ export default async function projectRoutes(app: FastifyInstance) {
         name: text(300).min(1),
         location: text(300).default(''),
         packIds: packIdsSchema.default([]),
+        excludeItems: excludeItemsSchema,
         requirements: z.array(requirementSchema).max(200).default([]),
         copyFromSiteId: z.string().optional(),
         emergency: emergencySchema.optional(),
@@ -97,7 +98,7 @@ export default async function projectRoutes(app: FastifyInstance) {
         const from = await loadSite(db, ctx, body.copyFromSiteId);
         reqs = await many(db, 'select category, name, source, why, optional from requirements where site_id = $1 order by position, created_at', [from.site.id]);
       }
-      reqs = reqs.concat(itemsFromPacks(body.packIds, reqs.map((r) => r.name)));
+      reqs = reqs.concat(itemsFromPacks(body.packIds, [...reqs.map((r) => r.name), ...body.excludeItems]));
       for (const r of body.requirements) if (!reqs.some((x) => x.name.toLowerCase() === r.name.toLowerCase())) reqs.push(r);
       for (const [i, r] of reqs.entries()) {
         await db.query(`insert into requirements (site_id, category, name, source, why, position, optional) values ($1, $2, $3, $4, $5, $6, $7)`, [site.id, r.category, r.name, r.source, r.why, i, !!r.optional]);
@@ -144,12 +145,12 @@ export default async function projectRoutes(app: FastifyInstance) {
     const ctx = requireOrg(req.ctx);
     requireContractorAdmin(ctx);
     requireWritable(ctx);
-    const body = z.object({ packIds: packIdsSchema.default([]), requirements: z.array(requirementSchema).max(200).default([]) }).parse(req.body);
+    const body = z.object({ packIds: packIdsSchema.default([]), excludeItems: excludeItemsSchema, requirements: z.array(requirementSchema).max(200).default([]) }).parse(req.body);
     return withTx(async (db) => {
       const { site } = await loadProject(db, ctx, (req.params as { id: string }).id);
       const existing = await many<{ name: string }>(db, 'select name from requirements where site_id = $1', [site.id]);
       const have = new Set(existing.map((r) => r.name.toLowerCase()));
-      const add = [...itemsFromPacks(body.packIds, existing.map((r) => r.name)), ...body.requirements].filter((r) => {
+      const add = [...itemsFromPacks(body.packIds, [...existing.map((r) => r.name), ...body.excludeItems]), ...body.requirements].filter((r) => {
         const k = r.name.toLowerCase();
         if (have.has(k)) return false;
         have.add(k);

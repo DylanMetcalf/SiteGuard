@@ -171,18 +171,42 @@ function contactPage(c, ctx){
       + '<button class="btn primary block" style="margin-top:12px;" data-action="contact-send">Send</button>')+'</div></section>';
 }
 
+/** The problem in plain words, next to what COMVERA does about it. Every claim is a real feature. */
+const PAINS = [
+  ['Documents everywhere', 'Emails, WhatsApp, shared folders and someone\'s laptop. Building one safety file means searching five places.',
+   'One file per site', 'Every document is filed against the requirement it answers, in one file per contractor per site.'],
+  ['Nobody knows what\'s current', '“FINAL_v2 (1).pdf”, a tracker last updated a week ago, and certificates that quietly expired.',
+   'Statuses you can trust', 'Missing, waiting for review, approved or expiring, with warnings before anything lapses.'],
+  ['The same follow-up, again', '“Did you send Sipho\'s medical?” Requests sit in inboxes and nobody can see who is acting on them.',
+   'Requests on the record', 'Ask once. It\'s tracked on the document, the other side is notified, and you see when it comes back.'],
+  ['Gaps found too late', 'Missing items turn up the day before induction, and work starts late or starts with a gap.',
+   'Ready before Monday', 'See who is Site Ready and which workers are cleared at the gate, before anyone arrives.'],
+];
+function painSection(){
+  return '<section class="lp-pain" aria-labelledby="lpPainTitle"><div class="lp-pain-head"><p class="lp-eyebrow">The problem</p>'
+    +'<h2 id="lpPainTitle">The work isn\'t the hard part. Keeping track of it is.</h2>'
+    +'<p>Contractors and sites both do the paperwork. What wastes the time is chasing, checking and re-checking it across inboxes, chats and folders.</p></div>'
+    +'<ol class="lp-pain-rows">'+PAINS.map(([pt, pd, st, sd])=>'<li>'
+      +'<div class="lp-pain-was"><span class="lp-pain-ic" aria-hidden="true">✕</span><div><h3>'+pt+'</h3><p>'+pd+'</p></div></div>'
+      +'<span class="lp-pain-arrow" aria-hidden="true">→</span>'
+      +'<div class="lp-pain-now"><span class="lp-pain-ic" aria-hidden="true">✓</span><div><h3>'+st+'</h3><p>'+sd+'</p></div></div></li>').join('')+'</ol>'
+    +'<div class="lp-pain-foot"><p>See it for yourself: work through a real-looking safety file in the interactive walkthrough. No sign-up.</p>'
+    +'<a class="btn primary" href="/walkthrough">Try the walkthrough</a></div></section>';
+}
+
 export function renderLanding(features){
   const demo = features && features.demo;
   return page('landing', ''
     +'<section class="lp-hero"><div class="lp-hero-text">'
-    +'<p class="lp-eyebrow">Safety files and contractor compliance · South Africa</p>'
-    +'<h1>Build, manage and prove your safety files — for every site.</h1>'
-    +'<p class="lp-lead">COMVERA is where contractors keep their safety documents, create what is missing and build a professional safety file for each site or client. Mines and sites use it to set requirements, review files and see who is cleared to work.</p>'
-    +'<div class="lp-cta">'+trial('Start free trial')+'<button class="btn secondary" data-action="auth-go" data-view="signup" data-kind="contractor">Build a safety file</button>'
-    +(demo?'<button class="btn secondary" data-action="start-demo" data-tour="1">Watch the 2-minute tour</button>':'')+'</div>'
-    +'<p class="lp-sub-links"><a href="/walkthrough">Try the interactive walkthrough</a> · '+go('how','See how it works')+' · '+go('pricing','View pricing')+' · '+go('contact','Contact us')+'</p>'
+    +'<p class="lp-eyebrow">Contractor safety files · South African mines and sites</p>'
+    +'<h1>Stop chasing safety documents.</h1>'
+    +'<p class="lp-lead">Certificates buried in email threads. Three versions of the “final” risk assessment. A medical that expired last week and nobody noticed until the gate. COMVERA puts every contractor safety file in one place, so everyone can see what\'s required, what\'s missing, what\'s expiring and whose move it is.</p>'
+    +'<div class="lp-cta">'+trial('Start free trial')+'<a class="btn secondary" href="/walkthrough">See how it works in 6 minutes</a>'
+    +(demo?'<button class="btn secondary" data-action="start-demo" data-tour="1">Explore the demo</button>':'')+'</div>'
+    +'<p class="lp-sub-links">'+go('how','How it works')+' · '+go('pricing','View pricing')+' · '+go('contact','Contact us')+'</p>'
     +'<ul class="lp-proof"><li>'+tick+'14-day trial of everything, no card</li><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li></ul>'
     +'</div>'+mock()+'</section>'
+    + painSection()
     +'<section class="lp-sides"><div class="lp-side"><p class="lp-eyebrow">For contractors</p><h2>Build a professional safety file in minutes.</h2>'
       +list(['Keep your company documents once and reuse them on every site', 'Document Studio drafts the risk assessments, method statements and policies you don\'t have yet', 'One bound PDF with a cover, contents and page numbers, versioned as it changes', 'Files for mines on COMVERA and for any other client'])
       +'<div class="lp-cta">'+go('contractors','For contractors','btn secondary small')+go('builder','How the builder works','linkish')+'</div></div>'
