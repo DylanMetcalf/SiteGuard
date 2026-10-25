@@ -9,7 +9,7 @@
  * Each run upserts what it sees and resolves what it no longer sees.
  */
 import type { Db } from '../db/pool.js';
-import { many, pool, withTx } from '../db/pool.js';
+import { many, one, pool, withTx } from '../db/pool.js';
 import { computeReadiness } from './readiness.js';
 import { publishChange } from './realtime.js';
 import { appUrl, queueToOrg } from './email.js';
@@ -329,6 +329,9 @@ export async function runAgent(): Promise<number> {
   for (const org of orgs) {
     // One short transaction per organisation keeps locks brief.
     await withTx(async (db) => {
+      // The organisation may have been deleted since the list was read (e.g. an expired demo
+      // sandbox); FOR SHARE also stops it being deleted while its findings are written.
+      if (!(await one(db, 'select 1 from organisations where id = $1 for share', [org.id]))) return;
       const changed = await runAgentForOrg(db, org);
       if (changed) await publishChange(db, [org.id]);
     });
