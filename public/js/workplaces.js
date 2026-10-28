@@ -134,12 +134,33 @@ function requirementsHtml(w, admin){
   const cats = [...new Set(w.requirements.map(r=>r.category))];
   cats.forEach(cat=>{
     html += '<div class="section-title">'+cat+'</div><div class="card">'+w.requirements.filter(r=>r.category===cat).map(r=>'<div class="reqrow"><div class="reqrow-main"><div class="reqrow-name">'+r.name+'</div>'
-      +'<div class="reqrow-meta">'+(r.optional?'<span class="badge grey">Optional</span>':'<span class="badge missing">Required</span>')+'<span class="srctag">'+(SOURCE_LABEL[r.source]||r.source)+'</span></div>'+(r.why?'<div class="site-card-sub" style="margin-top:3px;">'+r.why+'</div>':'')+'</div>'
+      +'<div class="reqrow-meta">'+(r.optional?'<span class="badge grey">Optional</span>':'<span class="badge missing">Required</span>')+'<span class="srctag">'+(SOURCE_LABEL[r.source]||r.source)+'</span></div>'+(r.why?'<div class="site-card-sub" style="margin-top:3px;">'+r.why+'</div>':'')
+      +templateLine(w, r, admin)+'</div>'
       +(admin?'<div class="req-actions"><button class="btn secondary small" data-action="wp-optional" data-id="'+w.id+'" data-name="'+r.name+'" data-optional="'+(r.optional?'0':'1')+'">'+(r.optional?'Make required':'Make optional')+'</button>'
         +'<button class="btn secondary small" data-action="wp-remove" data-id="'+w.id+'" data-name="'+r.name+'" aria-label="Remove '+r.name+'">Remove</button></div>':'')+'</div>').join('')+'</div>';
   });
   return html;
 }
+
+/** The mine's own form for a requirement: contractors download it, complete it and upload their copy. */
+function templateLine(w, r, admin){
+  const t = (w.templates||[]).find(x=>x.requirementName.toLowerCase()===r.name.toLowerCase());
+  const pick = (label)=>'<label class="btn secondary small" style="cursor:pointer;">'+label+'<input type="file" hidden accept="application/pdf,image/*,.docx,.doc,.xlsx,.xls" data-action-change="template-upload" data-workplace="'+w.id+'" data-name="'+r.name+'"></label>';
+  if(t) return '<div class="site-card-sub" style="margin-top:4px;">📄 Template: <a href="/api/templates/'+t.id+'/file">'+t.filename+'</a> · version '+t.version+'</div>'
+    +(admin?'<div class="row-actions" style="margin-top:4px;">'+pick('Replace template')+'<button class="btn ghost small" data-action="template-archive" data-id="'+t.id+'">Remove template</button></div>':'');
+  return admin ? '<div class="row-actions" style="margin-top:4px;">'+pick('Add your template')+'</div>' : '';
+}
+on('template-upload', async (el)=>{
+  const f = el.files && el.files[0];
+  if(!f) return;
+  if(f.size > 20*1024*1024){ showToast('File is too large (20MB max)'); el.value=''; return; }
+  const scope = el.dataset.workplace ? 'workplaceId='+encodeURIComponent(el.dataset.workplace) : 'siteId='+encodeURIComponent(el.dataset.site);
+  await act(()=>api.upload('/api/templates?'+scope+'&requirement='+encodeURIComponent(el.dataset.name), f), 'Template saved — contractors can download it from this requirement');
+});
+on('template-archive', (el)=>{
+  if(!confirm('Remove this template? Contractors will no longer see it. Earlier versions stay in the audit trail.')) return;
+  return act(()=>api.post('/api/templates/'+el.dataset.id+'/archive'), 'Template removed', el);
+});
 
 /* ---------- Create ---------- */
 export async function openNewWorkplace(prefill){

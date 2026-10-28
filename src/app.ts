@@ -41,6 +41,7 @@ import eventRoutes from './routes/events.js';
 import demoRoutes from './routes/demo.js';
 import workforceRoutes from './routes/workforce.js';
 import exchangeRoutes from './routes/exchange.js';
+import templateRoutes from './routes/templates.js';
 import exchangePortalRoutes from './routes/exchangePortal.js';
 
 declare module 'fastify' {
@@ -193,6 +194,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(demoRoutes);
   await app.register(workforceRoutes);
   await app.register(exchangeRoutes);
+  await app.register(templateRoutes);
   await app.register(exchangePortalRoutes);
 
   await app.register(fastifyStatic, { root: publicDir, index: false, wildcard: false });

@@ -9,6 +9,7 @@ import { can, entitlementsFor } from '../lib/entitlements.js';
 import { rulesOf } from '../lib/validity.js';
 import { reminderDaysOf } from '../jobs/reminders.js';
 import type { FastifyInstance } from 'fastify';
+import { templatesForSites } from './templates.js';
 import { many, pool, type Db } from '../db/pool.js';
 import { config, features, isPlatformAdmin } from '../config.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
@@ -96,7 +97,19 @@ export async function buildState(db: Db, ctx: OrgCtx) {
       state.workplaces[w.id] = {
         id: w.id, name: w.name, location: w.location, code: canAdminOrg(ctx) ? w.join_code : null, joinOpen: w.join_open,
         requirements: w.requirements, emergency: { musterPoint: '', contact: '', hospital: '', ...w.emergency }, createdAt: d(w.created_at)?.slice(0, 10), archivedAt: d(w.archived_at),
+        templates: [],
       };
+    }
+    const wpIds = Object.keys(state.workplaces);
+    if (wpIds.length) {
+      for (const t of await many<any>(
+        db,
+        `select t.id, t.workplace_id, t.requirement_name, t.title, t.version, f.filename from requirement_templates t join files f on f.id = t.file_id
+          where t.workplace_id = any($1::uuid[]) and t.superseded_at is null and t.archived_at is null`,
+        [wpIds],
+      )) {
+        state.workplaces[t.workplace_id].templates.push({ id: t.id, requirementName: t.requirement_name, title: t.title, version: t.version, filename: t.filename });
+      }
     }
   }
 
@@ -195,6 +208,9 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     for (const r of await many(db, `select * from requirements where site_id = any($1::uuid[]) order by position, created_at`, [activeIds])) {
       state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, optional: !!r.optional, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name) });
     }
+
+    // ---- the mine's own templates for requirements ----
+    state.templates = await templatesForSites(db, sites.filter((s) => activeIds.includes(s.id)));
 
     // ---- documents (site requirements) ----
     const docs = await many(

@@ -169,6 +169,22 @@ on('qa', (el)=>{
 export function openReqSheet(reqId){ S.openReq = reqId; openSheet(renderReqSheet(reqId)); S.openReq = reqId; }
 on('open-req', (el)=>openReqSheet(el.dataset.req));
 
+/** The site's own form for this requirement, if the mine has given one. */
+function templateCard(req, site, siteId, ro){
+  if(!site || reqIdIsLibrary(req)) return '';
+  const t = ((S.state.templates||{})[siteId]||[]).find(x=>x.requirementName.toLowerCase()===req.name.toLowerCase());
+  const hostAdmin = isHost() && isOrgAdmin() && !ro && !site.project;
+  const pick = (label)=>'<label class="btn secondary small" style="cursor:pointer;">'+label+'<input type="file" hidden accept="application/pdf,image/*,.docx,.doc,.xlsx,.xls" data-action-change="template-upload" '
+    +(site.workplaceId?'data-workplace="'+site.workplaceId+'"':'data-site="'+siteId+'"')+' data-name="'+req.name+'"></label>';
+  if(!t) return hostAdmin ? '<div class="row-actions" style="margin:6px 0;">'+pick('Add your template for this requirement')+'</div>' : '';
+  return '<div class="card" style="margin:8px 0;background:var(--brand-bg);border-color:transparent;"><div class="chat-card-title" style="color:var(--brand);">📄 '+(isHost()?'Your template':'Template from '+(site.hostName||'the site'))+'</div>'
+    +'<div class="site-card-sub" style="color:var(--ink-soft);">'+t.title+(t.description?' — '+t.description:'')+' · version '+t.version+'</div>'
+    +(isContractor()?'<div class="site-card-sub" style="color:var(--ink-soft);margin-top:4px;">Download it, complete it, then attach your completed copy below. The site reviews it as usual.</div>':'')
+    +'<div class="row-actions" style="margin-top:8px;"><a class="btn primary small" href="/api/templates/'+t.id+'/file">Download '+t.filename+'</a>'
+    +(hostAdmin?pick('Replace')+'<button class="btn ghost small" data-action="template-archive" data-id="'+t.id+'">Remove</button>':'')+'</div></div>';
+}
+const reqIdIsLibrary = (req)=>String(req.id||'').startsWith('lib:');
+
 function renderReqSheet(reqId){
   const req = findReq(reqId);
   if(!req) return sheetHead('Not found') + '<p class="site-card-sub">This requirement is no longer available.</p>';
@@ -186,6 +202,7 @@ function renderReqSheet(reqId){
   if(canSetOptional) body += '<div class="toggle-row" style="border:none;padding:0 0 6px;"><span>'+(req.optional ? 'Optional — welcome in the file but doesn\'t hold up readiness' : 'Required — counts towards '+(site.project?'the file being complete':'Site Ready'))+'</span>'
     +'<button class="btn secondary small" data-action="req-optional" data-req="'+reqId+'" data-optional="'+(req.optional?'0':'1')+'">'+(req.optional?'Make required':'Make optional')+'</button></div>';
   if(req.why) body += '<p style="font-size:13.5px;color:var(--ink-soft);">'+req.why+'</p>';
+  body += templateCard(req, site, siteId, ro);
   if(doc.version){
     body += '<div class="divider"></div><div class="site-card-sub">Version '+doc.version+' · updated '+timeAgo(doc.updatedAt)+'</div>';
     if(doc.expiryDate) body += '<div class="site-card-sub">'+(eff==='expired'?'Expired ':'Expires ')+timeAgo(doc.expiryDate)+'</div>';
