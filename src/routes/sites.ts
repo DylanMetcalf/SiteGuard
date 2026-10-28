@@ -4,6 +4,7 @@ import { track } from '../lib/events.js';
 import { z } from 'zod';
 import { many, one, pool, withTx, type Db } from '../db/pool.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
+import { hasLooseFiles, hostSitesInUse, siteLimitError } from '../lib/limits.js';
 import {
   actorRole, canAdminOrg, isUuid, limitsEnforced, loadSite, requireHostAdmin, requireOrg, requireReviewer, requireWritable, type OrgCtx,
 } from '../lib/authz.js';
@@ -140,9 +141,9 @@ export default async function siteRoutes(app: FastifyInstance) {
     return withTx(async (db) => {
       await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
       const limit = planOf(ctx.org).siteLimit;
-      if (limitsEnforced() && limit !== null) {
-        const n = Number((await one<{ n: number }>(db, `select (select count(*) from sites where org_id = $1 and status <> 'declined' and workplace_id is null) + (select count(*) from workplaces where org_id = $1) as n`, [ctx.org.id]))!.n);
-        if (n >= limit) throw new HttpError(402, 'site_limit', `Your plan includes ${limit} active sites. Upgrade under Billing to add more.`);
+      // Files outside a workplace together count as one site: only the first one can use up capacity.
+      if (limitsEnforced() && limit !== null && !(await hasLooseFiles(db, ctx.org.id)) && (await hostSitesInUse(db, ctx.org.id)) >= limit) {
+        throw siteLimitError(limit);
       }
       const contractor = await resolveContractor(db, ctx, body.contractorId || undefined, body.newContractor);
       const site = (await one<{ id: string; name: string }>(

@@ -6,10 +6,13 @@ export interface Plan {
   id: string;
   name: string;
   kind: OrgKind;
-  /** Maximum active sites (host plans). null = unlimited. */
+  /** Physical sites a site subscription covers (host plans, see lib/limits.ts). null = unlimited. */
   siteLimit: number | null;
-  /** Contractor projects (safety files for clients not on COMVERA). null = unlimited. Only enforced with billing on. */
-  projectLimit: number | null;
+  /**
+   * Connected sites a contractor plan covers: its own files at clients' sites plus its own projects,
+   * not counting files a subscribing site sponsors. null = unlimited. Only enforced with billing on.
+   */
+  connectedSiteLimit: number | null;
   /** Seats given on a fresh org / free plan. Paid plans bill per seat. */
   defaultSeats: number;
   maxSeats: number;
@@ -25,34 +28,34 @@ export const PLANS: Record<string, Plan> = {
     id: 'host_starter',
     name: 'Site Starter',
     kind: 'host',
-    siteLimit: 5,
-    projectLimit: null,
+    siteLimit: 1,
+    connectedSiteLimit: null,
     defaultSeats: 5,
     maxSeats: 25,
     ai: false,
     paid: true,
     stripePrice: config.STRIPE_PRICE_HOST_STARTER,
-    blurb: 'Up to 5 active sites. Compliance, permits, incidents, audit trail.',
+    blurb: 'One site: contractor compliance, sponsored contractor access, permits, incidents, audit trail.',
   },
   host_pro: {
     id: 'host_pro',
     name: 'Site Professional',
     kind: 'host',
-    siteLimit: null,
-    projectLimit: null,
+    siteLimit: 1,
+    connectedSiteLimit: null,
     defaultSeats: 10,
     maxSeats: 500,
     ai: true,
     paid: true,
     stripePrice: config.STRIPE_PRICE_HOST_PRO,
-    blurb: 'Unlimited sites, AI drafting and expiry detection, external share links.',
+    blurb: 'One site with AI drafting and expiry detection and external share links. More sites: one subscription each, or Enterprise.',
   },
   contractor_free: {
     id: 'contractor_free',
     name: 'Site-sponsored',
     kind: 'contractor',
     siteLimit: null,
-    projectLimit: 0,
+    connectedSiteLimit: 0,
     defaultSeats: 3,
     maxSeats: 3,
     ai: false,
@@ -64,33 +67,46 @@ export const PLANS: Record<string, Plan> = {
     name: 'Contractor Starter',
     kind: 'contractor',
     siteLimit: null,
-    projectLimit: 5,
+    connectedSiteLimit: 5,
     defaultSeats: 3,
     maxSeats: 5,
     ai: true,
     paid: true,
     stripePrice: config.STRIPE_PRICE_CONTRACTOR_STARTER,
-    blurb: 'Your own company account: up to 5 of your own safety files at a time, Document Studio with AI drafting, exports.',
+    blurb: 'Your company workspace for up to 5 connected sites: reusable documents, Document Studio with AI drafting, exports.',
   },
   contractor_pro: {
     id: 'contractor_pro',
     name: 'Contractor Pro',
     kind: 'contractor',
     siteLimit: null,
-    projectLimit: null,
+    connectedSiteLimit: 10,
     defaultSeats: 5,
     maxSeats: 200,
     ai: true,
     paid: true,
     stripePrice: config.STRIPE_PRICE_CONTRACTOR_PRO,
-    blurb: 'Unlimited safety files for every client, more seats, AI drafting and expiry detection, external share links.',
+    blurb: 'Up to 10 connected sites, more seats, AI drafting and expiry detection, external share links.',
+  },
+  contractor_business: {
+    id: 'contractor_business',
+    name: 'Contractor Business',
+    kind: 'contractor',
+    siteLimit: null,
+    connectedSiteLimit: 20,
+    defaultSeats: 10,
+    maxSeats: 500,
+    ai: true,
+    paid: true,
+    stripePrice: config.STRIPE_PRICE_CONTRACTOR_BUSINESS,
+    blurb: 'Up to 20 connected sites with everything in Contractor Pro. More than 20: talk to us.',
   },
   host_enterprise: {
     id: 'host_enterprise',
     name: 'Enterprise',
     kind: 'host',
     siteLimit: null,
-    projectLimit: null,
+    connectedSiteLimit: null,
     defaultSeats: 25,
     maxSeats: 5000,
     ai: true,

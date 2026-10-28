@@ -58,14 +58,15 @@ describe('billing', () => {
     assert.equal(st.org.seatLimit, 7);
   });
 
-  it('enforces the plan\'s site limit', async () => {
+  it('a site subscription covers one site: its contractor files are not each a site', async () => {
     for (let i = 0; i < 5; i++) {
       const r = await host.post('/api/sites', { name: 'Site ' + i, newContractor: { name: 'C' + i } });
       assert.equal(r.status, 200, JSON.stringify(r.body));
     }
-    const over = await host.post('/api/sites', { name: 'Sixth', newContractor: { name: 'C6' } });
+    assert.equal((await host.get('/api/billing')).body.activeSites, 1);
+    const over = await host.post('/api/workplaces', { name: 'Second shaft', location: 'Rustenburg' });
     assert.equal(over.status, 402);
-    assert.match(over.body.message, /5 active sites/);
+    assert.match(over.body.message, /covers 1 site/);
   });
 
   it('enforces seats, counting pending invitations', async () => {

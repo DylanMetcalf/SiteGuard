@@ -13,7 +13,7 @@ async function load(){
 let orgQuery = '';
 export function invalidatePlatform(){ cache = null; }
 
-const PLAN_OPTIONS = [['contractor_starter','Contractor Starter'],['contractor_pro','Contractor Pro'],['host_starter','Site Starter'],['host_pro','Site Professional'],['host_enterprise','Enterprise']];
+const PLAN_OPTIONS = [['contractor_starter','Contractor Starter'],['contractor_pro','Contractor Pro'],['contractor_business','Contractor Business'],['host_starter','Site Starter'],['host_pro','Site Professional'],['host_enterprise','Enterprise']];
 const rands = (c)=> c===null || c===undefined ? 'Quote' : 'R'+(c/100).toLocaleString('en-ZA', { maximumFractionDigits: 2 });
 const day = (v)=> v ? escapeHtml(String(v).slice(0,10)) : '';
 

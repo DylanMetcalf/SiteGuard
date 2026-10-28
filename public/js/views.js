@@ -1042,7 +1042,8 @@ function renderBilling(){
   html += '<div class="card checkpoint"><div class="kv"><span>Current plan</span><span>'+escapeHtml(current?current.name:b.plan)+'</span></div>'
     +'<div class="kv"><span>Status</span><span>'+(b.grant ? 'Given by COMVERA' : b.status==='trialing' && b.trialEndsAt ? (new Date(b.trialEndsAt) > new Date() ? 'Trial until '+timeAgo(b.trialEndsAt) : 'Trial ended '+timeAgo(b.trialEndsAt)) : escapeHtml(b.status))+'</span></div>'
     +'<div class="kv"><span>Seats</span><span>'+b.seatsUsed+' used of '+b.seatLimit+'</span></div>'
-    +(b.activeSites!==null?'<div class="kv"><span>Active sites</span><span>'+b.activeSites+(current&&current.siteLimit?' of '+current.siteLimit:'')+'</span></div>':'')
+    +(b.activeSites!==null?'<div class="kv"><span>Sites</span><span>'+b.activeSites+(current&&current.siteLimit?' of '+current.siteLimit:'')+'</span></div>':'')
+    +(b.connectedSites!=null?'<div class="kv"><span>Connected sites</span><span>'+b.connectedSites+(current&&current.connectedSiteLimit?' of '+current.connectedSiteLimit:'')+' <span class="muted">(sponsored sites are free)</span></span></div>':'')
     +(b.currentPeriodEnd?'<div class="kv"><span>Renews</span><span>'+timeAgo(b.currentPeriodEnd)+'</span></div>':'')
     +(b.hasCustomer?'<button class="btn secondary block" style="margin-top:10px;" data-action="billing-portal">Payment method &amp; invoices</button>':'')+'</div>';
   // A plan given with no end date needs nothing more from the customer.
