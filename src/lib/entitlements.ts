@@ -39,6 +39,8 @@ export const PLAN_FEATURES: Record<string, Feature[]> = {
   contractor_free: SPONSORED,
   contractor_starter: [...CORE, 'MULTI_SITE', 'AI_GENERATION'],
   contractor_pro: [...CORE, 'MULTI_SITE', 'AI_GENERATION', 'SHARE_LINKS'],
+  contractor_business: [...CORE, 'MULTI_SITE', 'AI_GENERATION', 'SHARE_LINKS'],
+  contractor_once: [...CORE, 'AI_GENERATION'],
 };
 
 /** Plain-language names for upgrade messages and the billing page. */

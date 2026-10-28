@@ -13,7 +13,7 @@ interface FileRow {
   content_type: string;
 }
 
-async function anySiteVisible(db: Db, ctx: OrgCtx, siteIds: string[]): Promise<boolean> {
+export async function anySiteVisible(db: Db, ctx: OrgCtx, siteIds: string[]): Promise<boolean> {
   for (const id of new Set(siteIds)) {
     try {
       await loadSite(db, ctx, id);

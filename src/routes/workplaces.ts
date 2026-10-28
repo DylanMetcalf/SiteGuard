@@ -13,6 +13,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { many, one, withTx, type Db } from '../db/pool.js';
+import { hostSitesInUse, siteLimitError } from '../lib/limits.js';
 import { canAdminOrg, isUuid, limitsEnforced, requireHostAdmin, requireOrg, requireWritable, type OrgCtx } from '../lib/authz.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { sponsorFile } from '../lib/sponsorship.js';
@@ -52,17 +53,12 @@ async function loadWorkplace(db: Db, ctx: OrgCtx, id: string, lock = false): Pro
   return w;
 }
 
-/** The plan's cap on active sites (archived sites don't count). */
+/** The plan's cap on sites (archived workplaces don't count). */
 async function checkSiteLimit(db: Db, ctx: OrgCtx) {
   await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
   const limit = planOf(ctx.org).siteLimit;
   if (!limitsEnforced() || limit === null) return;
-  const n = Number((await one<{ n: number }>(
-    db,
-    `select (select count(*) from sites where org_id = $1 and status <> 'declined' and workplace_id is null) + (select count(*) from workplaces where org_id = $1 and archived_at is null) as n`,
-    [ctx.org.id],
-  ))!.n);
-  if (n >= limit) throw new HttpError(402, 'site_limit', `Your plan includes ${limit} active sites. Archive one, or upgrade under Billing to add more.`);
+  if ((await hostSitesInUse(db, ctx.org.id)) >= limit) throw siteLimitError(limit);
 }
 
 async function createWorkplace(db: Db, ctx: OrgCtx, w: { name: string; location: string; emergency: unknown; requirements: unknown[] }) {
@@ -370,3 +366,4 @@ export async function joinWorkplaceByCode(db: Db, ctx: OrgCtx, code: string): Pr
   await publishChange(db, [w.org_id, ctx.org.id]);
   return { siteId: site.id, hostOrgId: w.org_id, already: false };
 }
+

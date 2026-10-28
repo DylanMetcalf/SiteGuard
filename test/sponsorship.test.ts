@@ -10,7 +10,7 @@ import { Agent, PDF, pool, setup, signup, teardown } from './helpers.js';
 
 let app: FastifyInstance;
 let mine: Agent, con: Agent, conOrg: string, mineOrg: string;
-let fileId: string, projectId: string;
+let fileId: string, projectId: string, joinCode: string;
 
 const endTrial = (orgId: string) => pool.query(`update organisations set trial_ends_at = now() - interval '1 day' where id = $1`, [orgId]);
 const req = async (a: Agent, siteId: string, name: string) =>
@@ -23,6 +23,7 @@ before(async () => {
   mineOrg = (await mine.state()).org.id;
   conOrg = (await con.state()).org.id;
   const w = await mine.post('/api/workplaces', { name: 'Sigma North', requirements: [{ category: 'Company Documents', name: 'Letter of Good Standing (COID)', source: 'legal' }] });
+  joinCode = w.body.code;
   fileId = (await con.post('/api/sites/join', { code: w.body.code })).body.siteId;
   projectId = (await con.post('/api/projects', { clientName: 'Upsilon Retail', name: 'Mall refit', requirements: [{ category: 'Client', name: 'Client induction', source: 'client' }] })).body.id;
 });
@@ -94,5 +95,23 @@ describe('contractor trial and site sponsorship', () => {
     assert.equal((await mine.post(`/api/sites/${fileId}/sponsorship/end`, {})).status, 409);
     assert.equal((await mine.post(`/api/sites/${fileId}/sponsorship/resume`)).status, 200);
     assert.equal((await con.state()).state.sites[fileId].sponsored, true);
+  });
+});
+
+describe('contractor capacity counts connected sites', () => {
+  it('counts own projects and unsponsored files, never a file a subscribing site sponsors', async () => {
+    const c = (await signup(app, { orgName: 'Chi Rigging', orgKind: 'contractor' })).agent;
+    const cOrg = (await c.state()).org.id;
+    await pool.query(`update organisations set grant_plan = 'contractor_starter', grant_until = null, grant_source = 'test' where id = $1`, [cOrg]);
+    assert.equal((await c.post('/api/sites/join', { code: joinCode })).status, 200);
+    for (let i = 0; i < 5; i++) assert.equal((await c.post('/api/projects', { clientName: 'Client ' + i, name: 'Job ' + i })).status, 200);
+    const b = (await c.get('/api/billing')).body;
+    assert.equal(b.connectedSites, 5, 'the sponsored file is free');
+    const over = await c.post('/api/projects', { clientName: 'Client 6', name: 'Job 6' });
+    assert.equal(over.status, 402);
+    assert.match(over.body.message, /covers 5 connected sites/);
+    // A bigger tier lifts the cap.
+    await pool.query(`update organisations set grant_plan = 'contractor_business' where id = $1`, [cOrg]);
+    assert.equal((await c.post('/api/projects', { clientName: 'Client 6', name: 'Job 6' })).status, 200);
   });
 });

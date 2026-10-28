@@ -20,10 +20,11 @@ import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { appUrl } from '../lib/email.js';
 import { seatsUsed } from './org.js';
+import { contractorSitesInUse, hostSitesInUse } from '../lib/limits.js';
 
 let stripe: Stripe | null = null;
 function getStripe(): Stripe {
-  if (!features.payments) throw unavailable('Online card payments aren\'t switched on yet. Contact us to subscribe, or use a promo code.');
+  if (features.paymentProvider !== 'stripe') throw unavailable('Online card payments aren\'t switched on yet. Contact us to subscribe, or use a promo code.');
   stripe ??= new Stripe(config.STRIPE_SECRET_KEY!);
   return stripe;
 }
@@ -41,10 +42,6 @@ async function ensureCustomer(ctx: OrgCtx): Promise<string> {
   });
   await pool.query('update organisations set stripe_customer_id = $2 where id = $1', [ctx.org.id, customer.id]);
   return customer.id;
-}
-
-async function activeSites(orgId: string): Promise<number> {
-  return Number((await one<{ n: number }>(pool, `select (select count(*) from sites where org_id = $1 and status <> 'declined' and workplace_id is null) + (select count(*) from workplaces where org_id = $1) as n`, [orgId]))!.n);
 }
 
 const STATUS_MAP: Record<string, string> = {
@@ -108,9 +105,13 @@ export default async function billingRoutes(app: FastifyInstance) {
   app.get('/api/billing', async (req) => {
     const ctx = requireOrg(req.ctx);
     const plan = planOf(ctx.org);
+    const prices = new Map((await pricingTable(pool)).map((p) => [p.planId, p]));
+    const paystack = features.paymentProvider === 'paystack';
     return {
       enabled: features.billing,
       payments: features.payments,
+      provider: features.paymentProvider,
+      paystackSubscription: !!ctx.org.paystack_subscription_code,
       plan: plan.id,
       status: ctx.org.subscription_status,
       standing: standing(ctx.org),
@@ -118,16 +119,18 @@ export default async function billingRoutes(app: FastifyInstance) {
       currentPeriodEnd: ctx.org.current_period_end,
       seatLimit: ctx.org.seat_limit,
       seatsUsed: await seatsUsed(pool, ctx.org.id),
-      activeSites: ctx.org.kind === 'host' ? await activeSites(ctx.org.id) : null,
-      hasSubscription: !!ctx.org.stripe_subscription_id,
+      activeSites: ctx.org.kind === 'host' ? await hostSitesInUse(pool, ctx.org.id) : null,
+      connectedSites: ctx.org.kind === 'contractor' ? await contractorSitesInUse(pool, ctx.org.id) : null,
+      hasSubscription: !!ctx.org.stripe_subscription_id || !!ctx.org.paystack_subscription_code,
       ownAccess: hasOwnAccess(ctx.org),
       sponsored: !!ctx.org.sponsored,
       grant: grantActive(ctx.org) ? { plan: PLANS[ctx.org.grant_plan!].name, until: ctx.org.grant_until, source: ctx.org.grant_source } : null,
       coupon: (ctx.org.settings as Record<string, unknown>)?.checkoutCouponCode ?? null,
       hasCustomer: !!ctx.org.stripe_customer_id,
       plans: plansFor(ctx.org.kind).map((p) => ({
-        id: p.id, name: p.name, blurb: p.blurb, siteLimit: p.siteLimit, maxSeats: p.maxSeats, ai: p.ai, paid: p.paid,
-        purchasable: !p.paid || (features.payments && !!p.stripePrice),
+        id: p.id, name: p.name, blurb: p.blurb, siteLimit: p.siteLimit, connectedSiteLimit: p.connectedSiteLimit, maxSeats: p.maxSeats, ai: p.ai, paid: p.paid,
+        once: !!p.once, priceCents: prices.get(p.id)?.priceCents ?? null, per: prices.get(p.id)?.per ?? 'month',
+        purchasable: !p.paid || (paystack ? (prices.get(p.id)?.priceCents ?? 0) >= 100 : features.paymentProvider === 'stripe' && !!p.stripePrice),
       })),
     };
   });
@@ -170,8 +173,11 @@ export default async function billingRoutes(app: FastifyInstance) {
     if (seats > plan.maxSeats) throw badRequest(`${plan.name} allows up to ${plan.maxSeats} seats.`);
     const used = await seatsUsed(pool, ctx.org.id);
     if (seats < used) throw badRequest(`You have ${used} people (including pending invitations). Remove people before dropping below ${used} seats.`);
-    if (plan.siteLimit !== null && (await activeSites(ctx.org.id)) > plan.siteLimit) {
-      throw badRequest(`${plan.name} includes ${plan.siteLimit} active sites and you have more. Close sites before downgrading.`);
+    if (plan.siteLimit !== null && (await hostSitesInUse(pool, ctx.org.id)) > plan.siteLimit) {
+      throw badRequest(`${plan.name} covers ${plan.siteLimit} site${plan.siteLimit === 1 ? '' : 's'} and you have more. Archive sites before changing.`);
+    }
+    if (plan.connectedSiteLimit !== null && (await contractorSitesInUse(pool, ctx.org.id)) > plan.connectedSiteLimit) {
+      throw badRequest(`${plan.name} covers ${plan.connectedSiteLimit} connected sites and you have more. Archive projects before changing.`);
     }
     const s = getStripe();
     const sub = await s.subscriptions.retrieve(ctx.org.stripe_subscription_id);
@@ -210,7 +216,7 @@ export default async function billingRoutes(app: FastifyInstance) {
   await app.register(async (scope) => {
     scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => done(null, body));
     scope.post('/api/billing/webhook', async (req, reply) => {
-      if (!features.payments || !config.STRIPE_WEBHOOK_SECRET) return reply.status(404).send();
+      if (!config.STRIPE_SECRET_KEY || !config.STRIPE_WEBHOOK_SECRET) return reply.status(404).send();
       let event: Stripe.Event;
       try {
         event = getStripe().webhooks.constructEvent(req.body as Buffer, String(req.headers['stripe-signature'] ?? ''), config.STRIPE_WEBHOOK_SECRET);

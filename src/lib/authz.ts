@@ -30,6 +30,10 @@ export interface OrgRow {
   seat_limit: number;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  billing_provider?: string | null;
+  paystack_customer_code?: string | null;
+  paystack_subscription_code?: string | null;
+  paystack_email_token?: string | null;
   current_period_end: Date | null;
   settings: Record<string, unknown>;
   is_demo: boolean;

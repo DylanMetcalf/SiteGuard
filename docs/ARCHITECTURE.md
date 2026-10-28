@@ -370,8 +370,30 @@ storage), and routes in `routes/studio.ts`.
 - **Promo codes** (`lib/promos.ts`, tables `promo_codes`, `promo_redemptions`): created by the platform
   admin; redeemed by an org admin at `POST /api/billing/redeem` with the code row locked; the same error
   for every invalid case so codes can't be probed. A 100% code becomes a grant; less needs a Stripe coupon.
-- **Pricing page** (`lib/pricing.ts`, table `plan_settings`): display prices, edited in Platform, served
-  publicly at `GET /api/pricing`. Charges come from Stripe prices only.
+- **Pricing page** (`lib/pricing.ts`, table `plan_settings`): prices edited in Platform, served publicly at
+  `GET /api/pricing`. With Paystack they are also what is charged; with Stripe, charges come from the Stripe prices.
+- **Capacity** (`lib/limits.ts`): a site subscription covers `siteLimit` physical sites (active workplaces, plus
+  one for any loose contractor files); a contractor plan covers `connectedSiteLimit` connected sites (its own
+  files at clients' sites and its projects, minus sponsored files). Checked when a workplace, loose file or
+  project is created and on plan changes (402 `site_limit`); shown on Plan & billing.
+- **Paystack** (`routes/paystack.ts`, `lib/paystack.ts`, migration 021; on when `PAYSTACK_SECRET_KEY` is set,
+  `features.paymentProvider = 'paystack'`). Checkout records a pending row in `payments` with the expected
+  amount, then sends the customer to Paystack (`/transaction/initialize`; monthly plans use a Paystack plan
+  code cached in `paystack_plans` per plan and price). `POST /api/billing/paystack/webhook` (CSRF-exempt, raw
+  body) checks `x-paystack-signature` (HMAC-SHA512, constant-time), de-duplicates by body hash in
+  `paystack_events`, and for `charge.success` re-fetches the transaction (`/transaction/verify`) and acts only
+  if status, amount, currency and reference match. `subscription.create` links the subscription (and
+  disables a replaced one after a plan change); `invoice.payment_failed` → `past_due` (grace);
+  `invoice.update` paid → active; `subscription.disable` → cancelled, with paid time kept as a grant until
+  `current_period_end`. Errors delete the event row so Paystack retries. Card changes use Paystack's manage
+  link; cancel calls `/subscription/disable`. `GET /api/billing/payments` lists the org's own payments.
+- **Once-off safety file** (`contractor_once`): a single Paystack charge that sets a grant for `ONCE_OFF_DAYS`
+  with one connected site. Refused while a subscription or a longer grant exists.
+- **Site templates** (`routes/templates.ts`, table `requirement_templates`, migration 022): a host admin uploads
+  a form for a requirement name at a workplace or one loose file; replacing keeps the old row (`superseded_at`).
+  `GET /api/templates/:id/file` is allowed for the owning host, or a contractor whose own file in that scope is
+  visible through `loadSite` (otherwise 404); contractors get current versions only and downloads are audited.
+  Current templates arrive in `state.templates[siteId]` and `state.workplaces[id].templates`.
 - **Platform admin** also searches organisations and gives or removes a plan (`/api/admin/orgs/:id/grant`);
   each change is written to that customer's own audit trail as "COMVERA platform".
 

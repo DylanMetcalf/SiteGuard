@@ -1026,7 +1026,35 @@ export function invalidateTeam(){ teamCache = null; }
 
 /* ---- Billing ---- */
 let billingCache = null;
-async function loadBilling(){ billingCache = await api.get('/api/billing'); render(); }
+async function loadBilling(){
+  const b = await api.get('/api/billing');
+  if(b.provider==='paystack' && isOrgAdmin()) b.history = (await api.get('/api/billing/payments').catch(()=>({payments:[]}))).payments;
+  billingCache = b; render();
+}
+const rands = c => 'R'+(c/100).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2});
+const PAY_STATUS = { pending:'Waiting for payment', success:'Paid', failed:'Not accepted', abandoned:'Not completed', refunded:'Refunded' };
+/** Paystack: flat monthly plans (no seat count), a once-off safety file, card updates on Paystack's own page. */
+function paystackPlans(b, html, promo){
+  if(b.grant && !b.grant.until) return html + promo;
+  html += '<div class="section-title">'+(b.paystackSubscription?'Change plan':'Choose a plan')+'</div>';
+  html += b.plans.filter(p=>p.paid).map(p=>{
+    const current = p.id===b.plan && (b.paystackSubscription || (p.once && b.grant));
+    const price = p.priceCents!=null ? rands(p.priceCents)+(p.once?' once-off':' / '+escapeHtml(p.per)) : 'Contact us';
+    const label = p.once ? 'Pay once' : b.paystackSubscription ? 'Switch to '+escapeHtml(p.name) : 'Subscribe';
+    const blocked = p.once && b.paystackSubscription;
+    return '<div class="plan-card'+(current?' current':'')+'"><div class="flexbetween"><div class="site-card-title">'+escapeHtml(p.name)+'</div><div class="site-card-title">'+price+'</div></div>'
+      +'<div class="site-card-sub">'+escapeHtml(p.blurb)+'</div>'
+      +(current && !p.once ? '<span class="badge approved" style="margin-top:8px;">Current</span>'
+        : blocked ? '' : p.purchasable ? '<button class="btn '+(p.once?'secondary':'primary')+' small" style="margin-top:8px;" data-action="paystack-checkout" data-plan="'+p.id+'">'+label+'</button>' : '<div class="site-card-sub" style="margin-top:6px;"><a href="/contact" target="_blank" rel="noopener">Contact us</a> for this plan.</div>')
+      +'</div>';
+  }).join('');
+  html += '<div class="site-card-sub" style="margin-top:8px;">You pay on Paystack’s secure page; COMVERA never sees your card. A plan is switched on only once Paystack confirms the payment. Switching plans starts the new one and stops the old one. Cancelling keeps what you paid for until the end of the month, and your data stays readable after that.</div>';
+  if(b.paystackSubscription) html += '<div class="row-actions" style="margin-top:10px;"><button class="btn secondary" data-action="billing-portal">Update card</button><button class="btn danger" data-action="paystack-cancel">Cancel subscription</button></div>';
+  if(b.history && b.history.length){
+    html += '<div class="section-title">Payments</div><div class="card">'+b.history.map(p=>'<div class="kv"><span>'+escapeHtml(String(p.paid_at||p.created_at).slice(0,10))+' · '+escapeHtml(p.planName)+'</span><span>'+rands(p.amount_cents)+' · '+(PAY_STATUS[p.status]||escapeHtml(p.status))+'</span></div>').join('')+'</div>';
+  }
+  return html + promo;
+}
 function renderBilling(){
   if(!billingCache){ loadBilling().catch(e=>showToast(e.message)); return '<div class="empty"><p>Loading…</p></div>'; }
   const b = billingCache;
@@ -1042,9 +1070,11 @@ function renderBilling(){
   html += '<div class="card checkpoint"><div class="kv"><span>Current plan</span><span>'+escapeHtml(current?current.name:b.plan)+'</span></div>'
     +'<div class="kv"><span>Status</span><span>'+(b.grant ? 'Given by COMVERA' : b.status==='trialing' && b.trialEndsAt ? (new Date(b.trialEndsAt) > new Date() ? 'Trial until '+timeAgo(b.trialEndsAt) : 'Trial ended '+timeAgo(b.trialEndsAt)) : escapeHtml(b.status))+'</span></div>'
     +'<div class="kv"><span>Seats</span><span>'+b.seatsUsed+' used of '+b.seatLimit+'</span></div>'
-    +(b.activeSites!==null?'<div class="kv"><span>Active sites</span><span>'+b.activeSites+(current&&current.siteLimit?' of '+current.siteLimit:'')+'</span></div>':'')
+    +(b.activeSites!==null?'<div class="kv"><span>Sites</span><span>'+b.activeSites+(current&&current.siteLimit?' of '+current.siteLimit:'')+'</span></div>':'')
+    +(b.connectedSites!=null?'<div class="kv"><span>Connected sites</span><span>'+b.connectedSites+(current&&current.connectedSiteLimit?' of '+current.connectedSiteLimit:'')+' <span class="muted">(sponsored sites are free)</span></span></div>':'')
     +(b.currentPeriodEnd?'<div class="kv"><span>Renews</span><span>'+timeAgo(b.currentPeriodEnd)+'</span></div>':'')
-    +(b.hasCustomer?'<button class="btn secondary block" style="margin-top:10px;" data-action="billing-portal">Payment method &amp; invoices</button>':'')+'</div>';
+    +(b.hasCustomer && b.provider==='stripe'?'<button class="btn secondary block" style="margin-top:10px;" data-action="billing-portal">Payment method &amp; invoices</button>':'')+'</div>';
+  if(b.provider==='paystack') return paystackPlans(b, html, promo);
   // A plan given with no end date needs nothing more from the customer.
   if(b.grant && !b.grant.until) return html + promo;
   html += '<div class="section-title">'+(b.hasSubscription?'Change plan or seats':'Choose a plan')+'</div>';
@@ -1334,7 +1364,17 @@ on('remove-member', async (el)=>{
   invalidateTeam(); if(ok) render();
 });
 on('revoke-invite', async (el)=>{ await act(()=>api.del('/api/org/invites/'+el.dataset.id), 'Invitation revoked', el); invalidateTeam(); render(); });
-on('billing-portal', async (el)=>{ try{ el.disabled = true; const r = await api.post('/api/billing/portal'); location.href = r.url; }catch(e){ showToast(e.message); el.disabled = false; } });
+on('billing-portal', async (el)=>{ try{ el.disabled = true; const r = await api.post(S.boot.features.paymentProvider==='paystack' ? '/api/billing/paystack/manage' : '/api/billing/portal'); location.href = r.url; }catch(e){ showToast(e.message); el.disabled = false; } });
+on('paystack-checkout', async (el)=>{
+  el.disabled = true;
+  try{ const r = await api.post('/api/billing/paystack/checkout', { plan: el.dataset.plan }); location.href = r.url; }
+  catch(e){ showToast(e.message); el.disabled = false; }
+});
+on('paystack-cancel', async (el)=>{
+  if(!confirm('Cancel your subscription? You keep what you paid for until the end of the month. Your data stays readable afterwards.')) return;
+  await act(()=>api.post('/api/billing/paystack/cancel'), 'Cancellation sent to Paystack', el);
+  invalidateBilling();
+});
 on('billing-choose', async (el)=>{
   const seats = parseInt(document.getElementById('billSeats').value, 10) || 1;
   el.disabled = true;

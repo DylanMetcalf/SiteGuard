@@ -22,7 +22,8 @@ that MVP. What's new is the backend underneath them.
 | **Server-enforced permissions.** | Every read and write is checked against the caller's organisation and role. Another tenant's records return 404. Covered by tests. |
 | **File storage.** | S3-compatible (AWS S3, Cloudflare R2, MinIO), private objects, 60-second presigned downloads, magic-byte type checks |
 | **AI drafting via a backend proxy.** | Server-side Claude API calls, plan-gated with a monthly allowance, plus expiry-date detection on uploaded certificates. No key in the browser. Without a key, drafting uses built-in templates tailored to the described work. |
-| **Billing.** Plans, seats, trials, upgrade/downgrade. | Stripe Checkout + Customer Portal + webhooks. 14-day trial for hosts, free tier for contractors, per-seat plans. A lapsed account becomes read-only. |
+| **Billing.** Plans, trials, upgrade/downgrade, once-off purchase. | Paystack for South Africa (subscriptions, once-off safety file, signed + verified webhooks, payment history); Stripe kept for other markets. 14-day trial; a site subscription covers one site; contractor tiers by connected sites (5/10/20); sponsored files free. A lapsed account becomes read-only, never deleted. |
+| **Site templates.** | A mine attaches its own form to a requirement; contractors download, complete and upload it for review. Versions kept. |
 | **Email notifications.** | Transactional outbox with retries. Invites, corrections, requests, permit requests, serious incidents, and a reminder digest for expiring docs/certificates, unclosed permits, open incidents and overdue requests. |
 | **Secure external sharing.** | Expiring, revocable, audited read-only links (readiness summary or full safety file), plus public `/verify/<code>` pages |
 | **Real-time sync.** | Server-Sent Events + Postgres LISTEN/NOTIFY. Colleagues and the other company see changes without refreshing. |
@@ -275,6 +276,9 @@ docs/                      Architecture and deployment guides
 
 ## Docs
 
+- **[COMVERA_LAUNCH_AUDIT.md](COMVERA_LAUNCH_AUDIT.md)**: the launch audit and readiness report (what works, risks,
+  blockers, research, prioritised plan) and **[COMVERA_NEXT_STEPS.md](COMVERA_NEXT_STEPS.md)**: what's left, in order.
+- [docs/ACCOUNT_RECOVERY.md](docs/ACCOUNT_RECOVERY.md): getting back into an account or the platform admin, safely.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): tenancy model, permission matrix, how the UI gets its
   data, security measures, and known limits.
 - **[docs/GO_LIVE.md](docs/GO_LIVE.md): start here to put COMVERA online** — the step-by-step checklist,

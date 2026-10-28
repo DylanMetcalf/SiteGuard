@@ -15,7 +15,9 @@ Ideas we are deliberately **not** building yet. Each gets revisited when there i
 | Saved assistant conversations and chat history | Nothing stored keeps POPIA scope small | Users ask to return to earlier answers |
 | Streaming assistant replies (word by word) | A full reply in a few seconds is acceptable for now | Users find the wait too long with web research |
 | AI-written summary of the compliance agent's findings (e.g. a weekly email) | The rule-based list is clear and free | Customers want a weekly management summary |
-| Paystack / PayFast billing | Invoicing by EFT works for the first customers; Stripe is built in | Card payments become a sales blocker |
+| PayFast as a second payment provider | Paystack is built in (2026-10-28) and covers cards and EFT in South Africa | Customers ask for Instant EFT/PayFast specifically |
+| Internal areas within a site (departments, shafts as sub-areas) | One workplace = one site keeps billing and gate clearance simple | A mine asks to split one site's contractors by area |
+| Filling a site template automatically from field mappings | Contractors download and complete templates; nothing is filled automatically | A mine supplies a stable form and asks for pre-filling |
 | Final, attorney-approved privacy notice and terms | Draft pages at /privacy and /terms describe what the software does and are marked for legal review | Before the first paid customer |
 | More Document Studio types (lift plan, traffic management plan, environmental management plan, incident investigation report, induction record) | The first 14 cover the starter packs; add by customer demand using the `add-document-blueprint` skill | Customers ask for them |
 | Background research agent that refreshes blueprints from new legislation | Legal content changes need a person's review, not automatic edits | A monthly reviewed routine proposes changes as a pull request |
