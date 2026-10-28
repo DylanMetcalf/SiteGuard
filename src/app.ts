@@ -42,6 +42,8 @@ import demoRoutes from './routes/demo.js';
 import workforceRoutes from './routes/workforce.js';
 import exchangeRoutes from './routes/exchange.js';
 import templateRoutes from './routes/templates.js';
+import managerRoutes from './routes/manager.js';
+import supportAccessRoutes from './routes/supportAccess.js';
 import exchangePortalRoutes from './routes/exchangePortal.js';
 
 declare module 'fastify' {
@@ -78,9 +80,17 @@ function humanIssue(issue: { path: PropertyKey[]; message: string; code?: string
   return `${label}: ${issue.message}`;
 }
 
+/** Link tokens are credentials: keep them out of request logs. */
+export const redactUrl = (url: string) =>
+  url
+    .replace(/(\/(?:x|gate|s|r|share|verify|invite|site-invite|review-links)\/)[A-Za-z0-9_-]{12,}/g, '$1[redacted]')
+    .replace(/([?&](?:token|code)=)[^&]+/g, '$1[redacted]');
+
 export async function buildApp(opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: opts.logger ?? !['test'].includes(config.NODE_ENV),
+    logger: (opts.logger ?? !['test'].includes(config.NODE_ENV))
+      ? { serializers: { req: (r: { method: string; url: string; host?: string; ip?: string }) => ({ method: r.method, url: redactUrl(r.url), host: r.host, remoteAddress: r.ip }) } }
+      : false,
     trustProxy: config.TRUST_PROXY,
     bodyLimit: 1024 * 1024,
   });
@@ -195,6 +205,8 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(workforceRoutes);
   await app.register(exchangeRoutes);
   await app.register(templateRoutes);
+  await app.register(managerRoutes);
+  await app.register(supportAccessRoutes);
   await app.register(exchangePortalRoutes);
 
   await app.register(fastifyStatic, { root: publicDir, index: false, wildcard: false });
@@ -206,6 +218,11 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   };
   app.get('/', sendShell);
   // The interactive walkthrough: a standalone public page with fictional data (public/walkthrough.html).
+  // The manager portal: a standalone page; everything it shows comes from /api/manager, which needs a platform admin plus the second step.
+  app.get('/manager', async (_req, reply) => {
+    reply.header('cache-control', 'no-store').header('x-robots-tag', 'noindex, nofollow');
+    return reply.sendFile('manager.html', { cacheControl: false });
+  });
   app.get('/walkthrough', async (_req, reply) => {
     reply.header('cache-control', 'no-cache');
     return reply.sendFile('walkthrough.html', { cacheControl: false });

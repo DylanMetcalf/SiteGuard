@@ -43,6 +43,8 @@ const schema = z.object({
   CONTACT_PHONE: z.string().max(40).optional(),
   /** Comma-separated emails of the people who run this service; they see the platform overview (More → Platform). */
   PLATFORM_ADMIN_EMAILS: z.string().default(''),
+  /** Encrypts platform admins' authenticator secrets in the database. Set it in production. */
+  MFA_SECRET_KEY: z.string().min(16).optional(),
 
   // AI drafting via server-side proxy. Unset → AI features are hidden.
   ANTHROPIC_API_KEY: z.string().optional(),

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Manager · COMVERA</title>
+<meta name="theme-color" content="#0E1E36">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/app.css">
+<style>
+  body{background:var(--paper);}
+  .mg{max-width:1080px; margin:0 auto; padding:calc(14px + env(safe-area-inset-top,0px)) 16px 60px;}
+  .mg-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+  .mg-brand{display:flex; align-items:center; gap:10px; font-family:var(--font-head); font-weight:700; letter-spacing:.12em; font-size:16px; color:var(--ink);}
+  .mg-brand img{width:30px; height:30px; border-radius:8px;}
+  .mg-brand small{font-weight:600; letter-spacing:.04em; color:var(--grey); font-size:12px;}
+  .mg-nav{display:flex; gap:6px; overflow-x:auto; margin-bottom:16px; padding-bottom:2px;}
+  .mg-nav button{white-space:nowrap;}
+  .mg-nav .on{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .mg h1{font-size:22px; font-weight:700; letter-spacing:-.02em; margin:0 0 4px;}
+  .mg-sub{color:var(--grey); font-size:13.5px; margin-bottom:12px;}
+  .mg-narrow{max-width:420px; margin:40px auto;}
+  .mg-tiles{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-bottom:6px;}
+  .mg-tile{background:#fff; border:1px solid var(--grey-line); border-radius:var(--radius-sm,12px); padding:12px;}
+  .mg-tile b{display:block; font-size:24px; letter-spacing:-.02em;}
+  .mg-tile span{font-size:12.5px; color:var(--grey);}
+  .mg-tile.warn b{color:var(--red);}
+  .mg-row{display:flex; gap:12px; align-items:flex-start; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--grey-line);}
+  .mg-row:last-child{border-bottom:none;}
+  .mg-row.click{cursor:pointer;}
+  .mg-main{min-width:0; flex:1;}
+  .mg-name{font-weight:600; font-size:14.5px;}
+  .mg-meta{font-size:12.5px; color:var(--grey); margin-top:3px; word-break:break-word;}
+  .mg-actions{display:flex; gap:6px; flex-wrap:wrap; flex:none;}
+  .mg-filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .mg-filters input,.mg-filters select{flex:1; min-width:140px;}
+  .mg-filters select#trialDays{flex:none; min-width:120px;}
+  .mg-code{font-family:var(--font-mono,monospace); font-size:16px; letter-spacing:.08em; background:#fff; border:1px dashed var(--grey-line); padding:10px; border-radius:8px; word-break:break-all; text-align:center;}
+  .mg-codes{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:10px 0;}
+  .mg-codes div{font-family:var(--font-mono,monospace); background:#fff; border:1px solid var(--grey-line); padding:8px; border-radius:8px; text-align:center;}
+  .mg-banner{background:var(--green-bg); color:var(--green); border-radius:var(--radius-xs); padding:9px 11px; font-size:13px; margin-bottom:10px;}
+  table.mg-t{width:100%; border-collapse:collapse; font-size:13px;}
+  table.mg-t th{text-align:left; color:var(--grey); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--grey-line);}
+  table.mg-t td{padding:7px 8px; border-bottom:1px solid var(--grey-line); vertical-align:top;}
+  .mg-scroll{overflow-x:auto;}
+</style>
+</head>
+<body>
+<div class="mg" id="mg"><div class="mg-sub" style="padding:40px 0;text-align:center;">Loading…</div></div>
+<script type="module" src="/js/manager.js"></script>
+</body>
+</html>

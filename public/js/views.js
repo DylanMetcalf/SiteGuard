@@ -833,7 +833,7 @@ function renderMore(){
   html += item('team', ICONS.people, 'Team & roles', 'Invite colleagues and set what they can do');
   if(isOrgAdmin()) html += item('billing', ICONS.card, 'Plan & billing', org().planName+' · '+org().seatLimit+' seats');
   if(isOrgAdmin()) html += item('settings', ICONS.gear, 'Organisation settings', 'Company details, notifications, integrations');
-  if(S.boot.me.platformAdmin) html += item('platform', ICONS.dashboard, 'Platform', 'Sign-ups, plans, usage and health across the service');
+  if(S.boot.me.platformAdmin) html += item('platform', ICONS.dashboard, 'Platform', 'Manager portal: customers, health, support and the activity log');
   html += '</div><div class="section-title">Account</div><div class="card">'
     +'<button class="menu-row" data-action="open-profile"><div class="qa-icon">'+initials(myName())+'</div><div style="flex:1;"><div class="qa-title">'+myName()+'</div><div class="qa-sub">'+S.boot.me.email+'</div></div>'+ICONS.chevron+'</button>'
     +'<button class="menu-row" data-action="open-feedback"><div class="qa-icon">'+ICONS.alert+'</div><div style="flex:1;"><div class="qa-title">Report a problem or suggest an idea</div><div class="qa-sub">Goes straight to the COMVERA team</div></div>'+ICONS.chevron+'</button>'
@@ -1118,6 +1118,7 @@ function renderSettings(){
       +'<label class="field-label" for="inspectxUrl">InspectX base URL</label><input type="url" id="inspectxUrl" value="'+(s.inspectxBaseUrl||'')+'" placeholder="https://app.inspectx.example/i/">'
       +(ro?'':'<button class="btn secondary block" style="margin-top:10px;" data-action="save-integration">Save</button>')+'</div>';
   }
+  if(isOrgAdmin()) html += supportAccessCard();
   html += '<div class="section-title">Your data</div><div class="card"><div class="site-card-sub">Download everything '+o.name+' can see in COMVERA — company details, team, sites and files, document records and the audit trail — as one file you can keep or move elsewhere. Uploaded documents are listed, not included; download those from each file.</div>'
     +'<a class="btn secondary small" style="margin-top:10px;" href="/api/org/export" download>Download our data</a>'
     +'<div class="site-card-sub" style="margin-top:8px;"><a href="/privacy" target="_blank" rel="noopener">Privacy notice</a> · <a href="/terms" target="_blank" rel="noopener">Terms of use</a></div></div>';
@@ -1127,6 +1128,21 @@ function renderSettings(){
       : 'No AI key is configured, so drafting and the assistant use COMVERA\'s built-in templates and rules. Add ANTHROPIC_API_KEY on the server to switch on AI.')+'</div></div>';
   return html;
 }
+
+/* ---- Support access: the customer's own admin lets COMVERA support look at the account for a while ---- */
+let supportCache = null;
+function supportAccessCard(){
+  if(!supportCache){ api.get('/api/support-access').then(r=>{ supportCache = r; render(); }).catch(()=>{}); return ''; }
+  const a = supportCache.active;
+  return '<div class="section-title">Support access</div><div class="card"><div class="site-card-sub">If you ask COMVERA for help, you can let our support team <strong>look</strong> at your account for a limited time. They can see your sites, the names and status of your documents, and recent activity. They <strong>cannot</strong> open your files, change anything, or see passwords. Every look is written to your activity history. You can end it at any time.</div>'
+    + (a ? '<div class="notice" style="margin-top:10px;background:var(--green-bg);color:var(--green);">On until '+escapeHtml(new Date(a.expiresAt).toLocaleString('en-ZA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))+(a.reason?' — '+escapeHtml(a.reason):'')+'</div><button class="btn secondary small" style="margin-top:8px;" data-action="support-end">Turn off now</button>'
+      : '<label class="field-label" for="supHours">Allow for</label><select id="supHours"><option value="1">1 hour</option><option value="4">4 hours</option><option value="24" selected>24 hours</option><option value="72">3 days</option></select>'
+        +'<label class="field-label" for="supReason">What do you need help with? (optional)</label><input type="text" id="supReason" maxlength="300" placeholder="e.g. Cannot find where to add a requirement">'
+        +'<button class="btn secondary small" style="margin-top:10px;" data-action="support-allow">Allow support to look</button>')
+    + '</div>';
+}
+on('support-allow', async (el)=>{ el.disabled = true; try{ supportCache = await api.post('/api/support-access', { hours: parseInt(document.getElementById('supHours').value,10), reason: document.getElementById('supReason').value.trim() }); showToast('Support access is on'); render(); }catch(e){ showToast(e.message); el.disabled = false; } });
+on('support-end', async (el)=>{ el.disabled = true; try{ supportCache = await api.post('/api/support-access/revoke'); showToast('Support access turned off'); render(); }catch(e){ showToast(e.message); el.disabled = false; } });
 
 const BRAND_SWATCHES = [['#16325C','Navy'],['#3F6E55','Sage'],['#0F6B6B','Teal'],['#B8430F','Safety orange'],['#A51C24','Red'],['#5B2A86','Purple'],['#1C1C1C','Black']];
 function brandingCard(ro){
@@ -1210,7 +1226,7 @@ on('back-sites', ()=>{
 });
 on('focus-site', (el, e)=>{ e.stopPropagation(); S.focusSiteId = el.dataset.site; render(); });
 on('site-tab', (el)=>{ S.siteTab = el.dataset.tab; render(); });
-on('goto-more', (el)=>{ S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); if(S.moreView==='exchanges'){ invalidateExchanges(); S.exchangeId = null; } render(); window.scrollTo(0,0); });
+on('goto-more', (el)=>{ if(el.dataset.view==='platform'){ location.href = '/manager'; return; } S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); if(S.moreView==='exchanges'){ invalidateExchanges(); S.exchangeId = null; } render(); window.scrollTo(0,0); });
 on('doc-centre-filter', (el)=>{ S.docCentreFilter = el.dataset.filter; render(); });
 on('doc-centre-jump', (el)=>{ S.docCentreFilter = el.dataset.filter; S.hostPeopleTab = 'documents'; S.nav='passport'; render(); });
 on('safety-filter', (el)=>{ S.safetyFilter = el.dataset.filter; render(); });

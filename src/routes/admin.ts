@@ -7,7 +7,8 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { many, one, pool, withTx } from '../db/pool.js';
-import { isPlatformAdmin } from '../config.js';
+import { isPlatformAdmin, isProd } from '../config.js';
+import { logPlatformAction } from '../lib/platformLog.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { isUuid, requireUser } from '../lib/authz.js';
 import { PLANS } from '../lib/plans.js';
@@ -19,6 +20,8 @@ import { publishChange } from '../lib/realtime.js';
 function requirePlatformAdmin(req: FastifyRequest) {
   const ctx = requireUser(req.ctx);
   if (!isPlatformAdmin(ctx.user)) throw notFound();
+  // In production these routes also need the second sign-in step (set up at /manager).
+  if (isProd && !(ctx.mfaVerifiedAt && Date.now() - new Date(ctx.mfaVerifiedAt).getTime() < 12 * 3600_000)) throw notFound();
   return ctx;
 }
 
@@ -36,8 +39,7 @@ const n = (sql: string, params: unknown[] = []) => one<{ n: number }>(pool, sql,
 
 export default async function adminRoutes(app: FastifyInstance) {
   app.get('/api/admin/overview', async (req, reply) => {
-    const ctx = requireUser(req.ctx);
-    if (!isPlatformAdmin(ctx.user)) throw notFound();
+    requirePlatformAdmin(req);
     reply.header('cache-control', 'no-store');
     const real = `not o.is_demo and o.managed_by_org is null`;
     const [orgs, plans, statuses] = await Promise.all([
@@ -111,16 +113,17 @@ export default async function adminRoutes(app: FastifyInstance) {
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) on conflict (code) do nothing returning id`,
       [b.code, b.description, b.plan, b.percentOff, b.durationDays, PLANS[b.plan].kind, b.orgId, b.expiresAt ? `${b.expiresAt}T23:59:59+02:00` : null, b.maxRedemptions, b.stripeCoupon, ctx.user.name]);
     if (!row) throw conflict('That code already exists.');
-    req.log.info({ promo: b.code, by: ctx.user.email }, 'promo code created');
+    await logPlatformAction(pool, ctx, 'Created a promo code', null, `${b.code} (${b.plan}, ${b.percentOff}% off)`, req.ip);
     return { id: row.id };
   });
 
   app.post('/api/admin/promos/:id/active', async (req) => {
-    requirePlatformAdmin(req);
+    const ctx = requirePlatformAdmin(req);
     const { id } = req.params as { id: string };
     if (!isUuid(id)) throw notFound();
     const { active } = z.object({ active: z.boolean() }).parse(req.body);
     const r = await pool.query('update promo_codes set active = $2 where id = $1', [id, active]);
+    if (r.rowCount) await logPlatformAction(pool, ctx, active ? 'Switched a promo code on' : 'Switched a promo code off', null, id, req.ip);
     if (!r.rowCount) throw notFound();
     return { ok: true };
   });
@@ -152,6 +155,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       const until = b.until ? `${b.until}T23:59:59+02:00` : null;
       await db.query('update organisations set grant_plan = $2, grant_until = $3, grant_source = $4 where id = $1', [id, b.plan, b.plan ? until : null, b.plan ? `admin${b.note ? ': ' + b.note : ''}` : null]);
       await auditPlatform(db, id, ctx.user.name, b.plan ? 'Plan given by COMVERA' : 'Plan from COMVERA removed', b.plan ? `${PLANS[b.plan].name}${b.until ? ' until ' + b.until : ', no end date'}` : '');
+      await logPlatformAction(db, ctx, b.plan ? 'Gave a plan' : 'Removed a given plan', id, `${org.name}: ${b.plan ?? 'none'}${b.until ? ' until ' + b.until : ''}`, req.ip);
       await publishChange(db, [id]);
     });
     return { ok: true };
@@ -175,6 +179,7 @@ export default async function adminRoutes(app: FastifyInstance) {
        values ($1, $2, $3, $4, $5, $6, $7, $8, now())
        on conflict (plan_id) do update set price_cents = $2, currency = $3, per = $4, blurb = $5, highlights = $6, visible = $7, updated_by_name = $8, updated_at = now()`,
       [planId, b.priceCents, b.currency, b.per, b.blurb || null, b.highlights, b.visible, ctx.user.name]);
+    await logPlatformAction(pool, ctx, 'Changed pricing', null, `${planId}: ${b.priceCents === null ? 'contact us' : b.priceCents / 100 + ' ' + b.currency + ' per ' + b.per}`, req.ip);
     return { ok: true };
   });
 

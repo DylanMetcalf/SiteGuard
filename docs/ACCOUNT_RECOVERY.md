@@ -39,6 +39,14 @@ a separate password.
 3. Losing the Render account itself is recovered through Render's own support. Keep its two-factor
    recovery codes somewhere safe and offline.
 
+### The manager portal's second step
+- Sign in at `/manager` with your normal email and password, then the 6-digit code from your authenticator app.
+- Lost your phone: use one of the eight recovery codes (each works once) and set up a new authenticator afterwards.
+- Lost the phone **and** the recovery codes: in Render → comvera_db → Shell run
+  `delete from admin_mfa where user_id = (select id from users where email = 'you@yourcompany.co.za');`
+  then sign in at `/manager` and set it up again. Only someone with access to your Render account can do this, which is the point.
+- If you change `MFA_SECRET_KEY` every admin must be reset the same way.
+
 ## 5. Payment provider access
 Paystack and Stripe accounts are recovered through their own support. COMVERA stores only customer and
 subscription codes, never cards, so nothing in COMVERA needs to change. If a secret key may have leaked,
