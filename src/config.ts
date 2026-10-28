@@ -66,6 +66,13 @@ const schema = z.object({
   STRIPE_PRICE_CONTRACTOR_PRO: z.string().optional(),
   STRIPE_PRICE_CONTRACTOR_STARTER: z.string().optional(),
   STRIPE_PRICE_CONTRACTOR_BUSINESS: z.string().optional(),
+  /**
+   * Paystack (South Africa's card and EFT payments; Stripe does not onboard South African
+   * businesses directly). A test key (sk_test_…) runs everything in Paystack's test mode.
+   */
+  PAYSTACK_SECRET_KEY: z.string().optional(),
+  /** How long a once-off safety file purchase keeps the workspace open. */
+  ONCE_OFF_DAYS: z.coerce.number().int().min(7).max(365).default(60),
 
   /** Allow creating throwaway demo sandboxes from the sign-in page. */
   DEMO_SANDBOX_ENABLED: bool(true),
@@ -106,9 +113,10 @@ if (isProd) {
 export const features = {
   ai: !!config.ANTHROPIC_API_KEY,
   /** Plans, trials and limits are enforced. */
-  billing: !!config.STRIPE_SECRET_KEY || config.ENFORCE_PLANS,
-  /** Card payments through Stripe are available. */
-  payments: !!config.STRIPE_SECRET_KEY,
+  billing: !!config.STRIPE_SECRET_KEY || !!config.PAYSTACK_SECRET_KEY || config.ENFORCE_PLANS,
+  /** Online payments are available (Paystack preferred when both are set). */
+  payments: !!config.STRIPE_SECRET_KEY || !!config.PAYSTACK_SECRET_KEY,
+  paymentProvider: (config.PAYSTACK_SECRET_KEY ? 'paystack' : config.STRIPE_SECRET_KEY ? 'stripe' : null) as 'paystack' | 'stripe' | null,
   email: !!config.SMTP_URL,
   demo: config.DEMO_SANDBOX_ENABLED,
   devRoleSwitcher: config.DEV_ROLE_SWITCHER && !isProd,

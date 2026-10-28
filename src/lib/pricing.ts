@@ -7,6 +7,7 @@
  * generators sell single files from about R400–R500, specialist-compiled files
  * cost roughly R2,000 to R10,000, and a traditionally prepared file is about R5,000.
  * A contractor subscription should cost less per month than one prepared file.
+ * The once-off safety file (R1,299) sits inside the R1,200–R1,500 range the owner proposed.
  * Contractor Business (R1,699) is a proposal between Pro and a custom deal: owner to confirm.
  */
 import type { Db } from '../db/pool.js';
@@ -30,6 +31,8 @@ export const DEFAULT_PRICING: Record<string, Omit<PlanPrice, 'planId'>> = {
     highlights: ['Up to 10 connected sites', 'Secure share links for clients', 'AI drafting and expiry detection', 'Up to 200 people'] },
   contractor_business: { priceCents: 169900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
     highlights: ['Up to 20 connected sites', 'Everything in Contractor Pro', 'Up to 500 people'] },
+  contractor_once: { priceCents: 129900, currency: 'ZAR', per: 'safety file', blurb: null, visible: true,
+    highlights: ['One safety file for one site or project', 'Paid once, no subscription', 'Workspace open for 60 days to finish it', 'Stays readable afterwards'] },
   host_starter: { priceCents: 249900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
     highlights: ['One site', 'Sponsored access for your contractors', 'Gate clearance, audits and validity rules', 'Permits, incidents and audit trail'] },
   host_pro: { priceCents: 599900, currency: 'ZAR', per: 'month', blurb: null, visible: true,

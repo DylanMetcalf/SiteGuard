@@ -18,6 +18,8 @@ export interface Plan {
   maxSeats: number;
   ai: boolean;
   paid: boolean;
+  /** Bought once (a grant for ONCE_OFF_DAYS), never a recurring subscription. */
+  once?: boolean;
   /** Stripe Price id (per-seat, recurring). */
   stripePrice?: string;
   blurb: string;
@@ -100,6 +102,19 @@ export const PLANS: Record<string, Plan> = {
     paid: true,
     stripePrice: config.STRIPE_PRICE_CONTRACTOR_BUSINESS,
     blurb: 'Up to 20 connected sites with everything in Contractor Pro. More than 20: talk to us.',
+  },
+  contractor_once: {
+    id: 'contractor_once',
+    name: 'Once-off safety file',
+    kind: 'contractor',
+    siteLimit: null,
+    connectedSiteLimit: 1,
+    defaultSeats: 3,
+    maxSeats: 3,
+    ai: true,
+    paid: true,
+    once: true,
+    blurb: 'One safety file for one site or project, paid once with no subscription. The workspace stays open for a set period to finish and download it; it stays readable after that.',
   },
   host_enterprise: {
     id: 'host_enterprise',

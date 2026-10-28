@@ -6,6 +6,7 @@ process.env.TEST_DATABASE_URL && (process.env.DATABASE_URL = process.env.TEST_DA
 process.env.LOCAL_STORAGE_DIR = '.data/test-uploads';
 process.env.APP_URL = 'http://localhost:3000';
 if (!process.env.TEST_WITH_BILLING) delete process.env.STRIPE_SECRET_KEY;
+if (!process.env.TEST_WITH_PAYSTACK) delete process.env.PAYSTACK_SECRET_KEY;
 delete process.env.ANTHROPIC_API_KEY;
 
 const { pool } = await import('../src/db/pool.js');

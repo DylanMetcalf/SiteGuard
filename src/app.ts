@@ -33,6 +33,7 @@ import gateRoutes from './routes/gate.js';
 import oversightRoutes from './routes/oversight.js';
 import projectRoutes from './routes/projects.js';
 import billingRoutes from './routes/billing.js';
+import paystackRoutes from './routes/paystack.js';
 import shareRoutes from './routes/share.js';
 import legalRoutes from './routes/legal.js';
 import adminRoutes from './routes/admin.js';
@@ -52,7 +53,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
 
 /** Paths that authenticate some other way (e.g. Stripe signature) and skip CSRF checks. */
-const CSRF_EXEMPT = new Set(['/api/billing/webhook']);
+const CSRF_EXEMPT = new Set(['/api/billing/webhook', '/api/billing/paystack/webhook']);
 /** The Exchange portal has its own short sessions and CSRF header (routes/exchangePortal.ts). */
 const isPortal = (p: string) => p.startsWith('/api/x/');
 
@@ -184,6 +185,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(oversightRoutes);
   await app.register(projectRoutes);
   await app.register(billingRoutes);
+  await app.register(paystackRoutes);
   await app.register(shareRoutes);
   await app.register(legalRoutes);
   await app.register(adminRoutes);

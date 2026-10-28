@@ -24,7 +24,7 @@ import { contractorSitesInUse, hostSitesInUse } from '../lib/limits.js';
 
 let stripe: Stripe | null = null;
 function getStripe(): Stripe {
-  if (!features.payments) throw unavailable('Online card payments aren\'t switched on yet. Contact us to subscribe, or use a promo code.');
+  if (features.paymentProvider !== 'stripe') throw unavailable('Online card payments aren\'t switched on yet. Contact us to subscribe, or use a promo code.');
   stripe ??= new Stripe(config.STRIPE_SECRET_KEY!);
   return stripe;
 }
@@ -105,9 +105,13 @@ export default async function billingRoutes(app: FastifyInstance) {
   app.get('/api/billing', async (req) => {
     const ctx = requireOrg(req.ctx);
     const plan = planOf(ctx.org);
+    const prices = new Map((await pricingTable(pool)).map((p) => [p.planId, p]));
+    const paystack = features.paymentProvider === 'paystack';
     return {
       enabled: features.billing,
       payments: features.payments,
+      provider: features.paymentProvider,
+      paystackSubscription: !!ctx.org.paystack_subscription_code,
       plan: plan.id,
       status: ctx.org.subscription_status,
       standing: standing(ctx.org),
@@ -117,7 +121,7 @@ export default async function billingRoutes(app: FastifyInstance) {
       seatsUsed: await seatsUsed(pool, ctx.org.id),
       activeSites: ctx.org.kind === 'host' ? await hostSitesInUse(pool, ctx.org.id) : null,
       connectedSites: ctx.org.kind === 'contractor' ? await contractorSitesInUse(pool, ctx.org.id) : null,
-      hasSubscription: !!ctx.org.stripe_subscription_id,
+      hasSubscription: !!ctx.org.stripe_subscription_id || !!ctx.org.paystack_subscription_code,
       ownAccess: hasOwnAccess(ctx.org),
       sponsored: !!ctx.org.sponsored,
       grant: grantActive(ctx.org) ? { plan: PLANS[ctx.org.grant_plan!].name, until: ctx.org.grant_until, source: ctx.org.grant_source } : null,
@@ -125,7 +129,8 @@ export default async function billingRoutes(app: FastifyInstance) {
       hasCustomer: !!ctx.org.stripe_customer_id,
       plans: plansFor(ctx.org.kind).map((p) => ({
         id: p.id, name: p.name, blurb: p.blurb, siteLimit: p.siteLimit, connectedSiteLimit: p.connectedSiteLimit, maxSeats: p.maxSeats, ai: p.ai, paid: p.paid,
-        purchasable: !p.paid || (features.payments && !!p.stripePrice),
+        once: !!p.once, priceCents: prices.get(p.id)?.priceCents ?? null, per: prices.get(p.id)?.per ?? 'month',
+        purchasable: !p.paid || (paystack ? (prices.get(p.id)?.priceCents ?? 0) >= 100 : features.paymentProvider === 'stripe' && !!p.stripePrice),
       })),
     };
   });
@@ -211,7 +216,7 @@ export default async function billingRoutes(app: FastifyInstance) {
   await app.register(async (scope) => {
     scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => done(null, body));
     scope.post('/api/billing/webhook', async (req, reply) => {
-      if (!features.payments || !config.STRIPE_WEBHOOK_SECRET) return reply.status(404).send();
+      if (!config.STRIPE_SECRET_KEY || !config.STRIPE_WEBHOOK_SECRET) return reply.status(404).send();
       let event: Stripe.Event;
       try {
         event = getStripe().webhooks.constructEvent(req.body as Buffer, String(req.headers['stripe-signature'] ?? ''), config.STRIPE_WEBHOOK_SECRET);
