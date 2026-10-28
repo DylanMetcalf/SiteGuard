@@ -5,6 +5,26 @@ Newest first.
 
 ---
 
+**DECISION** Paystack is the payment provider for South Africa (`PAYSTACK_SECRET_KEY`); the Stripe integration stays for other markets. Prices charged are the pricing-page prices (`plan_settings`), flat per month, not per seat.
+**REASON** Stripe's global availability page lists South Africa only as an "extended network" market reached through Paystack, so a South African company cannot open a Stripe account directly. Paystack has subscriptions, signed webhooks and transaction verification. One price source removes the risk of the page and the charge disagreeing.
+**DATE** 2026-10-28
+
+**DECISION** A payment counts only after a signed Paystack webhook *and* a re-fetched transaction that matches the amount, currency and reference COMVERA recorded at checkout. Failed renewals put the account in grace (past due), cancellations keep paid time as a grant until the period ends, and nothing is ever deleted over billing.
+**REASON** A browser redirect proves nothing, and a webhook body alone could be replayed or wrong. Contractors' compliance records must never disappear because a card failed.
+**DATE** 2026-10-28
+
+**DECISION** A site subscription covers one physical site (a workplace; a mine's loose contractor files count together as one). More sites: one subscription each, or Enterprise. Contractor plans are tiers by connected sites: Starter 5, Pro 10, Business 20 (own files and projects, never counting files a subscribing site sponsors). Prices for Business (R1,699) and the once-off file (R1,299) are proposals for the owner to confirm.
+**REASON** The owner's commercial model: the site is the unit a mine budgets for, and contractor value grows with the number of sites they serve. Sponsored files stay free so a mine's invitation never costs the contractor money.
+**DATE** 2026-10-28
+
+**DECISION** A once-off safety file is a time-limited grant (`contractor_once`, one connected site, `ONCE_OFF_DAYS`, default 60) bought with a single Paystack charge, never a subscription. It does not promise a compliant file.
+**REASON** Some contractors need one file for one tender and will not subscribe. A grant reuses the existing access model, and the file stays readable after the period ends.
+**DATE** 2026-10-28
+
+**DECISION** Site templates: a mine uploads its own form per requirement (workplace-wide or for one file); contractors download, complete and upload it, and it is reviewed like any document. Versions are kept; contractors see only the current one. No automatic filling.
+**REASON** Mines insist on their own formats (inductions, method statements, medicals). Keeping the completed copy as an ordinary submission means review, history and gate clearance all work unchanged.
+**DATE** 2026-10-28
+
 **DECISION** The interactive walkthrough is a static public page inside the app (`/walkthrough`) with fictional data that runs only in the browser, rather than a separate site or a live sandbox.
 **REASON** One link that works without an account, goes online with COMVERA at no extra cost, can never touch real records, and can't drift into claiming features that don't exist (its test checks it never calls the API).
 **DATE** 2026-10-13

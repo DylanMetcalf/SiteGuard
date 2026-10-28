@@ -168,10 +168,25 @@ You do not need Cloudflare to launch. It becomes worthwhile when:
 
 ## Payments (not needed to launch)
 
-Billing through Stripe is built in but **optional**. With no Stripe keys, every organisation has
-full access and no limits, so you can sell your first customers on a simple invoice (EFT) and
-switch Stripe on later. Stripe does support South African businesses, but check your company is
-eligible before relying on it. A local option such as Paystack or PayFast is in the parking lot.
+Billing is built in but **optional**. With no payment keys, every organisation has full access and
+no limits, so you can sell your first customers on a simple invoice (EFT) and switch payments on later.
+
+**Taking card payments in South Africa: Paystack.** Stripe does not open accounts for South African
+companies directly (it reaches South Africa only through Paystack), so COMVERA uses Paystack:
+1. Sign up at paystack.com with the company details (CIPC registration, director ID, bank account).
+   Paystack reviews the business before live payments are allowed; test mode works straight away.
+2. In Paystack → Settings → API Keys & Webhooks, copy the **test** secret key (`sk_test_…`) into
+   Render as `PAYSTACK_SECRET_KEY`, and set the webhook URL to
+   `https://comvera.co.za/api/billing/paystack/webhook`.
+3. Buy a plan yourself with Paystack's test card, check it turns on under Plan & billing, and check the
+   payment appears in the Paystack dashboard. Then cancel it and check the account keeps access until the
+   month ends.
+4. When Paystack approves the business, swap in the **live** key (`sk_live_…`). Nothing else changes.
+
+What customers are charged is the price on the pricing page (More → Platform → *Pricing page*), so
+change prices there. A price change applies to new subscriptions; existing ones keep their price.
+COMVERA never sees card numbers. A payment counts only after Paystack confirms it to the server,
+never because someone landed back on the site.
 
 **Who pays (once Stripe is on).** Everyone starts with a 14-day trial of the full product. After that:
 contractors pay for their own company (Contractor Starter or Pro); mines and sites pay for theirs, and
@@ -179,10 +194,13 @@ their subscription **sponsors** each contractor's file on their own sites, so a 
 paying mine can finish that mine's safety file without paying. A sponsorship never covers the
 contractor's other clients. Nothing is deleted when a trial ends; it becomes read-only until a plan is chosen.
 
-**Prices on the website.** More → Platform → *Pricing page*. The prices there are only what the public
-pricing page shows; what customers are charged is the Stripe price for each plan
-(`STRIPE_PRICE_CONTRACTOR_STARTER`, `STRIPE_PRICE_CONTRACTOR_PRO`, `STRIPE_PRICE_HOST_STARTER`,
-`STRIPE_PRICE_HOST_PRO`), so keep them in step. The starting prices are a proposal (see `docs/DECISIONS.md`).
+**What each plan covers.** A site subscription covers one site (more sites: one subscription each, or
+Enterprise). Contractor plans cover connected sites: Starter 5, Pro 10, Business 20. Sites that sponsor
+a contractor never count. The once-off safety file is one site or project, paid once, open for 60 days.
+
+**Prices on the website.** More → Platform → *Pricing page*. With Paystack these are also the prices
+charged. (With Stripe instead, the charge is the Stripe price for each plan, `STRIPE_PRICE_*`, so keep
+them in step.) The starting prices are a proposal (see `docs/DECISIONS.md`).
 
 **Free access for family, testers or partners.** More → Platform → *Promo codes* → *Create a code*, e.g.
 `FAMILYFREE`, plan Contractor Pro, 100% off, blank "lasts for" (no end date), and "how many
