@@ -125,6 +125,7 @@ export const features = {
 };
 
 const platformAdmins = new Set(config.PLATFORM_ADMIN_EMAILS.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean));
+export const platformAdminCount = platformAdmins.size;
 /** Platform admins must also have confirmed their email, so nobody can claim the address by signing up first. */
 export function isPlatformAdmin(user: { email: string; email_verified_at: unknown; is_demo?: boolean }): boolean {
   return !user.is_demo && !!user.email_verified_at && platformAdmins.has(user.email.toLowerCase());

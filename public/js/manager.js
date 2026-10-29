@@ -66,19 +66,28 @@ function recoveryView(codes) {
 }
 
 /* ---------- the portal ---------- */
-const NAV = [['overview', 'Overview'], ['customers', 'Customers'], ['attention', 'Needs attention'], ['inbox', 'Support inbox'], ['log', 'Activity log']];
+const NAV = [['overview', 'Overview'], ['customers', 'Customers'], ['attention', 'Needs attention'], ['inbox', 'Support inbox'], ['pricing', 'Prices'], ['promos', 'Promo codes'], ['log', 'Activity log']];
 function shell(body) {
   root.innerHTML = top(true) + '<nav class="mg-nav" aria-label="Manager sections">'
     + NAV.map(([v, l]) => '<button class="btn secondary small' + (S.view === v || (v === 'customers' && S.view === 'customer') ? ' on' : '') + '" data-action="nav" data-view="' + v + '">' + l + '</button>').join('') + '</nav>' + body;
 }
 const tile = (n, l, warn) => '<div class="mg-tile' + (warn && Number(n) > 0 ? ' warn' : '') + '"><b>' + esc(n) + '</b><span>' + l + '</span></div>';
 
+const MARK = { done: ['✓', 'Done'], todo: ['!', 'To do'], attention: ['!', 'Needs a look'], optional: ['○', 'Optional for now'], manual: ['☐', 'Do yourself'] };
+function checklist(items) {
+  const doneN = items.filter((i) => i.status === 'done').length;
+  const order = { attention: 0, todo: 1, manual: 2, optional: 3, done: 4 };
+  return card('Setup checklist · ' + doneN + ' of ' + items.length + ' done', items.slice().sort((a, b) => order[a.status] - order[b.status]).map((i) =>
+    row('<span class="mg-chk ' + i.status + '" aria-hidden="true">' + MARK[i.status][0] + '</span> ' + esc(i.title) + ' <span class="srctag">' + MARK[i.status][1] + '</span>', esc(i.detail))).join(''));
+}
+
 async function overview() {
-  const o = await api.get('/api/manager/overview');
+  const [o, setup] = await Promise.all([api.get('/api/manager/overview'), api.get('/api/manager/setup')]);
   const kind = (k) => o.orgs.find((x) => x.kind === k) || { total: 0, last7: 0 };
   const st = (s) => (o.status.find((x) => x.s === s) || { n: 0 }).n;
   const ex = (s) => (o.exchanges.find((x) => x.status === s) || { n: 0 }).n;
   shell('<h1>Overview</h1><div class="mg-sub">Counts only. Real customers; demo and test accounts are left out.</div>'
+    + checklist(setup.items)
     + '<div class="section-title">Customers</div><div class="mg-tiles">'
     + tile(kind('host').total, 'Mines / sites (+' + kind('host').last7 + ' this week)') + tile(kind('contractor').total, 'Contractors (+' + kind('contractor').last7 + ' this week)')
     + tile(o.users.total, 'People (+' + o.users.last7 + ' this week)') + tile(o.users.active7, 'Active in 7 days')
@@ -173,7 +182,31 @@ async function log() {
       + r.actions.map((a) => '<tr><td>' + dt(a.at) + '</td><td>' + esc(a.by) + '</td><td>' + esc(a.action) + '</td><td>' + esc(a.orgName || '') + '</td><td>' + esc(a.detail) + '</td></tr>').join('') + '</table></div>'));
 }
 
-const VIEWS = { overview, customers, customer, support: supportView, attention, inbox, log };
+async function pricing() {
+  const r = await api.get('/api/admin/pricing');
+  shell('<h1>Prices</h1><div class="mg-sub">What the public pricing page shows, and what customers are charged when payments run through Paystack. Leave the price empty to show “Contact us”. A change applies to new subscriptions; existing ones keep their price.</div>'
+    + r.plans.map((p) => card(esc(p.name) + ' <span class="srctag">' + (p.kind === 'host' ? 'Mine / site' : 'Contractor') + '</span>',
+      '<div class="mg-filters"><input type="number" min="0" step="1" id="pr-' + p.planId + '" value="' + (p.priceCents === null ? '' : p.priceCents / 100) + '" placeholder="Price in rand (blank = contact us)" aria-label="Price in rand">'
+      + '<input type="text" id="pe-' + p.planId + '" value="' + esc(p.per) + '" maxlength="40" aria-label="Per" style="max-width:160px;">'
+      + '<select id="pv-' + p.planId + '"><option value="1"' + (p.visible ? ' selected' : '') + '>Shown on the website</option><option value="0"' + (p.visible ? '' : ' selected') + '>Hidden</option></select></div>'
+      + '<label class="field-label" for="ph-' + p.planId + '">What is included (one point per line, up to 8)</label><textarea id="ph-' + p.planId + '" rows="4">' + esc(p.highlights.join('\n')) + '</textarea>'
+      + '<button class="btn secondary small" style="margin-top:8px;" data-action="save-price" data-plan="' + p.planId + '" data-blurb="' + esc(p.blurb || '') + '" data-currency="' + esc(p.currency) + '">Save</button>')).join(''));
+}
+
+async function promos() {
+  const r = await api.get('/api/admin/promos');
+  const plans = (S.plans || (S.plans = (await api.get('/api/pricing')).plans)).filter((p) => p.planId !== 'host_enterprise');
+  shell('<h1>Promo codes</h1><div class="mg-sub">Free or discounted access for partners, family and testers. They type the code under Plan &amp; billing.</div>'
+    + card('Create a code', '<div class="mg-filters"><input id="pc-code" maxlength="40" placeholder="CODE e.g. PARTNER2026" autocapitalize="characters"><select id="pc-plan">'
+      + plans.map((p) => '<option value="' + esc(p.planId) + '">' + esc(p.name) + '</option>').join('') + '</select></div>'
+      + '<div class="mg-filters"><input id="pc-days" type="number" min="1" max="3650" placeholder="Lasts for (days, blank = no end)"><input id="pc-max" type="number" min="1" placeholder="How many companies (blank = any)"><input id="pc-desc" maxlength="200" placeholder="Who is it for?"></div>'
+      + '<div class="mg-meta">100% off. A partial discount needs a matching Stripe coupon, so it is not offered here.</div><button class="btn primary small" style="margin-top:8px;" data-action="create-promo">Create code</button>')
+    + card('Codes', r.promos.length ? r.promos.map((c) => row('<code>' + esc(c.code) + '</code> <span class="srctag">' + esc(c.plan) + '</span>' + (c.active ? '' : ' <span class="srctag">off</span>'),
+      esc(c.description || '') + ' ' + (c.durationDays ? c.durationDays + ' days' : 'no end date') + ' · used ' + c.redemptions + (c.maxRedemptions ? ' of ' + c.maxRedemptions : ''),
+      '<button class="btn secondary small" data-action="toggle-promo" data-id="' + c.id + '" data-on="' + (c.active ? '0' : '1') + '">' + (c.active ? 'Switch off' : 'Switch on') + '</button>')).join('') : none('No codes yet.')));
+}
+
+const VIEWS = { pricing, promos, overview, customers, customer, support: supportView, attention, inbox, log };
 async function show(view = S.view) {
   S.view = view;
   shell('<div class="mg-sub" style="padding:30px 0;text-align:center;">Loading…</div>');
@@ -229,6 +262,18 @@ document.addEventListener('click', async (ev) => {
     if (a === 'filter') { S.filters = { q: val('fq'), kind: val('fk'), status: val('fs') }; return show('customers'); }
     if (a === 'open-org') { S.orgId = el.dataset.id; return show('customer'); }
     if (a === 'open-support') return show('support');
+    if (a === 'save-price') {
+      const id = el.dataset.plan, raw = val('pr-' + id);
+      await api.put('/api/admin/pricing/' + id, { priceCents: raw === '' ? null : Math.round(Number(raw) * 100), currency: el.dataset.currency || 'ZAR', per: val('pe-' + id) || 'month', blurb: el.dataset.blurb || null,
+        highlights: document.getElementById('ph-' + id).value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 8), visible: val('pv-' + id) === '1' });
+      return toast('Saved');
+    }
+    if (a === 'create-promo') {
+      await api.post('/api/admin/promos', { code: val('pc-code'), plan: val('pc-plan'), description: val('pc-desc'), percentOff: 100,
+        durationDays: val('pc-days') ? Number(val('pc-days')) : null, maxRedemptions: val('pc-max') ? Number(val('pc-max')) : null });
+      toast('Code created'); return show('promos');
+    }
+    if (a === 'toggle-promo') { await api.post('/api/admin/promos/' + el.dataset.id + '/active', { active: el.dataset.on === '1' }); return show('promos'); }
     if (a === 'extend-trial') { await api.post('/api/manager/orgs/' + S.orgId + '/extend-trial', { days: Number(val('trialDays')) }); toast('Trial extended'); return show('customer'); }
     if (a === 'give-plan') {
       const plan = val('giveplan');
