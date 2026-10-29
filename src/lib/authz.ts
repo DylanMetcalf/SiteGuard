@@ -64,6 +64,8 @@ export interface Ctx {
   role: Role | null;
   /** Set when the session's expiry was extended on this request, so the cookie is re-issued. */
   renewedUntil?: Date;
+  /** When this session passed the platform admin's second step, if it did. */
+  mfaVerifiedAt?: Date | null;
   /** The request changes something (anything but GET/HEAD/OPTIONS). */
   write?: boolean;
 }

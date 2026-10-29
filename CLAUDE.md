@@ -56,6 +56,9 @@ haven't built.
 - The interactive walkthrough (`/walkthrough`: `public/walkthrough.html`, `walkthrough.css`, `js/walkthrough-page.js`) is
   fictional data in the browser only: never call the API from it, and keep every claim matched to a real feature
   (`docs/INTERACTIVE_WALKTHROUGH.md`).
+- The manager portal (`/manager`, `routes/manager.ts`, `lib/totp.ts`): platform admins only, ordinary sign-in plus a fresh authenticator
+  step, 404 for everyone else; no separate password, hard-coded account or secret URL. Customer content (names/statuses, never files) only
+  through a customer-granted, expiring `support_access_grants` row; log every action with `logPlatformAction` in the same transaction.
 - The assistant is read-only: new abilities are tools that read the caller's own org or return cards
   the user confirms through existing endpoints.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and

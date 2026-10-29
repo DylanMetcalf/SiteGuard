@@ -5,6 +5,10 @@ Newest first.
 
 ---
 
+**DECISION** The operator's manager portal (`/manager`) uses the ordinary account sign-in plus an authenticator-app second step, not a separate username and password, a secret address or any shared login. It shows counts and statuses by default, and a customer's account contents (names and statuses, never files) only while that customer's own admin has switched on time-limited support access. Every action goes into an append-only log.
+**REASON** A separate hard-coded login would be a standing back door. A view-everything portal would make COMVERA handle customers' personal information on their behalf without their say-so (POPIA), and one stolen login would expose every customer. This gives the operator what is needed to run and support the service while keeping "we cannot see your documents" true.
+**DATE** 2026-10-29
+
 **DECISION** Paystack is the payment provider for South Africa (`PAYSTACK_SECRET_KEY`); the Stripe integration stays for other markets. Prices charged are the pricing-page prices (`plan_settings`), flat per month, not per seat.
 **REASON** Stripe's global availability page lists South Africa only as an "extended network" market reached through Paystack, so a South African company cannot open a Stripe account directly. Paystack has subscriptions, signed webhooks and transaction verification. One price source removes the risk of the page and the charge disagreeing.
 **DATE** 2026-10-28

@@ -481,6 +481,25 @@ time-limited transaction) and a **workspace** (an organisation someone signed up
 - **Screens**: `public/exchange.html` + `public/js/exchange.js` (portal), `public/js/exchanges.js`
   (More → Exchanges, contractor sheet → Request documents, Documents → Share securely).
 
+## Manager portal (platform operator)
+
+- **Page and API:** `/manager` (static, `public/manager.html`, `js/manager.js`) over `routes/manager.ts` (`/api/manager/*`).
+  No separate password or address: it is the ordinary sign-in for an address in `PLATFORM_ADMIN_EMAILS` (confirmed email),
+  plus a second step. Everyone else gets 404.
+- **Second step** (`lib/totp.ts`, `admin_mfa`, `sessions.mfa_verified_at`): RFC 6238 authenticator codes, no extra
+  dependency, secret encrypted with `MFA_SECRET_KEY` when set. A code can't be replayed (`last_step`), failures lock the account
+  like password failures, eight single-use recovery codes are stored as hashes. A session counts for 12 hours.
+  In production the older `/api/admin/*` routes need the same fresh session.
+- **Without the customer's say-so:** counts, plans, dates, people's names and emails, payment and email status, failed emails,
+  trials ending, stuck sign-ups, the support inbox (feedback and contact enquiries), and the activity log.
+- **Only with the customer's say-so** (`support_access_grants`, `routes/supportAccess.ts`): the customer's own admin allows
+  1 hour to 3 days, can end it any time. Then `GET /api/manager/orgs/:id/support-view` returns sites, requirement and document
+  names and statuses and recent activity. **Never file contents**, and nothing in the portal changes customer documents.
+  Each look is written to `platform_actions` and to the customer's own audit trail.
+- **Actions** (each logged in `platform_actions`, which is append-only at the database level): extend a trial, give or remove a
+  plan, send a user a reset email (goes to that person only), re-queue a failed email, mark a support item handled, pricing and promo changes.
+- **Logs:** request logging redacts link tokens (`redactUrl` in `app.ts`).
+
 ## Known limits and next steps
 
 These are deliberate scope boundaries, not hidden gaps:

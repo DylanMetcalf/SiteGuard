@@ -49,10 +49,11 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
     csrf_token: string;
     org_id: string | null;
     last_seen_at: Date;
+    mfa_verified_at: Date | null;
     user: UserRow;
   }>(
     pool,
-    `select s.id, s.csrf_token, s.org_id, s.last_seen_at,
+    `select s.id, s.csrf_token, s.org_id, s.last_seen_at, s.mfa_verified_at,
             json_build_object('id', u.id, 'email', u.email, 'name', u.name, 'title', u.title, 'phone', u.phone,
                               'email_verified_at', u.email_verified_at, 'is_demo', u.is_demo) as user
        from sessions s join users u on u.id = s.user_id
@@ -84,5 +85,5 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
     await pool.query(`update sessions set last_seen_at = now(), expires_at = $2 where id = $1`, [row.id, renewedUntil]);
   }
 
-  return { user: row.user, sessionId: row.id, csrfToken: row.csrf_token, org, role, renewedUntil };
+  return { user: row.user, sessionId: row.id, csrfToken: row.csrf_token, org, role, renewedUntil, mfaVerifiedAt: row.mfa_verified_at };
 }

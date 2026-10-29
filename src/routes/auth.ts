@@ -23,6 +23,25 @@ const email = z.string().trim().toLowerCase().email().max(254);
 const password = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(200);
 
+/** Emails a one-hour, single-use password reset link (used by "forgot password" and by platform support). */
+export async function queueResetEmail(db: Db, user: { id: string; name: string; email: string }) {
+  const token = newToken();
+  await db.query(
+    `insert into email_tokens (token_hash, user_id, purpose, expires_at) values ($1, $2, 'reset_password', now() + interval '1 hour')`,
+    [sha256(token), user.id],
+  );
+  await queueEmail(db, {
+    to: user.email,
+    subject: 'Reset your COMVERA password',
+    lines: [
+      `Hi ${user.name},`,
+      'Someone asked to reset the password for this COMVERA account. If that was you, use the link below — it expires in 1 hour and works once.',
+      "If it wasn't you, ignore this email; your password hasn't changed.",
+    ],
+    action: { label: 'Choose a new password', url: appUrl(`/reset-password?token=${token}`) },
+  });
+}
+
 export async function createOrganisation(db: Db, orgName: string, kind: OrgKind, extra: Partial<{ is_demo: boolean; demo_group: string }> = {}) {
   const { plan, status, trialEndsAt } = defaultPlanFor(kind);
   return (await one<{ id: string }>(
@@ -226,23 +245,7 @@ export default async function authRoutes(app: FastifyInstance) {
     const body = z.object({ email }).parse(req.body);
     const user = await one<{ id: string; name: string }>(pool, 'select id, name from users where email = $1 and not is_demo', [body.email]);
     if (user) {
-      await withTx(async (db) => {
-        const token = newToken();
-        await db.query(
-          `insert into email_tokens (token_hash, user_id, purpose, expires_at) values ($1, $2, 'reset_password', now() + interval '1 hour')`,
-          [sha256(token), user.id],
-        );
-        await queueEmail(db, {
-          to: body.email,
-          subject: 'Reset your COMVERA password',
-          lines: [
-            `Hi ${user.name},`,
-            'Someone asked to reset the password for this COMVERA account. If that was you, use the link below — it expires in 1 hour and works once.',
-            "If it wasn't you, ignore this email; your password hasn't changed.",
-          ],
-          action: { label: 'Choose a new password', url: appUrl(`/reset-password?token=${token}`) },
-        });
-      });
+      await withTx((db) => queueResetEmail(db, { id: user.id, name: user.name, email: body.email }));
     }
     // Same response either way, so this can't be used to discover accounts.
     return { ok: true };
