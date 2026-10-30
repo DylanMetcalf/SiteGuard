@@ -498,6 +498,8 @@ time-limited transaction) and a **workspace** (an organisation someone signed up
   Each look is written to `platform_actions` and to the customer's own audit trail.
 - **Actions** (each logged in `platform_actions`, which is append-only at the database level): extend a trial, give or remove a
   plan, send a user a reset email (goes to that person only), re-queue a failed email, mark a support item handled, pricing and promo changes.
+- **Setup checklist** (`GET /api/manager/setup`, top of Overview): live, plain-language status of what is switched on (domain, email, support address, MFA key, payments, plans, storage, AI) plus things only a person can do (lawyer review, POPIA, restore test). Never returns secret values.
+- **Prices and Promo codes tabs** use the existing `/api/admin/pricing` and `/api/admin/promos` routes (the old in-app Platform page now just opens `/manager`).
 - **Logs:** request logging redacts link tokens (`redactUrl` in `app.ts`).
 
 ## Known limits and next steps

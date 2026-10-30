@@ -15,7 +15,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { many, one, pool, withTx } from '../db/pool.js';
-import { isPlatformAdmin } from '../config.js';
+import { config, features, isPlatformAdmin, platformAdminCount } from '../config.js';
 import { conflict, forbidden, HttpError, notFound, unauthorized } from '../lib/errors.js';
 import { isUuid, requireUser, type Ctx } from '../lib/authz.js';
 import { PLANS, defaultPlanFor, type OrgKind } from '../lib/plans.js';
@@ -183,6 +183,47 @@ export default async function managerRoutes(app: FastifyInstance) {
     ]);
     const past = await q(`select count(*)::int as n from organisations o where ${REAL_ORG} and o.subscription_status = 'past_due'`);
     return { orgs, status, paidPlans: plans, users, content, exchanges: exch, email: mail, payments: pay, openInbox: (inbox as { open: number }).open, pastDue: past };
+  });
+
+  // ---------- setup checklist: what is switched on, and what still needs doing ----------
+  app.get('/api/manager/setup', rl(30), async (req, reply) => {
+    await requireManager(req);
+    reply.header('cache-control', 'no-store');
+    const host = new URL(config.APP_URL).hostname;
+    const [failedMail, priced, customers] = await Promise.all([
+      one<{ n: number }>(pool, `select count(*)::int as n from email_outbox where status = 'failed' and created_at > now() - interval '30 days'`),
+      one<{ n: number }>(pool, `select count(*)::int as n from plan_settings`),
+      one<{ n: number }>(pool, `select count(*)::int as n from organisations o where ${REAL_ORG}`),
+    ]);
+    type Item = { id: string; title: string; status: 'done' | 'todo' | 'attention' | 'optional' | 'manual'; detail: string };
+    const items: Item[] = [
+      { id: 'domain', title: 'Your own web address', status: /^localhost$|\.onrender\.com$/.test(host) ? 'todo' : 'done',
+        detail: /^localhost$|\.onrender\.com$/.test(host) ? 'Links in emails still use ' + host + '. Connect comvera.co.za in Render (Settings → Custom Domains), then set APP_URL to https://comvera.co.za.' : 'Links in emails use ' + host + '.' },
+      { id: 'email', title: 'Email sending', status: !features.email ? 'todo' : (failedMail?.n ?? 0) > 0 ? 'attention' : 'done',
+        detail: !features.email ? 'Not switched on, so password resets, invitations and document requests cannot reach anyone. Set SMTP_URL and EMAIL_FROM in Render → Environment.' : (failedMail?.n ?? 0) > 0 ? (failedMail!.n + ' email(s) failed in the last 30 days. Open Needs attention.') : 'Switched on, and no failed emails in 30 days.' },
+      { id: 'support', title: 'A support email address on the site', status: config.SUPPORT_EMAIL ? 'done' : 'todo',
+        detail: config.SUPPORT_EMAIL ? 'Shown to customers: ' + config.SUPPORT_EMAIL : 'Set SUPPORT_EMAIL in Render so customers know where to write.' },
+      { id: 'mfakey', title: 'Authenticator secrets are encrypted', status: config.MFA_SECRET_KEY ? 'done' : 'todo',
+        detail: config.MFA_SECRET_KEY ? 'MFA_SECRET_KEY is set.' : 'Set MFA_SECRET_KEY in Render (16+ random characters), then set up your authenticator again.' },
+      { id: 'admins', title: 'Who can open this portal', status: platformAdminCount > 0 ? 'done' : 'todo',
+        detail: platformAdminCount + ' address' + (platformAdminCount === 1 ? '' : 'es') + ' on the list. Keep it to the people who really need it.' },
+      { id: 'payments', title: 'Taking payments', status: features.payments ? 'done' : 'optional',
+        detail: features.payments ? 'Switched on through ' + features.paymentProvider + '. Do a test purchase and a cancel before real customers pay.' : 'Not needed for a free pilot. To charge, open a Paystack account and set PAYSTACK_SECRET_KEY (test key first).' },
+      { id: 'plans', title: 'Plans and limits enforced', status: features.billing ? 'done' : 'optional',
+        detail: features.billing ? 'Trials and plan limits are on.' : 'Off: everyone has full access with no limits. Fine for a free pilot.' },
+      { id: 'prices', title: 'Prices reviewed', status: (priced?.n ?? 0) > 0 ? 'done' : 'optional',
+        detail: (priced?.n ?? 0) > 0 ? 'You have set your own prices.' : 'Still the starting prices. Review them under the Prices tab.' },
+      { id: 'storage', title: 'Where uploaded files are kept', status: config.STORAGE_DRIVER === 's3' ? 'done' : 'optional',
+        detail: config.STORAGE_DRIVER === 's3' ? 'Private cloud storage.' : 'On the server’s own disk. Fine to start; move to private cloud storage before you have many customers.' },
+      { id: 'ai', title: 'AI drafting', status: features.ai ? 'done' : 'optional',
+        detail: features.ai ? 'Switched on.' : 'Off: documents use the built-in templates. Add ANTHROPIC_API_KEY to switch AI on.' },
+      { id: 'firstcustomer', title: 'A first real customer', status: (customers?.n ?? 0) > 1 ? 'done' : 'optional',
+        detail: (customers?.n ?? 0) > 1 ? (customers!.n + ' organisations so far.') : 'Invite 2–3 friendly mines and their contractors for a free pilot.' },
+      { id: 'legal', title: 'Privacy and Terms checked by a lawyer', status: 'manual', detail: 'The pages are drafts. Have a South African attorney review them before public launch.' },
+      { id: 'popia', title: 'POPIA paperwork', status: 'manual', detail: 'Register an Information Officer, and sign data agreements with Render, your email provider and Paystack.' },
+      { id: 'backup', title: 'A backup restore test', status: 'manual', detail: 'In Render, restore the latest database backup into a NEW database and open a site. 15 minutes, once a month.' },
+    ];
+    return { items };
   });
 
   // ---------- customers ----------

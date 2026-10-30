@@ -108,6 +108,19 @@ describe('manager portal: what it shows', () => {
   });
 });
 
+describe('manager portal: setup checklist', () => {
+  it('tells the operator what is on and what still needs doing, without any secret values', async () => {
+    const r = await ops.get('/api/manager/setup');
+    assert.equal(r.status, 200);
+    const by = Object.fromEntries(r.body.items.map((i: { id: string; status: string }) => [i.id, i.status]));
+    assert.equal(by.email, 'todo', 'no SMTP in tests');
+    assert.equal(by.admins, 'done');
+    assert.equal(by.legal, 'manual');
+    assert.equal(JSON.stringify(r.body).includes('sk_'), false);
+    assert.equal((await mine.get('/api/manager/setup')).status, 404);
+  });
+});
+
 describe('manager portal: actions and attention', () => {
   it('extends a trial, logs it for the platform and the customer, and refuses for paying customers', async () => {
     await pool.query(`update organisations set subscription_status = 'trialing', trial_ends_at = now() + interval '1 day' where id = $1`, [mineOrg]);
