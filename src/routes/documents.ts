@@ -13,6 +13,7 @@ import { publishChange } from '../lib/realtime.js';
 import { appUrl, queueToOrg } from '../lib/email.js';
 import { bumpVersion, effectiveStatus, libraryTypeFor, LIBRARY_TYPES } from '../lib/readiness.js';
 import { sniffType, storage } from '../lib/storage.js';
+import { assertClean } from '../lib/scan.js';
 import { extractExpiryDate } from '../lib/ai.js';
 import { rl } from './auth.js';
 import { notifyOrg, REVIEWERS } from '../lib/notify.js';
@@ -93,6 +94,7 @@ function requireSubmitter(s: Slot) {
 
 /** Stores an uploaded buffer as a private file owned by the caller's organisation. */
 export async function storeFile(db: Db, ctx: OrgCtx, buf: Buffer, filename: string, declaredType: string) {
+  await assertClean(buf);
   const type = sniffType(buf, declaredType, filename);
   if (!type) throw badRequest('That file type is not supported. Upload a PDF, photo (JPG/PNG/WebP/HEIC), Word, Excel or text file.', 'unsupported_file');
   const safeName = path.basename(filename).replace(/[\x00-\x1f]/g, '').slice(0, 180) || 'document';

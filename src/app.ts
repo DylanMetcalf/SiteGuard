@@ -11,6 +11,7 @@ import { config, isProd } from './config.js';
 import { HttpError } from './lib/errors.js';
 import type { Ctx } from './lib/authz.js';
 import { renewCookie, resolveSession, SESSION_COOKIE } from './lib/sessions.js';
+import { securityEvent } from './lib/securityLog.js';
 import { safeEqual } from './lib/security.js';
 import authRoutes from './routes/auth.js';
 import orgRoutes from './routes/org.js';
@@ -83,7 +84,7 @@ function humanIssue(issue: { path: PropertyKey[]; message: string; code?: string
 /** Link tokens are credentials: keep them out of request logs. */
 export const redactUrl = (url: string) =>
   url
-    .replace(/(\/(?:x|gate|s|r|share|verify|invite|site-invite|review-links)\/)[A-Za-z0-9_-]{12,}/g, '$1[redacted]')
+    .replace(/(\/(?:x|gate|s|r|share|verify|invite|site-invite|review|review-links)\/)[A-Za-z0-9_-]{12,}/g, '$1[redacted]')
     .replace(/([?&](?:token|code)=)[^&]+/g, '$1[redacted]');
 
 export async function buildApp(opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
@@ -122,6 +123,11 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
 
   app.decorateRequest('ctx', null);
 
+  // Browser features the app never uses are switched off for every page.
+  app.addHook('onSend', async (_req, reply) => {
+    reply.header('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
+  });
+
   app.addHook('onRequest', async (req, reply) => {
     if (!req.url.startsWith('/api/')) return;
     req.ctx = await resolveSession(req.cookies[SESSION_COOKIE], req);
@@ -147,6 +153,9 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof HttpError) {
+      if (err.code === 'csrf') securityEvent(req, 'csrf_rejected', { path: req.url.split('?')[0] });
+      if (err.code === 'infected_file') securityEvent(req, 'upload_rejected_infected');
+      if (err.code === 'scan_unavailable') securityEvent(req, 'upload_scan_unavailable');
       return reply.status(err.statusCode).send({ error: err.code, message: err.message });
     }
     if (err instanceof ZodError) {
@@ -154,6 +163,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     }
     const e = err as { statusCode?: number; code?: string; message: string };
     if (e.statusCode === 429) {
+      securityEvent(req, 'rate_limited', { path: redactUrl(req.url.split('?')[0]) });
       return reply.status(429).send({ error: 'rate_limited', message: 'Too many attempts — wait a minute and try again.' });
     }
     if (e.code === 'FST_REQ_FILE_TOO_LARGE') {

@@ -20,6 +20,7 @@ import { conflict, forbidden, HttpError, notFound, unauthorized } from '../lib/e
 import { isUuid, requireUser, type Ctx } from '../lib/authz.js';
 import { PLANS, defaultPlanFor, type OrgKind } from '../lib/plans.js';
 import { logPlatformAction } from '../lib/platformLog.js';
+import { securityEvent } from '../lib/securityLog.js';
 import { publishChange } from '../lib/realtime.js';
 import { hashRecovery, matchStep, newRecoveryCodes, newSecret, openSecret, otpauthUrl, sealSecret } from '../lib/totp.js';
 import { queueResetEmail, rl } from './auth.js';
@@ -98,7 +99,8 @@ export default async function managerRoutes(app: FastifyInstance) {
   });
 
   /** Sign-in failures on the second step lock the account like password failures do. */
-  async function failedCode(userId: string) {
+  async function failedCode(userId: string, req?: FastifyRequest) {
+    if (req) securityEvent(req, 'mfa_failed', { userId });
     await pool.query(
       `update users set failed_login_count = failed_login_count + 1,
               locked_until = case when failed_login_count + 1 >= 10 then now() + interval '15 minutes' else locked_until end where id = $1`, [userId]);
@@ -117,12 +119,13 @@ export default async function managerRoutes(app: FastifyInstance) {
     if (!row || row.enabled_at) throw conflict('Start the setup again.');
     const secret = openSecret(row.secret);
     const step = secret ? matchStep(secret, code) : null;
-    if (step === null) return failedCode(ctx.user.id);
+    if (step === null) return failedCode(ctx.user.id, req);
     const { codes, hashes } = newRecoveryCodes();
     await withTx(async (db) => {
       await db.query('update admin_mfa set enabled_at = now(), last_step = $2, recovery_hashes = $3 where user_id = $1', [ctx.user.id, step, hashes]);
       await db.query('update sessions set mfa_verified_at = now() where id = $1', [ctx.sessionId]);
       await logPlatformAction(db, ctx, 'Set up the second sign-in step', null, '', req.ip);
+      securityEvent(req, 'mfa_enrolled');
     });
     return { ok: true, recoveryCodes: codes };
   });
@@ -149,9 +152,10 @@ export default async function managerRoutes(app: FastifyInstance) {
         await db.query('update sessions set mfa_verified_at = now() where id = $1', [ctx.sessionId]);
         await db.query('update users set failed_login_count = 0, locked_until = null where id = $1', [ctx.user.id]);
         await logPlatformAction(db, ctx, 'Signed in to the manager portal', null, `with ${how}`, req.ip);
+        securityEvent(req, 'mfa_verified', { method: how });
       }
     });
-    if (!how) return failedCode(ctx.user.id);
+    if (!how) return failedCode(ctx.user.id, req);
     return { ok: true, usedRecoveryCode: how === 'recovery code' };
   });
 

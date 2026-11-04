@@ -15,6 +15,9 @@ export async function createSession(
   userId: string,
   orgId: string | null,
 ): Promise<void> {
+  // A new sign-in never inherits an earlier session from the same browser (no session fixation).
+  const previous = req.cookies?.[SESSION_COOKIE];
+  if (previous && previous.length <= 100) await db.query('delete from sessions where id = $1', [sha256(previous)]);
   const token = newToken();
   const expires = new Date(Date.now() + config.SESSION_TTL_DAYS * 86400_000);
   await db.query(
@@ -57,8 +60,8 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
             json_build_object('id', u.id, 'email', u.email, 'name', u.name, 'title', u.title, 'phone', u.phone,
                               'email_verified_at', u.email_verified_at, 'is_demo', u.is_demo) as user
        from sessions s join users u on u.id = s.user_id
-      where s.id = $1 and s.expires_at > now()`,
-    [id],
+      where s.id = $1 and s.expires_at > now() and s.created_at > now() - make_interval(days => $2)`,
+    [id, config.SESSION_MAX_DAYS],
   );
   if (!row) return null;
 

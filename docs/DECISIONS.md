@@ -5,6 +5,12 @@ Newest first.
 
 ---
 
+**DECISION** Security programme (Nov 2026): sessions are capped at 30 days from sign-in; security events are structured log lines (kept by the host, outside the app's database) rather than a new table; virus scanning is an optional private ClamAV service that fails closed; vulnerable transitive packages are pinned with `overrides` rather than downgrading direct dependencies.
+**REASON** Each is the smallest control that closes a real gap found in the audit (see docs/security/COMVERA_SECURITY_FINDINGS.md) without new infrastructure the product does not yet need, and without sending documents to any third party.
+**DATE** 2026-11-04
+
+---
+
 **DECISION** The operator's manager portal (`/manager`) uses the ordinary account sign-in plus an authenticator-app second step, not a separate username and password, a secret address or any shared login. It shows counts and statuses by default, and a customer's account contents (names and statuses, never files) only while that customer's own admin has switched on time-limited support access. Every action goes into an append-only log.
 **REASON** A separate hard-coded login would be a standing back door. A view-everything portal would make COMVERA handle customers' personal information on their behalf without their say-so (POPIA), and one stolen login would expose every customer. This gives the operator what is needed to run and support the service while keeping "we cannot see your documents" true.
 **DATE** 2026-10-29

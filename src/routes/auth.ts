@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { emailRef, securityEvent } from '../lib/securityLog.js';
 import { notifyOrg } from '../lib/notify.js';
 import { z } from 'zod';
 import { one, pool, withTx, type Db } from '../db/pool.js';
@@ -208,6 +209,7 @@ export default async function authRoutes(app: FastifyInstance) {
       [body.email],
     );
     if (user?.locked_until && new Date(user.locked_until) > new Date()) {
+      securityEvent(req, 'login_locked', { userId: user.id });
       throw new HttpError(423, 'locked', 'Too many failed attempts. Try again in 15 minutes, or reset your password.');
     }
     const ok = await verifyPassword(body.password, user?.password_hash ?? (await dummyPasswordHash()));
@@ -220,8 +222,10 @@ export default async function authRoutes(app: FastifyInstance) {
           [user.id],
         );
       }
+      securityEvent(req, 'login_failed', { userId: user?.id ?? null, emailRef: user ? null : emailRef(body.email) });
       throw unauthorized('Email or password is incorrect.');
     }
+    securityEvent(req, 'login_succeeded', { userId: user.id });
     await pool.query('update users set failed_login_count = 0, locked_until = null where id = $1', [user.id]);
     const orgId =
       (await one<{ org_id: string }>(
@@ -247,6 +251,7 @@ export default async function authRoutes(app: FastifyInstance) {
     if (user) {
       await withTx((db) => queueResetEmail(db, { id: user.id, name: user.name, email: body.email }));
     }
+    securityEvent(req, 'password_reset_requested', { userId: user?.id ?? null, emailRef: user ? null : emailRef(body.email) });
     // Same response either way, so this can't be used to discover accounts.
     return { ok: true };
   });
@@ -271,6 +276,7 @@ export default async function authRoutes(app: FastifyInstance) {
       );
       // A reset signs out every existing session.
       await db.query('delete from sessions where user_id = $1', [row.user_id]);
+      securityEvent(req, 'password_reset_completed', { userId: row.user_id });
       const u = await one<{ last_active_org_id: string | null }>(db, 'select last_active_org_id from users where id = $1', [row.user_id]);
       const m = await one<{ org_id: string }>(db, 'select org_id from memberships where user_id = $1 order by (org_id = $2) desc limit 1', [row.user_id, u?.last_active_org_id]);
       await createSession(db, reply, req, row.user_id, m?.org_id ?? null);
@@ -421,12 +427,14 @@ export default async function authRoutes(app: FastifyInstance) {
     await pool.query('update users set password_hash = $2 where id = $1', [ctx.user.id, await hashPassword(body.next)]);
     // Sign out everywhere else.
     await pool.query('delete from sessions where user_id = $1 and id <> $2', [ctx.user.id, ctx.sessionId]);
+    securityEvent(req, 'password_changed');
     return { ok: true };
   });
 
   app.post('/api/me/sign-out-everywhere', async (req) => {
     const ctx = requireUser(req.ctx);
     await pool.query('delete from sessions where user_id = $1 and id <> $2', [ctx.user.id, ctx.sessionId]);
+    securityEvent(req, 'sessions_revoked');
     return { ok: true };
   });
 }

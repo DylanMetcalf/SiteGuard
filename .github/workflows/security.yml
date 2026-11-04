@@ -1,0 +1,35 @@
+name: Security checks
+# Weekly, read-only. Fails (and GitHub emails the owner) when a production dependency has a known
+# advisory, or when the live site's security headers or certificate are wrong. Changes nothing.
+on:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: npm audit --omit=dev --audit-level=moderate
+
+  live-site:
+    if: ${{ vars.COMVERA_URL != '' || vars.SITEGUARD_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node scripts/security-check.mjs
+        env:
+          COMVERA_URL: ${{ vars.COMVERA_URL || vars.SITEGUARD_URL }}

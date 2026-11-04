@@ -7,6 +7,7 @@ process.env.LOCAL_STORAGE_DIR = '.data/test-uploads';
 process.env.APP_URL = 'http://localhost:3000';
 if (!process.env.TEST_WITH_BILLING) delete process.env.STRIPE_SECRET_KEY;
 if (!process.env.TEST_WITH_PAYSTACK) delete process.env.PAYSTACK_SECRET_KEY;
+if (process.env.CLAMAV_PORT !== '33100') delete process.env.CLAMAV_HOST;
 delete process.env.ANTHROPIC_API_KEY;
 
 const { pool } = await import('../src/db/pool.js');

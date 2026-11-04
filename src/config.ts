@@ -19,6 +19,11 @@ const schema = z.object({
   TRUST_PROXY: bool(false),
 
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(14),
+  /** A session ends this many days after sign-in however active it is (sliding renewal stops here). */
+  SESSION_MAX_DAYS: z.coerce.number().int().positive().default(30),
+  /** Optional virus scanning of uploads: a private ClamAV (clamd) service. Unset = no scanning. */
+  CLAMAV_HOST: z.string().optional(),
+  CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
 
   // Storage: "s3" for any S3-compatible store (AWS S3, Cloudflare R2, MinIO), "local" for dev.
   STORAGE_DRIVER: z.enum(['s3', 'local']).default('local'),
