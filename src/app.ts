@@ -59,7 +59,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
 
 /** Paths that authenticate some other way (e.g. Stripe signature) and skip CSRF checks. */
-const MFA_SETUP_ALLOWED = ['/api/bootstrap', '/api/me/mfa', '/api/auth/logout', '/api/auth/switch-org', '/api/client-errors', '/api/events'];
+const MFA_SETUP_ALLOWED = ['/api/bootstrap', '/api/me/mfa', '/api/auth/logout', '/api/auth/switch-org', '/api/auth/verify-email',
+  '/api/auth/resend-verification', '/api/auth/invite', '/api/client-errors', '/api/events'];
 
 const CSRF_EXEMPT = new Set(['/api/billing/webhook', '/api/billing/paystack/webhook']);
 /** The Exchange portal has its own short sessions and CSRF header (routes/exchangePortal.ts). */
@@ -142,7 +143,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     if (req.ctx) req.ctx.write = mutating;
     const pathOnly = req.url.split('?')[0];
     // An organisation that requires the second step: members without it can only set it up (or sign out/switch).
-    if (req.ctx?.org && mustSetUpMfa(req.ctx) && pathOnly.startsWith('/api/') && !MFA_SETUP_ALLOWED.some((p) => pathOnly === p || pathOnly.startsWith(p + '/'))) {
+    if (req.ctx?.org && mustSetUpMfa(req.ctx) && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !MFA_SETUP_ALLOWED.some((p) => pathOnly === p || pathOnly.startsWith(p + '/'))) {
       throw new HttpError(403, 'mfa_setup_required', 'Your organisation requires two-step sign-in. Set it up under Profile → Security to continue.');
     }
     if (!mutating || CSRF_EXEMPT.has(pathOnly) || isPortal(pathOnly)) return;

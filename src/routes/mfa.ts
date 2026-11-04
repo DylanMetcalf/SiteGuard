@@ -42,6 +42,20 @@ async function auditIfOrg(db: Db, ctx: Ctx, action: string) {
   if (ctx.org && ctx.role) await audit(db, ctx as Parameters<typeof audit>[1], action, '');
 }
 
+const notLocked = async (userId: string) => {
+  if (await lockedOut(pool, userId)) throw new HttpError(423, 'locked', 'Too many failed attempts. Try again in 15 minutes.');
+};
+
+/** Lockout first, then the password; a wrong password counts towards the same lockout as at sign-in. */
+async function checkPassword(userId: string, password: string) {
+  await notLocked(userId);
+  const hash = (await one<{ password_hash: string | null }>(pool, 'select password_hash from users where id = $1', [userId]))?.password_hash ?? null;
+  if (!(await verifyPassword(password, hash))) {
+    await recordMfaFailure(pool, userId);
+    throw badRequest('Your password is incorrect.', 'wrong_password');
+  }
+}
+
 export default async function mfaRoutes(app: FastifyInstance) {
   app.get('/api/me/mfa', async (req) => {
     const ctx = requireUser(req.ctx);
@@ -60,8 +74,8 @@ export default async function mfaRoutes(app: FastifyInstance) {
 
   app.post('/api/me/mfa/enable', rl(10), async (req) => {
     const ctx = requireUser(req.ctx);
-    const { code } = z.object({ code: z.string().trim().min(6).max(10) }).parse(req.body);
-    if (await lockedOut(pool, ctx.user.id)) throw new HttpError(423, 'locked', 'Too many wrong codes. Try again in 15 minutes.');
+    const { code, password } = z.object({ code: z.string().trim().min(6).max(10), password: z.string().min(1).max(200) }).parse(req.body);
+    await checkPassword(ctx.user.id, password);
     const codes = await withTx(async (db) => {
       const c = await finishEnrolment(db, ctx.user.id, code);
       if (!c) { await recordMfaFailure(db, ctx.user.id); return null; }
@@ -81,6 +95,7 @@ export default async function mfaRoutes(app: FastifyInstance) {
   app.post('/api/me/mfa/recovery-codes', rl(5), async (req) => {
     const ctx = requireUser(req.ctx);
     const { code } = z.object({ code: z.string().trim().min(6).max(20) }).parse(req.body);
+    await notLocked(ctx.user.id);
     const codes = await withTx(async (db) => {
       if (!(await consumeMfaCode(db, ctx.user.id, code))) { await recordMfaFailure(db, ctx.user.id); return null; }
       const { codes: c, hashes } = newRecoveryCodes();
@@ -98,8 +113,7 @@ export default async function mfaRoutes(app: FastifyInstance) {
     const b = z.object({ password: z.string().min(1).max(200), code: z.string().trim().min(6).max(20) }).parse(req.body);
     const required = await orgsRequiringMfa(pool, ctx.user.id);
     if (required.length) throw conflict(`${required.join(', ')} requires two-step sign-in, so it can't be turned off.`);
-    const hash = (await one<{ password_hash: string | null }>(pool, 'select password_hash from users where id = $1', [ctx.user.id]))?.password_hash ?? null;
-    if (!(await verifyPassword(b.password, hash))) throw badRequest('Your password is incorrect.', 'wrong_password');
+    await checkPassword(ctx.user.id, b.password);
     const ok = await withTx(async (db) => {
       if (!(await consumeMfaCode(db, ctx.user.id, b.code))) { await recordMfaFailure(db, ctx.user.id); return false; }
       await db.query('delete from user_mfa where user_id = $1', [ctx.user.id]);

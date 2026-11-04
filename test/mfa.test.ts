@@ -35,8 +35,8 @@ describe('turning it on', () => {
     const s = await owner.post('/api/me/mfa/setup');
     assert.equal(s.status, 200);
     secret = s.body.secret;
-    assert.equal((await owner.post('/api/me/mfa/enable', { code: '000000' })).status, 401);
-    const e = await owner.post('/api/me/mfa/enable', { code: code() });
+    assert.equal((await owner.post('/api/me/mfa/enable', { code: '000000', password: PASSWORD })).status, 401);
+    const e = await owner.post('/api/me/mfa/enable', { code: code(), password: PASSWORD });
     assert.equal(e.status, 200, JSON.stringify(e.body));
     recovery = e.body.recoveryCodes;
     assert.equal(recovery.length, 8);
@@ -131,7 +131,7 @@ describe('an organisation requiring it', () => {
   it('once the member sets it up, the workspace opens; they cannot turn it off while required', async () => {
     const s = await member.post('/api/me/mfa/setup');
     const memberCode = codeAt(s.body.secret, currentStep());
-    assert.equal((await member.post('/api/me/mfa/enable', { code: memberCode })).status, 200);
+    assert.equal((await member.post('/api/me/mfa/enable', { code: memberCode, password: PASSWORD })).status, 200);
     const st = await member.state();
     assert.ok(st.state, 'workspace loads');
     const off = await member.post('/api/me/mfa/disable', { password: PASSWORD, code: codeAt(s.body.secret, currentStep() + 1) });
@@ -153,5 +153,83 @@ describe('platform reset', () => {
     assert.equal((await pool.query(`select count(*)::int as n from user_mfa where user_id = $1`, [memberId])).rows[0].n, 0);
     const log = (await pool.query(`select action from platform_actions order by id desc limit 1`)).rows[0].action;
     assert.equal(log, 'Reset two-step sign-in');
+  });
+});
+
+describe('review fixes (no ways around the lockout or the password)', () => {
+  let solo: Agent, soloEmail = '', soloSecret = '', soloRecovery: string[] = [];
+  const soloCode = (o = 0) => codeAt(soloSecret, currentStep() + o);
+  const lock = (on: boolean) => pool.query(
+    `update users set failed_login_count = $2, locked_until = $3 where email = $1`, [soloEmail, on ? 10 : 0, on ? new Date(Date.now() + 900_000) : null]);
+
+  before(async () => {
+    ({ agent: solo, email: soloEmail } = await signup(app, { orgName: 'Solo Contractors', orgKind: 'contractor' }));
+  });
+
+  it('turning it on needs the account password', async () => {
+    const s = await solo.post('/api/me/mfa/setup');
+    soloSecret = s.body.secret;
+    assert.equal((await solo.post('/api/me/mfa/enable', { code: soloCode() })).status, 400, 'no password');
+    assert.equal((await solo.post('/api/me/mfa/enable', { code: soloCode(), password: 'wrong-password-1' })).body.error, 'wrong_password');
+    const e = await solo.post('/api/me/mfa/enable', { code: soloCode(), password: PASSWORD });
+    assert.equal(e.status, 200);
+    soloRecovery = e.body.recoveryCodes;
+    await lock(false);
+  });
+
+  it('ten wrong codes lock the account, and a password reset does not unlock it or keep old tickets', async () => {
+    const t = (await login(soloEmail)).body.ticket;
+    for (let i = 0; i < 2; i++) {
+      const tk = (await login(soloEmail)).body.ticket;
+      for (let j = 0; j < 5; j++) await new Agent(app).post('/api/auth/login/mfa', { ticket: tk, code: '000001' });
+    }
+    assert.equal((await login(soloEmail)).status, 423, 'locked: not even a new ticket');
+    assert.equal((await new Agent(app).post('/api/auth/login/mfa', { ticket: t, code: soloCode(1) })).status, 401, 'an older ticket was replaced');
+    await new Agent(app).post('/api/auth/forgot', { email: soloEmail });
+    const token = await lastEmailToken(soloEmail, '/reset-password');
+    assert.equal((await new Agent(app).post('/api/auth/reset', { token, password: PASSWORD })).status, 200);
+    const u = (await pool.query(`select locked_until from users where email = $1`, [soloEmail])).rows[0];
+    assert.ok(u.locked_until && new Date(u.locked_until) > new Date(), 'reset keeps the lock');
+    assert.equal((await pool.query(`select count(*)::int as n from login_challenges l join users u on u.id = l.user_id where u.email = $1`, [soloEmail])).rows[0].n, 0, 'tickets cancelled');
+    // the reset ended every session; sign back in with a recovery code once the lock has passed
+    await lock(false);
+    solo = new Agent(app);
+    const tk = (await solo.post('/api/auth/login', { email: soloEmail, password: PASSWORD })).body.ticket;
+    assert.equal((await solo.post('/api/auth/login/mfa', { ticket: tk, code: soloRecovery[0] })).status, 200);
+  });
+
+  it('the signed-in routes respect the lockout too', async () => {
+    await lock(true);
+    assert.equal((await solo.post('/api/me/mfa/recovery-codes', { code: soloCode(1) })).status, 423);
+    assert.equal((await solo.post('/api/me/mfa/disable', { password: PASSWORD, code: soloCode(1) })).status, 423);
+    await lock(false);
+  });
+
+  it('a wrong password when turning it off counts towards the lockout', async () => {
+    const before = (await pool.query(`select failed_login_count as n from users where email = $1`, [soloEmail])).rows[0].n;
+    const r = await solo.post('/api/me/mfa/disable', { password: 'wrong-password-1', code: soloCode(2) });
+    assert.equal(r.body.error, 'wrong_password');
+    const afterN = (await pool.query(`select failed_login_count as n from users where email = $1`, [soloEmail])).rows[0].n;
+    assert.equal(afterN, before + 1);
+    await lock(false);
+  });
+
+  it('new recovery codes replace the old ones, and turning it off works with password and code', async () => {
+    const r = await solo.post('/api/me/mfa/recovery-codes', { code: soloCode(1) });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.recoveryCodes.length, 8);
+    const off = await solo.post('/api/me/mfa/disable', { password: PASSWORD, code: r.body.recoveryCodes[0] });
+    assert.equal(off.status, 200, JSON.stringify(off.body));
+    assert.equal((await solo.get('/api/me/mfa')).body.enabled, false);
+    assert.equal((await login(soloEmail)).body.ok, true, 'password-only again');
+  });
+
+  it('a gated session never blocks the Exchange portal', async () => {
+    // member's organisation requires it and the platform reset just removed theirs: sign in fresh (gated)
+    const m = new Agent(app);
+    assert.equal((await m.post('/api/auth/login', { email: memberEmail, password: PASSWORD })).body.ok, true);
+    assert.equal((await m.state()).mfaSetupRequired, true);
+    const x = await m.get('/api/x/state');
+    assert.notEqual(x.body?.error, 'mfa_setup_required');
   });
 });

@@ -25,6 +25,7 @@ export function mfaBody(){
       +'<div style="font-family:var(--font-mono,monospace);font-size:16px;letter-spacing:.06em;text-align:center;padding:10px;border:1px dashed var(--grey-line);border-radius:8px;word-break:break-all;">'+key+'</div>'
       +'<div class="site-card-sub" style="margin:6px 0 10px;">On this phone you can also <a href="'+escapeHtml(st.setup.otpauth)+'">open it in your authenticator app</a>.</div>'
       +'<label class="field-label" for="mfaCode">Type the 6-digit code the app shows</label><input type="text" id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6">'
+      +'<label class="field-label" for="mfaPassword">Your password</label><input type="password" id="mfaPassword" autocomplete="current-password">'
       +'<button class="btn primary block" style="margin-top:10px;" data-action="mfa-enable">Turn on</button>';
   }
   const req = st.info.requiredBy.length ? '<div class="site-card-sub" style="margin-top:6px;">Required by '+escapeHtml(st.info.requiredBy.join(', '))+'.</div>' : '';
@@ -47,7 +48,7 @@ export function renderMfaGate(){
   st.gate = true;
   return '<div class="auth-wrap"><div class="card" style="max-width:460px;margin:40px auto;">'
     +'<h1 style="font-size:22px;margin:0 0 6px;">Set up two-step sign-in</h1>'
-    +'<p class="site-card-sub" style="margin-bottom:12px;">'+escapeHtml(S.boot.org ? S.boot.org.name : 'Your organisation')+' requires a second sign-in step for everyone. It takes about two minutes.</p>'
+    +'<p class="site-card-sub" style="margin-bottom:12px;">'+(S.boot.org ? S.boot.org.name : 'Your organisation')+' requires a second sign-in step for everyone. It takes about two minutes.</p>'
     + mfaBody()
     +'<button class="btn ghost block" style="margin-top:12px;" data-action="auth-signout">Sign out</button></div></div>';
 }
@@ -60,7 +61,7 @@ on('mfa-start', async (el)=>{
 });
 on('mfa-enable', async (el)=>{
   el.disabled = true; st.err = '';
-  try{ const r = await api.post('/api/me/mfa/enable', { code: val('mfaCode') }); st.codes = r.recoveryCodes; st.setup = null; await load(); }
+  try{ const r = await api.post('/api/me/mfa/enable', { code: val('mfaCode'), password: document.getElementById('mfaPassword').value }); st.codes = r.recoveryCodes; st.setup = null; await load(); }
   catch(e){ st.err = e.message; }
   rerender();
 });

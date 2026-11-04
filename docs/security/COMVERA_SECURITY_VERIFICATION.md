@@ -76,5 +76,8 @@ implementation, upload handling, and the Render configuration.
 Built and tested: optional authenticator codes for every user, organisation-level requirement, single-use login
 ticket (5 minutes, 5 attempts), replay blocked, shared lockout with password failures, single-use recovery codes,
 password reset never signs in an MFA user, server-side set-up gate (`403 mfa_setup_required`, minimal bootstrap),
-platform reset needs the manager portal, a reason, and is logged. `npm test`: 249 passed, 0 failed; typecheck and
-`node --check` clean; independent review of the diff done before merge.
+platform reset needs the manager portal, a reason, and is logged. An independent review found 9 issues (one high: a password reset cleared the code
+lockout); all fixed with regression tests: reset keeps the lock and cancels open tickets, turning it on needs the
+password, every signed-in MFA route checks the lockout and counts wrong passwords, set-up can't overwrite an active
+key, one live ticket per person, the gate never blocks the Exchange portal or email/invite links.
+`npm test`: 255 passed, 0 failed; typecheck and `node --check` clean.

@@ -45,11 +45,13 @@ export async function lockedOut(db: Db, userId: string): Promise<boolean> {
 export async function startEnrolment(db: Db, userId: string, email: string): Promise<{ secret: string; otpauth: string } | null> {
   if (await mfaEnabled(db, userId)) return null;
   const secret = newSecret();
-  await db.query(
+  const r = await db.query(
     `insert into user_mfa (user_id, secret) values ($1, $2)
-     on conflict (user_id) do update set secret = excluded.secret, created_at = now(), recovery_hashes = '{}', last_step = 0`,
+     on conflict (user_id) do update set secret = excluded.secret, created_at = now(), recovery_hashes = '{}', last_step = 0
+     where user_mfa.enabled_at is null`,
     [userId, sealSecret(secret)],
   );
+  if (!r.rowCount) return null;
   return { secret, otpauth: otpauthUrl(email, secret) };
 }
 
