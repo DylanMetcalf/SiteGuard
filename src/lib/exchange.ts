@@ -16,6 +16,7 @@ import { badRequest } from './errors.js';
 import { sha256 } from './security.js';
 import { appUrl, queueEmail } from './email.js';
 import { sniffType, storage } from './storage.js';
+import { assertClean } from './scan.js';
 import { notifyOrg } from './notify.js';
 
 export interface ExchangeRow {
@@ -104,6 +105,7 @@ export async function refreshRequestStatus(db: Db, exchangeId: string): Promise<
 
 /** Stores a recipient's upload as the requesting organisation's own file (its compliance copy). */
 export async function storeExchangeFile(db: Db, orgId: string, buf: Buffer, filename: string, declaredType: string) {
+  await assertClean(buf);
   const type = sniffType(buf, declaredType, filename);
   if (!type) throw badRequest('That file type is not supported. Upload a PDF, photo (JPG/PNG/WebP/HEIC), Word, Excel or text file.', 'unsupported_file');
   const safeName = path.basename(filename).replace(/[\x00-\x1f]/g, '').slice(0, 180) || 'document';

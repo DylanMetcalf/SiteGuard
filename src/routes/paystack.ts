@@ -23,6 +23,7 @@ import { trackFirst } from '../lib/events.js';
 import { appUrl } from '../lib/email.js';
 import { contractorSitesInUse, hostSitesInUse } from '../lib/limits.js';
 import { seatsUsed } from './org.js';
+import { securityEvent } from '../lib/securityLog.js';
 import { paystack, validSignature, verifyTransaction, type PaystackTransaction } from '../lib/paystack.js';
 
 const requirePaystack = () => {
@@ -292,7 +293,10 @@ export default async function paystackRoutes(app: FastifyInstance) {
     scope.post('/api/billing/paystack/webhook', async (req, reply) => {
       if (features.paymentProvider !== 'paystack') return reply.status(404).send();
       const raw = req.body as Buffer;
-      if (!Buffer.isBuffer(raw) || !validSignature(raw, req.headers['x-paystack-signature'] as string | undefined)) return reply.status(400).send({ error: 'bad_signature' });
+      if (!Buffer.isBuffer(raw) || !validSignature(raw, req.headers['x-paystack-signature'] as string | undefined)) {
+        securityEvent(req, 'webhook_bad_signature', { provider: 'paystack' });
+        return reply.status(400).send({ error: 'bad_signature' });
+      }
       let body: { event?: string; data?: Record<string, unknown> };
       try {
         body = JSON.parse(raw.toString('utf8'));

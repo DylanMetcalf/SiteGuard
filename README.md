@@ -279,6 +279,7 @@ docs/                      Architecture and deployment guides
 - **[COMVERA_LAUNCH_AUDIT.md](COMVERA_LAUNCH_AUDIT.md)**: the launch audit and readiness report (what works, risks,
   blockers, research, prioritised plan) and **[COMVERA_NEXT_STEPS.md](COMVERA_NEXT_STEPS.md)**: what's left, in order.
 - **Manager portal** at `/manager` (platform admins, with an authenticator step): customers, health, what needs attention, support inbox, activity log.
+- [docs/security/](docs/security/): security architecture, threat model, findings register, test plan, verification, incident response, backups, external configuration and residual risks.
 - [docs/ACCOUNT_RECOVERY.md](docs/ACCOUNT_RECOVERY.md): getting back into an account or the platform admin, safely.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): tenancy model, permission matrix, how the UI gets its
   data, security measures, and known limits.

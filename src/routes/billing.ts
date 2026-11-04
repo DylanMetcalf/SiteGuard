@@ -20,6 +20,7 @@ import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { appUrl } from '../lib/email.js';
 import { seatsUsed } from './org.js';
+import { securityEvent } from '../lib/securityLog.js';
 import { contractorSitesInUse, hostSitesInUse } from '../lib/limits.js';
 
 let stripe: Stripe | null = null;
@@ -221,6 +222,7 @@ export default async function billingRoutes(app: FastifyInstance) {
       try {
         event = getStripe().webhooks.constructEvent(req.body as Buffer, String(req.headers['stripe-signature'] ?? ''), config.STRIPE_WEBHOOK_SECRET);
       } catch {
+        securityEvent(req, 'webhook_bad_signature', { provider: 'stripe' });
         return reply.status(400).send({ error: 'bad_signature' });
       }
       const fresh = await one(pool, 'insert into stripe_events (id, type) values ($1, $2) on conflict do nothing returning id', [event.id, event.type]);
