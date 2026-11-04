@@ -1130,6 +1130,7 @@ function renderProfileSheet(){
     +'<label class="field-label" for="pwCurrent">Current password</label><input type="password" id="pwCurrent" autocomplete="current-password">'
     +'<label class="field-label" for="pwNext">New password</label><input type="password" id="pwNext" autocomplete="new-password">'
     +'<button class="btn secondary block" style="margin-top:8px;" data-action="change-password">Change password</button>'
+    +'<button class="btn secondary block" style="margin-top:8px;" data-action="open-mfa">Two-step sign-in: '+(me.mfaEnabled?'on':'off')+'</button>'
     +'<button class="btn secondary block" style="margin-top:8px;" data-action="sign-out-everywhere">Sign out on all other devices</button>'
     +'<button class="btn danger block" style="margin-top:8px;" data-action="auth-signout">Sign out</button>';
   return body;

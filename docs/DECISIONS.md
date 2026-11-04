@@ -5,6 +5,12 @@ Newest first.
 
 ---
 
+**DECISION** Two-step sign-in for customers is optional per person and can be required per organisation by its admin; there is no SMS option, and support resets it only through the manager portal with a reason.
+**REASON** Closes SEC-010 with the authenticator code system already used for platform admins; SMS codes are weaker and cost money; one organisation's rule applies to its members only, never to other organisations they belong to beyond blocking access until set up.
+**DATE** 2026-11-04
+
+---
+
 **DECISION** Security programme (Nov 2026): sessions are capped at 30 days from sign-in; security events are structured log lines (kept by the host, outside the app's database) rather than a new table; virus scanning is an optional private ClamAV service that fails closed; vulnerable transitive packages are pinned with `overrides` rather than downgrading direct dependencies.
 **REASON** Each is the smallest control that closes a real gap found in the audit (see docs/security/COMVERA_SECURITY_FINDINGS.md) without new infrastructure the product does not yet need, and without sending documents to any third party.
 **DATE** 2026-11-04

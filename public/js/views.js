@@ -1118,6 +1118,10 @@ function renderSettings(){
       +'<label class="field-label" for="inspectxUrl">InspectX base URL</label><input type="url" id="inspectxUrl" value="'+(s.inspectxBaseUrl||'')+'" placeholder="https://app.inspectx.example/i/">'
       +(ro?'':'<button class="btn secondary block" style="margin-top:10px;" data-action="save-integration">Save</button>')+'</div>';
   }
+  if(isOrgAdmin()) html += '<div class="section-title">Two-step sign-in</div><div class="card"><div class="site-card-sub">'+(o.requireMfa
+      ? 'Everyone in '+o.name+' must use a code from an authenticator app when they sign in. People without it are asked to set it up before they can see anything.'
+      : 'Ask everyone in '+o.name+' to use a code from an authenticator app when they sign in, not just a password. Turn it on for your own account first (Profile → Security).')+'</div>'
+    +(ro?'':'<button class="btn '+(o.requireMfa?'secondary':'primary')+' small" style="margin-top:10px;" data-action="org-require-mfa" data-on="'+(o.requireMfa?'0':'1')+'">'+(o.requireMfa?'Stop requiring it':'Require two-step sign-in for everyone')+'</button>')+'</div>';
   if(isOrgAdmin()) html += supportAccessCard();
   html += '<div class="section-title">Your data</div><div class="card"><div class="site-card-sub">Download everything '+o.name+' can see in COMVERA — company details, team, sites and files, document records and the audit trail — as one file you can keep or move elsewhere. Uploaded documents are listed, not included; download those from each file.</div>'
     +'<a class="btn secondary small" style="margin-top:10px;" href="/api/org/export" download>Download our data</a>'
@@ -1141,6 +1145,11 @@ function supportAccessCard(){
         +'<button class="btn secondary small" style="margin-top:10px;" data-action="support-allow">Allow support to look</button>')
     + '</div>';
 }
+on('org-require-mfa', async (el)=>{
+  const turnOn = el.dataset.on === '1';
+  if(!confirm(turnOn ? 'Require two-step sign-in for everyone in '+org().name+'? People without it will have to set it up before they can continue.' : 'Stop requiring two-step sign-in? People can then turn it off for their own accounts.')) return;
+  await act(()=>api.post('/api/org/require-mfa', { on: turnOn }), turnOn ? 'Two-step sign-in is now required' : 'Two-step sign-in is no longer required', el);
+});
 on('support-allow', async (el)=>{ el.disabled = true; try{ supportCache = await api.post('/api/support-access', { hours: parseInt(document.getElementById('supHours').value,10), reason: document.getElementById('supReason').value.trim() }); showToast('Support access is on'); render(); }catch(e){ showToast(e.message); el.disabled = false; } });
 on('support-end', async (el)=>{ el.disabled = true; try{ supportCache = await api.post('/api/support-access/revoke'); showToast('Support access turned off'); render(); }catch(e){ showToast(e.message); el.disabled = false; } });
 

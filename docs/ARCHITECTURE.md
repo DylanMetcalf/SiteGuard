@@ -486,10 +486,16 @@ time-limited transaction) and a **workspace** (an organisation someone signed up
 - **Page and API:** `/manager` (static, `public/manager.html`, `js/manager.js`) over `routes/manager.ts` (`/api/manager/*`).
   No separate password or address: it is the ordinary sign-in for an address in `PLATFORM_ADMIN_EMAILS` (confirmed email),
   plus a second step. Everyone else gets 404.
-- **Second step** (`lib/totp.ts`, `admin_mfa`, `sessions.mfa_verified_at`): RFC 6238 authenticator codes, no extra
+- **Second step** (`lib/totp.ts`, `lib/mfa.ts`, `user_mfa`, `sessions.mfa_verified_at`): RFC 6238 authenticator codes, no extra
   dependency, secret encrypted with `MFA_SECRET_KEY` when set. A code can't be replayed (`last_step`), failures lock the account
   like password failures, eight single-use recovery codes are stored as hashes. A session counts for 12 hours.
   In production the older `/api/admin/*` routes need the same fresh session.
+- **Customer two-step sign-in** (`routes/mfa.ts`, `lib/mfa.ts`, migration 024): any user can turn it on (Profile → Security).
+  With it on, a correct password returns a ticket (`login_challenges`, hashed, 5 minutes, 5 attempts), and
+  `POST /api/auth/login/mfa` exchanges ticket + code for a session. Password reset never signs such a user in.
+  An organisation admin who has it on can require it (`settings.requireMfa`); members without it get a minimal bootstrap
+  and `403 mfa_setup_required` on every other API call until they set it up. It can't be turned off while any of your
+  organisations requires it. The manager portal can reset it (reason required, logged, sessions ended, user emailed).
 - **Without the customer's say-so:** counts, plans, dates, people's names and emails, payment and email status, failed emails,
   trials ending, stuck sign-ups, the support inbox (feedback and contact enquiries), and the activity log.
 - **Only with the customer's say-so** (`support_access_grants`, `routes/supportAccess.ts`): the customer's own admin allows

@@ -5,6 +5,7 @@
  * client never receives data it isn't allowed to see.
  */
 import { libraryTypeFor } from '../lib/readiness.js';
+import { mustSetUpMfa } from '../lib/mfa.js';
 import { can, entitlementsFor } from '../lib/entitlements.js';
 import { rulesOf } from '../lib/validity.js';
 import { reminderDaysOf } from '../jobs/reminders.js';
@@ -396,10 +397,14 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
     );
     const me = {
       id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, title: ctx.user.title, phone: ctx.user.phone,
-      verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo, platformAdmin: isPlatformAdmin(ctx.user),
+      verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo, platformAdmin: isPlatformAdmin(ctx.user), mfaEnabled: !!ctx.user.mfa,
     };
     if (!ctx.org || !ctx.role) {
       return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: null, features: baseFeatures };
+    }
+    // The organisation requires the second step and this person hasn't set it up: nothing else loads until they do.
+    if (mustSetUpMfa(ctx)) {
+      return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: { id: ctx.org.id, name: ctx.org.name, kind: ctx.org.kind }, mfaSetupRequired: true, features: baseFeatures };
     }
     const c = ctx as OrgCtx;
     const plan = planOf(c.org);
@@ -414,7 +419,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         reg: c.org.reg_number, coid: c.org.coid_number, vat: c.org.vat_number, address: c.org.address, trade: c.org.trade,
         role: c.role, roleLabel: roleLabel(c.org.kind, c.role), uiRole: uiRole(c),
         plan: plan.id, planName: plan.name, subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
-        currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, validityRules: rulesOf(c.org.settings), cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
+        currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), requireMfa: (c.org.settings as Record<string, unknown> | null)?.requireMfa === true, seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, validityRules: rulesOf(c.org.settings), cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
         siteLimit: plan.siteLimit,
         // Own access = subscription, trial in date or a promo/enterprise grant. Without it a
         // contractor works only on sponsored files.

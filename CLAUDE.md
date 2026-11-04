@@ -59,6 +59,9 @@ haven't built.
 - The manager portal (`/manager`, `routes/manager.ts`, `lib/totp.ts`): platform admins only, ordinary sign-in plus a fresh authenticator
   step, 404 for everyone else; no separate password, hard-coded account or secret URL. Customer content (names/statuses, never files) only
   through a customer-granted, expiring `support_access_grants` row; log every action with `logPlatformAction` in the same transaction.
+- Two-step sign-in (`lib/mfa.ts`, `routes/mfa.ts`, `user_mfa`): a password alone never creates a session for a user with it on (login
+  ticket in `login_challenges`); no route may sign such a user in another way (reset, invite, switch). `settings.requireMfa` gates
+  members server-side (`MFA_SETUP_ALLOWED` in `app.ts`).
 - Security: findings live in `docs/security/COMVERA_SECURITY_FINDINGS.md` (add a row and a regression test for each fix). Log security events with
   `securityEvent()` (`lib/securityLog.ts`), never with emails, tokens or codes. Every new upload path goes through `storeFile` or
   `storeExchangeFile` (virus scan, type check). New link-token routes need adding to `redactUrl` in `app.ts`.

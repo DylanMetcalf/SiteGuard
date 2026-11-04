@@ -44,6 +44,8 @@ import workforceRoutes from './routes/workforce.js';
 import exchangeRoutes from './routes/exchange.js';
 import templateRoutes from './routes/templates.js';
 import managerRoutes from './routes/manager.js';
+import mfaRoutes from './routes/mfa.js';
+import { mustSetUpMfa } from './lib/mfa.js';
 import supportAccessRoutes from './routes/supportAccess.js';
 import exchangePortalRoutes from './routes/exchangePortal.js';
 
@@ -57,6 +59,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
 
 /** Paths that authenticate some other way (e.g. Stripe signature) and skip CSRF checks. */
+const MFA_SETUP_ALLOWED = ['/api/bootstrap', '/api/me/mfa', '/api/auth/logout', '/api/auth/switch-org', '/api/client-errors', '/api/events'];
+
 const CSRF_EXEMPT = new Set(['/api/billing/webhook', '/api/billing/paystack/webhook']);
 /** The Exchange portal has its own short sessions and CSRF header (routes/exchangePortal.ts). */
 const isPortal = (p: string) => p.startsWith('/api/x/');
@@ -137,6 +141,10 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
     if (req.ctx) req.ctx.write = mutating;
     const pathOnly = req.url.split('?')[0];
+    // An organisation that requires the second step: members without it can only set it up (or sign out/switch).
+    if (req.ctx?.org && mustSetUpMfa(req.ctx) && pathOnly.startsWith('/api/') && !MFA_SETUP_ALLOWED.some((p) => pathOnly === p || pathOnly.startsWith(p + '/'))) {
+      throw new HttpError(403, 'mfa_setup_required', 'Your organisation requires two-step sign-in. Set it up under Profile → Security to continue.');
+    }
     if (!mutating || CSRF_EXEMPT.has(pathOnly) || isPortal(pathOnly)) return;
     if (req.ctx) {
       // Double-submit token bound to the session.
@@ -216,6 +224,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(exchangeRoutes);
   await app.register(templateRoutes);
   await app.register(managerRoutes);
+  await app.register(mfaRoutes);
   await app.register(supportAccessRoutes);
   await app.register(exchangePortalRoutes);
 

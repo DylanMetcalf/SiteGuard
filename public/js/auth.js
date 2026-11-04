@@ -184,6 +184,12 @@ function roleCard(kind, title, sub){
 on('pick-kind', (el)=>{ S.authContext.kind = el.dataset.kind; S.authContext.error = ''; keepTyped(render); });
 
 function signInCard(note, email){
+  if(S.authContext.mfaTicket){
+    return '<div class="card"><div class="site-card-sub" style="margin-bottom:4px;">Open your authenticator app and type the 6-digit code for COMVERA. Lost your phone? Type one of your recovery codes.</div>'
+      +'<label class="field-label" for="siCode">Code</label><input type="text" id="siCode" inputmode="numeric" autocomplete="one-time-code" maxlength="20" autofocus>'
+      +'<button class="btn primary block" style="margin-top:14px;" data-action="signin-mfa">Sign in</button>'+errorBox()
+      +'<div class="auth-links"><button class="linkish" data-action="signin-mfa-cancel">Start again</button></div></div>';
+  }
   return '<div class="card">'+(note?'<div class="site-card-sub" style="margin-bottom:4px;">'+note+'</div>':'')
     +'<label class="field-label" for="siEmail">Email</label><input type="email" id="siEmail" autocomplete="email" value="'+escapeHtml(email)+'"'+(email?'':' autofocus')+'>'
     +'<label class="field-label" for="siPassword">Password</label><input type="password" id="siPassword" autocomplete="current-password"'+(email?' autofocus':'')+'>'
@@ -246,11 +252,27 @@ on('auth-done', ()=>finish());
 on('signin', async (el)=>{
   el.disabled = true;
   try{
-    await api.post('/api/auth/login', { email: val('siEmail'), password: document.getElementById('siPassword').value });
+    const r = await api.post('/api/auth/login', { email: val('siEmail'), password: document.getElementById('siPassword').value });
+    if(r && r.mfaRequired){ S.authContext.mfaTicket = r.ticket; S.authContext.error = ''; render(); return; }
     if(S.authView === 'invite' || S.authView === 'site-invite'){ await reload(); render(); }
     else await finish();
   }catch(e){ fail(e); }
 });
+
+on('signin-mfa', async (el)=>{
+  el.disabled = true;
+  try{
+    const r = await api.post('/api/auth/login/mfa', { ticket: S.authContext.mfaTicket, code: val('siCode') });
+    S.authContext.mfaTicket = null;
+    if(r && r.usedRecoveryCode) showToast('Recovery code used: it will not work again. Make new codes under Profile → Security.');
+    if(S.authView === 'invite' || S.authView === 'site-invite'){ await reload(); render(); }
+    else await finish();
+  }catch(e){
+    if(/expired/i.test(e.message)) S.authContext.mfaTicket = null;
+    fail(e);
+  }
+});
+on('signin-mfa-cancel', ()=>{ S.authContext.mfaTicket = null; S.authContext.error = ''; render(); });
 
 on('signup', async (el)=>{
   const mode = el.dataset.mode;
@@ -292,7 +314,8 @@ on('forgot', async (el)=>{
 on('reset-password', async (el)=>{
   el.disabled = true;
   try{
-    await api.post('/api/auth/reset', { token: S.authContext.token, password: document.getElementById('rpPassword').value });
+    const r = await api.post('/api/auth/reset', { token: S.authContext.token, password: document.getElementById('rpPassword').value });
+    if(r && r.signIn){ go('signin'); showToast('Password changed. Sign in with your new password and your authenticator code.'); return; }
     await finish();
     showToast('Password changed — you\'re signed in.');
   }catch(e){ fail(e); }

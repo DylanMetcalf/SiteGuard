@@ -43,9 +43,15 @@ a separate password.
 - Sign in at `/manager` with your normal email and password, then the 6-digit code from your authenticator app.
 - Lost your phone: use one of the eight recovery codes (each works once) and set up a new authenticator afterwards.
 - Lost the phone **and** the recovery codes: in Render → comvera_db → Shell run
-  `delete from admin_mfa where user_id = (select id from users where email = 'you@yourcompany.co.za');`
+  `delete from user_mfa where user_id = (select id from users where email = 'you@yourcompany.co.za');`
   then sign in at `/manager` and set it up again. Only someone with access to your Render account can do this, which is the point.
-- If you change `MFA_SECRET_KEY` every admin must be reset the same way.
+- If you change `MFA_SECRET_KEY` every user with two-step sign-in must be reset the same way.
+
+### A customer lost their phone and their recovery codes
+- In `/manager`, open their organisation, find the person and choose **Reset two-step**. Give a reason (for example
+  "phoned from the number on file, confirmed by their admin"). Check who they are first: this removes their second step.
+- Their sessions end, they get an email saying it was reset, and the action is in the activity log. They sign in with
+  their password and, if their organisation requires it, set it up again straight away.
 
 ## 5. Payment provider access
 Paystack and Stripe accounts are recovered through their own support. COMVERA stores only customer and

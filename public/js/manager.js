@@ -132,7 +132,8 @@ async function customer() {
       + '<div class="mg-meta">Documents: ' + Object.keys(STATUS).map((k) => (st[k] || 0) + ' ' + STATUS[k].toLowerCase()).join(' · ') + '</div>')
     + card('People', r.members.map((m) => row(esc(m.name) + ' <span class="srctag">' + esc(m.role) + '</span>',
       esc(m.email) + ' · ' + (m.verified ? 'email confirmed' : '<b>email not confirmed</b>') + ' · last seen ' + ago(m.lastSeen) + (m.emailProblem ? ' · <b>emails to them are failing</b>' : ''),
-      '<button class="btn secondary small" data-action="reset-email" data-id="' + m.id + '" data-email="' + esc(m.email) + '">Send reset email</button>')).join(''))
+      '<button class="btn secondary small" data-action="reset-email" data-id="' + m.id + '" data-email="' + esc(m.email) + '">Send reset email</button>'
+      + (m.mfa ? '<button class="btn ghost small" data-action="reset-mfa" data-id="' + m.id + '" data-email="' + esc(m.email) + '">Reset two-step</button>' : ''))).join(''))
     + card('Payments', r.payments.length ? r.payments.map((p) => row(rands(p.amountCents) + ' · ' + esc(p.kind) + ' · ' + esc(p.planId), esc(p.status) + (p.failureReason ? ' — ' + esc(p.failureReason) : '') + ' · ' + dt(p.paidAt || p.createdAt) + ' · ref ' + esc(p.reference))).join('') : none('No online payments yet.'))
     + card('Support access',
       r.supportAccess ? '<div class="mg-banner">The customer has allowed support access until ' + dt(r.supportAccess.expiresAt) + ' (by ' + esc(r.supportAccess.grantedBy) + (r.supportAccess.reason ? ': ' + esc(r.supportAccess.reason) : '') + ').</div>'
@@ -243,12 +244,20 @@ document.addEventListener('click', async (ev) => {
   try {
     if (a === 'login') {
       el.disabled = true;
-      try { await api.post('/api/auth/login', { email: val('mgEmail'), password: document.getElementById('mgPass').value }); } catch (e) { el.disabled = false; return loginView(e.message); }
+      let r;
+      try { r = await api.post('/api/auth/login', { email: val('mgEmail'), password: document.getElementById('mgPass').value }); } catch (e) { el.disabled = false; return loginView(e.message); }
+      if (r && r.mfaRequired) { S.ticket = r.ticket; return codeView(); }
       return start();
     }
     if (a === 'verify') {
       el.disabled = true;
-      try { const r = await api.post('/api/manager/mfa/verify', { code: val('mgCode') }); if (r.usedRecoveryCode) toast('Recovery code used. Make a note: it will not work again.'); } catch (e) { return codeView(e.message); }
+      try {
+        const r = S.ticket
+          ? await api.post('/api/auth/login/mfa', { ticket: S.ticket, code: val('mgCode') })
+          : await api.post('/api/manager/mfa/verify', { code: val('mgCode') });
+        S.ticket = null;
+        if (r.usedRecoveryCode) toast('Recovery code used. Make a note: it will not work again.');
+      } catch (e) { if (/expired/i.test(e.message)) { S.ticket = null; return loginView(e.message); } return codeView(e.message); }
       return start();
     }
     if (a === 'enable') {
@@ -283,6 +292,12 @@ document.addEventListener('click', async (ev) => {
     if (a === 'reset-email') {
       if (!confirm('Send a password reset email to ' + el.dataset.email + '? The link goes to that person only.')) return;
       await api.post('/api/manager/users/' + el.dataset.id + '/reset-email'); return toast('Reset email queued');
+    }
+    if (a === 'reset-mfa') {
+      const reason = prompt('Reset two-step sign-in for ' + el.dataset.email + '? Only do this after confirming who they are (for example a call to a number you already have). Reason:');
+      if (!reason) return;
+      await api.post('/api/manager/users/' + el.dataset.id + '/reset-mfa', { reason });
+      toast('Two-step sign-in reset; they have been emailed'); return show('customer');
     }
     if (a === 'requeue') { await api.post('/api/manager/emails/' + el.dataset.id + '/requeue'); toast('Queued to send again'); return show('attention'); }
     if (a === 'handle') {

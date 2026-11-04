@@ -1,5 +1,11 @@
 # COMVERA security changelog
 
+## 2026-11-04: customer two-step sign-in (SEC-010)
+- Authenticator-app codes for every user, optional; organisation admins can require them for their members.
+- Login with a password returns a single-use ticket when two-step is on; password reset no longer signs such users in.
+- Recovery codes (8, single use), shared lockout, replay protection, email on every change, manager-portal reset with reason.
+- Migration 024 renames `admin_mfa` to `user_mfa` (existing admin set-ups keep working) and adds `login_challenges`.
+
 ## 2026-11-04: security programme (branch `claude/siteguard-multitenant-saas-04lxw0`)
 - Sessions end 30 days after sign-in at the latest (`SESSION_MAX_DAYS`); expired ones are cleaned up daily. (SEC-002)
 - A new sign-in deletes the browser's previous session. (SEC-003)

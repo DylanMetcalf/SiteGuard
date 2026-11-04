@@ -51,15 +51,18 @@ describe('manager portal: who can get in', () => {
   });
 
   it('refuses to replay a code, and accepts a recovery code once', async () => {
+    // With a second step on, the code is asked for at sign-in itself (no session from the password alone).
     const fresh = new Agent(app);
-    assert.equal((await fresh.post('/api/auth/login', { email: 'ops@comvera.test', password: PASSWORD })).status, 200);
-    assert.equal((await fresh.get('/api/manager/overview')).status, 403);
-    assert.equal((await fresh.post('/api/manager/mfa/verify', { code: now() })).status, 401, 'same 30-second code already used');
-    assert.equal((await fresh.post('/api/manager/mfa/verify', { code: recovery[0] })).status, 200);
-    assert.equal((await fresh.get('/api/manager/overview')).status, 200);
+    const first = await fresh.post('/api/auth/login', { email: 'ops@comvera.test', password: PASSWORD });
+    assert.equal(first.body.mfaRequired, true);
+    assert.equal((await fresh.get('/api/manager/overview')).status, 401);
+    assert.equal((await fresh.post('/api/auth/login/mfa', { ticket: first.body.ticket, code: now() })).status, 401, 'same 30-second code already used');
+    assert.equal((await fresh.post('/api/auth/login/mfa', { ticket: first.body.ticket, code: recovery[0] })).status, 200);
+    assert.equal((await fresh.get('/api/manager/overview')).status, 200, 'a sign-in with the code counts for the portal');
     const again = new Agent(app);
-    await again.post('/api/auth/login', { email: 'ops@comvera.test', password: PASSWORD });
-    assert.equal((await again.post('/api/manager/mfa/verify', { code: recovery[0] })).status, 401, 'recovery codes are single-use');
+    const t = (await again.post('/api/auth/login', { email: 'ops@comvera.test', password: PASSWORD })).body.ticket;
+    assert.equal((await again.post('/api/auth/login/mfa', { ticket: t, code: recovery[0] })).status, 401, 'recovery codes are single-use');
+    await pool.query(`update users set failed_login_count = 0, locked_until = null where email = 'ops@comvera.test'`);
   });
 
   it('a session older than the limit has to repeat the second step', async () => {
