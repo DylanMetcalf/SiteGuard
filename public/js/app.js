@@ -14,6 +14,7 @@ import './inbox.js';
 import './builder.js';
 import './safetyfiles.js';
 import { maybeOfferTour } from './tour.js';
+import { renderMfaGate } from './mfa.js';
 
 const app = document.getElementById('app');
 
@@ -70,6 +71,7 @@ function render(){
     wasOutside = true;
     return;
   }
+  if(b.mfaSetupRequired){ app.innerHTML = renderMfaGate(); stopLive(); return; }
   if(!b.org){ app.innerHTML = renderNoOrg(); stopLive(); return; }
   // Don't yank the page out from under someone typing in it.
   const active = document.activeElement;

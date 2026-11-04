@@ -5,7 +5,7 @@ COMVERA is not "completely secure"; no system is. These are the known risks that
 
 | Risk | Level | Why it remains | What would reduce it |
 |---|---|---|---|
-| Customer accounts protected by password only | Medium | MFA exists only for platform admins (SEC-010) | Optional, then required, TOTP for organisation owners and admins |
+| Customer accounts that have not turned on two-step sign-in | Low–Medium | Two-step sign-in is optional unless the organisation requires it (SEC-010 fixed) | Encourage mine admins to require it; consider requiring it by default for paying mines |
 | Malware in uploaded files | Medium until E6 | Scanning is built but needs a ClamAV service (SEC-007) | Deploy ClamAV (E6) |
 | Provider-level settings unverified | Medium | Database exposure, backup encryption and restores cannot be seen from the code (SEC-011) | E5, E13; record evidence |
 | Email deliverability and spoofing | Low–Medium | No bounce handling; DMARC monitoring only (SEC-009, SEC-015) | Email provider webhooks; DMARC quarantine (E8) |

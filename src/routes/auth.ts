@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { emailRef, securityEvent } from '../lib/securityLog.js';
+import { consumeMfaCode, lockedOut, mfaEnabled, recordMfaFailure } from '../lib/mfa.js';
 import { notifyOrg } from '../lib/notify.js';
 import { z } from 'zod';
 import { one, pool, withTx, type Db } from '../db/pool.js';
@@ -225,17 +226,60 @@ export default async function authRoutes(app: FastifyInstance) {
       securityEvent(req, 'login_failed', { userId: user?.id ?? null, emailRef: user ? null : emailRef(body.email) });
       throw unauthorized('Email or password is incorrect.');
     }
-    securityEvent(req, 'login_succeeded', { userId: user.id });
-    await pool.query('update users set failed_login_count = 0, locked_until = null where id = $1', [user.id]);
     const orgId =
       (await one<{ org_id: string }>(
         pool,
         `select org_id from memberships where user_id = $1 order by (org_id = $2) desc, created_at limit 1`,
         [user.id, user.last_active_org_id],
       ))?.org_id ?? null;
+    // A second step is on: no session yet, only a short-lived single-use ticket for the code.
+    // The failure counter is not reset here, so a known password doesn't buy fresh code guesses.
+    if (await mfaEnabled(pool, user.id)) {
+      const ticket = newToken();
+      await withTx(async (db) => {
+        await db.query('select 1 from users where id = $1 for update', [user.id]); // one live ticket per person
+        await db.query(`delete from login_challenges where user_id = $1 or expires_at < now()`, [user.id]);
+        await db.query(`insert into login_challenges (token_hash, user_id, org_id, expires_at) values ($1, $2, $3, now() + interval '5 minutes')`, [sha256(ticket), user.id, orgId]);
+      });
+      return { ok: false, mfaRequired: true, ticket };
+    }
+    securityEvent(req, 'login_succeeded', { userId: user.id });
+    await pool.query('update users set failed_login_count = 0, locked_until = null where id = $1', [user.id]);
     await createSession(pool, reply, req, user.id, orgId);
     if (orgId) await signInEvent(orgId, user.id, 'Signed in', req.ip);
     return { ok: true };
+  });
+
+  app.post('/api/auth/login/mfa', rl(10), async (req, reply) => {
+    const body = z.object({ ticket: z.string().min(10).max(100), code: z.string().trim().min(1).max(20) }).parse(req.body);
+    const expired = () => unauthorized('That sign-in has expired. Enter your email and password again.');
+    const result = await withTx(async (db) => {
+      const ch = await one<{ user_id: string; org_id: string | null; attempts: number }>(
+        db, `select user_id, org_id, attempts from login_challenges where token_hash = $1 and expires_at > now() for update`, [sha256(body.ticket)]);
+      if (!ch) return { kind: 'expired' as const };
+      await db.query('select 1 from users where id = $1 for update', [ch.user_id]); // serialises parallel tickets
+      if (await lockedOut(db, ch.user_id)) return { kind: 'locked' as const };
+      const how = await consumeMfaCode(db, ch.user_id, body.code);
+      if (!how) {
+        await recordMfaFailure(db, ch.user_id);
+        if (ch.attempts + 1 >= 5) await db.query('delete from login_challenges where token_hash = $1', [sha256(body.ticket)]);
+        else await db.query('update login_challenges set attempts = attempts + 1 where token_hash = $1', [sha256(body.ticket)]);
+        return { kind: 'wrong' as const, userId: ch.user_id };
+      }
+      await db.query('delete from login_challenges where token_hash = $1', [sha256(body.ticket)]);
+      await db.query('update users set failed_login_count = 0, locked_until = null where id = $1', [ch.user_id]);
+      await createSession(db, reply, req, ch.user_id, ch.org_id, { mfaVerified: true });
+      return { kind: 'ok' as const, userId: ch.user_id, orgId: ch.org_id, how };
+    });
+    if (result.kind === 'expired') throw expired();
+    if (result.kind === 'locked') throw new HttpError(423, 'locked', 'Too many failed attempts. Try again in 15 minutes.');
+    if (result.kind === 'wrong') {
+      securityEvent(req, 'mfa_failed', { userId: result.userId });
+      throw unauthorized('That code is not right. Check your authenticator app and try again.');
+    }
+    securityEvent(req, 'login_succeeded', { userId: result.userId, method: result.how });
+    if (result.orgId) await signInEvent(result.orgId, result.userId, 'Signed in', req.ip);
+    return { ok: true, usedRecoveryCode: result.how === 'recovery code' };
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
@@ -260,7 +304,7 @@ export default async function authRoutes(app: FastifyInstance) {
     const body = z.object({ token: z.string().max(100), password }).parse(req.body);
     const problem = passwordProblem(body.password);
     if (problem) throw badRequest(problem, 'weak_password');
-    await withTx(async (db) => {
+    const r = await withTx(async (db) => {
       const row = await one<{ user_id: string }>(
         db,
         `update email_tokens set used_at = now()
@@ -269,19 +313,27 @@ export default async function authRoutes(app: FastifyInstance) {
         [sha256(body.token)],
       );
       if (!row) throw badRequest('That reset link has expired or was already used. Request a new one.', 'invalid_token');
+      // With a second step on, the lockout stays: an inbox must not buy fresh code guesses.
+      const keepLock = await mfaEnabled(db, row.user_id);
       await db.query(
-        `update users set password_hash = $2, failed_login_count = 0, locked_until = null,
+        `update users set password_hash = $2,
+                failed_login_count = case when $3 then failed_login_count else 0 end,
+                locked_until = case when $3 then locked_until else null end,
                 email_verified_at = coalesce(email_verified_at, now()) where id = $1`,
-        [row.user_id, await hashPassword(body.password)],
+        [row.user_id, await hashPassword(body.password), keepLock],
       );
-      // A reset signs out every existing session.
+      // A reset signs out every existing session and cancels half-finished sign-ins.
       await db.query('delete from sessions where user_id = $1', [row.user_id]);
+      await db.query('delete from login_challenges where user_id = $1', [row.user_id]);
       securityEvent(req, 'password_reset_completed', { userId: row.user_id });
       const u = await one<{ last_active_org_id: string | null }>(db, 'select last_active_org_id from users where id = $1', [row.user_id]);
       const m = await one<{ org_id: string }>(db, 'select org_id from memberships where user_id = $1 order by (org_id = $2) desc limit 1', [row.user_id, u?.last_active_org_id]);
+      // With a second step on, the reset alone never signs anyone in: an email inbox is not two factors.
+      if (keepLock) return { signIn: true };
       await createSession(db, reply, req, row.user_id, m?.org_id ?? null);
+      return { signIn: false };
     });
-    return { ok: true };
+    return { ok: true, ...(r ?? {}) };
   });
 
   app.post('/api/auth/verify-email', rl(20), async (req) => {

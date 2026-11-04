@@ -193,6 +193,7 @@ export async function runReminders(): Promise<number> {
 
 export async function cleanupExpired(): Promise<void> {
   await pool.query(`delete from sessions where expires_at < now() or created_at < now() - make_interval(days => $1)`, [config.SESSION_MAX_DAYS]);
+  await pool.query(`delete from login_challenges where expires_at < now()`);
   await pool.query(`delete from email_tokens where expires_at < now() - interval '7 days'`);
   await pool.query(`delete from reminder_log where sent_at < now() - interval '180 days'`);
   await pool.query(`delete from exchange_sessions where expires_at < now()`);

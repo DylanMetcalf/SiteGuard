@@ -25,7 +25,7 @@ T1–T20. Findings SEC-002 to SEC-006. Low-risk fix applied: dependency updates 
 **Audit 2: identity and authorisation.** Re-checked login, lockout, reset, password change, revocation and roles.
 Found SEC-002 (no absolute session cap) and SEC-003 (previous session survives a new sign-in), fixed and proven:
 the two new tests **fail without the fix and pass with it**. Membership removal, demotion and cross-tenant tests
-already existed and pass. MFA for customers remains open (SEC-010).
+already existed and pass. Customer MFA (SEC-010) was added later the same day; see the addendum below.
 
 **Audit 3: data, files, email, infrastructure.** Upload allowlist and serving headers confirmed; added optional
 fail-closed ClamAV scanning on both storage choke points (`storeFile`, `storeExchangeFile`) with tests for clean,
@@ -49,7 +49,7 @@ real ClamAV behaviour (only a protocol-compatible fake was used).
 | Password storage and reset | VERIFIED |
 | Session management (cookie flags, revocation, lifetime, fixation) | VERIFIED |
 | MFA for platform admins | VERIFIED |
-| MFA for customer accounts | FAILED (not implemented: SEC-010) |
+| MFA for customer accounts | VERIFIED (optional per user, can be required per organisation; `test/mfa.test.ts`) |
 | Tenant isolation and object-level access | VERIFIED (tests) |
 | CSRF | VERIFIED |
 | Upload type and serving controls | VERIFIED |
@@ -65,9 +65,19 @@ real ClamAV behaviour (only a protocol-compatible fake was used).
 ## Readiness
 - Internal development: **supported.**
 - Controlled external testing (a free pilot with synthetic or low-sensitivity data first): **supported** once E1–E4 are done.
-- Public launch: **not yet.** Needs SEC-010 (customer MFA, at least optional), E5, E6 or an accepted malware risk, E13 restore test, legal review, and an independent security test.
+- Public launch: **not yet.** Needs E5, E6 or an accepted malware risk, E13 restore test, legal review, and an independent security test.
 - Handling sensitive production data at scale (medical certificates for many workers): **not yet**, for the same reasons.
 
 ## Independent review recommended
 Authorisation across all routes (loadSite coverage), the Exchange guest portal, the payment webhooks, the TOTP
 implementation, upload handling, and the Render configuration.
+
+## Addendum: customer two-step sign-in (SEC-010)
+Built and tested: optional authenticator codes for every user, organisation-level requirement, single-use login
+ticket (5 minutes, 5 attempts), replay blocked, shared lockout with password failures, single-use recovery codes,
+password reset never signs in an MFA user, server-side set-up gate (`403 mfa_setup_required`, minimal bootstrap),
+platform reset needs the manager portal, a reason, and is logged. An independent review found 9 issues (one high: a password reset cleared the code
+lockout); all fixed with regression tests: reset keeps the lock and cancels open tickets, turning it on needs the
+password, every signed-in MFA route checks the lockout and counts wrong passwords, set-up can't overwrite an active
+key, one live ticket per person, the gate never blocks the Exchange portal or email/invite links.
+`npm test`: 255 passed, 0 failed; typecheck and `node --check` clean.

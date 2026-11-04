@@ -10,7 +10,7 @@ Signals: the weekly security workflow fails; the uptime check fails; many `secur
 | Situation | Do this |
 |---|---|
 | A customer account is taken over | Ask the customer's owner to change the password (this signs out every session) and remove unknown members. Use the manager portal to send them a reset email. |
-| Platform admin account suspected | Remove the address from `PLATFORM_ADMIN_EMAILS` in Render; delete its row in `admin_mfa`; sign in again and re-enrol. |
+| Platform admin account suspected | Remove the address from `PLATFORM_ADMIN_EMAILS` in Render; delete its row in `user_mfa`; sign in again and re-enrol. |
 | A secret may be exposed | Roll it in the provider (Paystack, Stripe, SMTP, S3, Anthropic), paste the new value into Render, then check a test payment or email. Never paste secrets into chat or tickets. |
 | Database credentials exposed | Rotate the Render database password and restrict external access; Render restarts the service with the new connection string. |
 | Malicious file reported | Note the file id from the audit trail; do not open it on your own machine; ask the uploading company; turn on ClamAV if it is not on. |

@@ -14,6 +14,7 @@ export async function createSession(
   req: FastifyRequest,
   userId: string,
   orgId: string | null,
+  opts: { mfaVerified?: boolean } = {},
 ): Promise<void> {
   // A new sign-in never inherits an earlier session from the same browser (no session fixation).
   const previous = req.cookies?.[SESSION_COOKIE];
@@ -21,9 +22,9 @@ export async function createSession(
   const token = newToken();
   const expires = new Date(Date.now() + config.SESSION_TTL_DAYS * 86400_000);
   await db.query(
-    `insert into sessions (id, user_id, org_id, csrf_token, ip, user_agent, expires_at)
-     values ($1, $2, $3, $4, $5, $6, $7)`,
-    [sha256(token), userId, orgId, newToken(), req.ip, String(req.headers['user-agent'] ?? '').slice(0, 300), expires],
+    `insert into sessions (id, user_id, org_id, csrf_token, ip, user_agent, expires_at, mfa_verified_at)
+     values ($1, $2, $3, $4, $5, $6, $7, case when $8 then now() end)`,
+    [sha256(token), userId, orgId, newToken(), req.ip, String(req.headers['user-agent'] ?? '').slice(0, 300), expires, !!opts.mfaVerified],
   );
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
@@ -58,7 +59,8 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
     pool,
     `select s.id, s.csrf_token, s.org_id, s.last_seen_at, s.mfa_verified_at,
             json_build_object('id', u.id, 'email', u.email, 'name', u.name, 'title', u.title, 'phone', u.phone,
-                              'email_verified_at', u.email_verified_at, 'is_demo', u.is_demo) as user
+                              'email_verified_at', u.email_verified_at, 'is_demo', u.is_demo,
+                              'mfa', exists (select 1 from user_mfa m where m.user_id = u.id and m.enabled_at is not null)) as user
        from sessions s join users u on u.id = s.user_id
       where s.id = $1 and s.expires_at > now() and s.created_at > now() - make_interval(days => $2)`,
     [id, config.SESSION_MAX_DAYS],

@@ -54,6 +54,8 @@ export interface UserRow {
   phone: string;
   email_verified_at: Date | null;
   is_demo: boolean;
+  /** The user has a second sign-in step (authenticator app) turned on. */
+  mfa?: boolean;
 }
 
 export interface Ctx {

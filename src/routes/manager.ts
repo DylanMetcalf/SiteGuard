@@ -21,8 +21,9 @@ import { isUuid, requireUser, type Ctx } from '../lib/authz.js';
 import { PLANS, defaultPlanFor, type OrgKind } from '../lib/plans.js';
 import { logPlatformAction } from '../lib/platformLog.js';
 import { securityEvent } from '../lib/securityLog.js';
+import { mfaNotice } from './mfa.js';
 import { publishChange } from '../lib/realtime.js';
-import { hashRecovery, matchStep, newRecoveryCodes, newSecret, openSecret, otpauthUrl, sealSecret } from '../lib/totp.js';
+import { consumeMfaCode, finishEnrolment, lockedOut, mfaEnabled, recordMfaFailure, startEnrolment } from '../lib/mfa.js';
 import { queueResetEmail, rl } from './auth.js';
 
 const MFA_MAX_AGE_MS = 12 * 3600_000;
@@ -37,7 +38,7 @@ function requireAdminUser(req: FastifyRequest): Ctx {
 /** A platform admin whose session has passed the second step recently. */
 async function requireManager(req: FastifyRequest): Promise<Ctx> {
   const ctx = requireAdminUser(req);
-  const mfa = await one<{ enabled_at: Date | null }>(pool, 'select enabled_at from admin_mfa where user_id = $1', [ctx.user.id]);
+  const mfa = await one<{ enabled_at: Date | null }>(pool, 'select enabled_at from user_mfa where user_id = $1', [ctx.user.id]);
   const fresh = ctx.mfaVerifiedAt && Date.now() - new Date(ctx.mfaVerifiedAt).getTime() < MFA_MAX_AGE_MS;
   if (!mfa?.enabled_at || !fresh) throw new HttpError(403, 'mfa_required', 'Enter your authenticator code to continue.');
   return ctx;
@@ -80,53 +81,40 @@ export default async function managerRoutes(app: FastifyInstance) {
   app.get('/api/manager/me', async (req, reply) => {
     const ctx = requireAdminUser(req);
     reply.header('cache-control', 'no-store');
-    const mfa = await one<{ enabled_at: Date | null }>(pool, 'select enabled_at from admin_mfa where user_id = $1', [ctx.user.id]);
+    const mfa = await one<{ enabled_at: Date | null }>(pool, 'select enabled_at from user_mfa where user_id = $1', [ctx.user.id]);
     const fresh = !!ctx.mfaVerifiedAt && Date.now() - new Date(ctx.mfaVerifiedAt).getTime() < MFA_MAX_AGE_MS;
     return { email: ctx.user.email, name: ctx.user.name, enrolled: !!mfa?.enabled_at, verified: !!mfa?.enabled_at && fresh };
   });
 
   app.post('/api/manager/mfa/setup', rl(5), async (req) => {
     const ctx = requireAdminUser(req);
-    const have = await one<{ enabled_at: Date | null }>(pool, 'select enabled_at from admin_mfa where user_id = $1', [ctx.user.id]);
-    if (have?.enabled_at) throw conflict('The second step is already set up for this account.');
-    const secret = newSecret();
-    await pool.query(
-      `insert into admin_mfa (user_id, secret) values ($1, $2)
-       on conflict (user_id) do update set secret = excluded.secret, created_at = now()`,
-      [ctx.user.id, sealSecret(secret)],
-    );
-    return { secret, otpauth: otpauthUrl(ctx.user.email, secret) };
+    const r = await withTx((db) => startEnrolment(db, ctx.user.id, ctx.user.email));
+    if (!r) throw conflict('The second step is already set up for this account.');
+    return r;
   });
 
-  /** Sign-in failures on the second step lock the account like password failures do. */
-  async function failedCode(userId: string, req?: FastifyRequest) {
-    if (req) securityEvent(req, 'mfa_failed', { userId });
-    await pool.query(
-      `update users set failed_login_count = failed_login_count + 1,
-              locked_until = case when failed_login_count + 1 >= 10 then now() + interval '15 minutes' else locked_until end where id = $1`, [userId]);
+  async function failedCode(userId: string, req: FastifyRequest): Promise<never> {
+    securityEvent(req, 'mfa_failed', { userId });
+    await recordMfaFailure(pool, userId);
     throw unauthorized('That code is not right. Check your authenticator app and try again.');
   }
   async function checkNotLocked(userId: string) {
-    const u = await one<{ locked_until: Date | null }>(pool, 'select locked_until from users where id = $1', [userId]);
-    if (u?.locked_until && new Date(u.locked_until) > new Date()) throw new HttpError(423, 'locked', 'Too many wrong codes. Try again in 15 minutes.');
+    if (await lockedOut(pool, userId)) throw new HttpError(423, 'locked', 'Too many wrong codes. Try again in 15 minutes.');
   }
 
   app.post('/api/manager/mfa/enable', rl(10), async (req) => {
     const ctx = requireAdminUser(req);
     const { code } = z.object({ code: z.string().trim().max(10) }).parse(req.body);
     await checkNotLocked(ctx.user.id);
-    const row = await one<{ secret: string; enabled_at: Date | null }>(pool, 'select secret, enabled_at from admin_mfa where user_id = $1', [ctx.user.id]);
-    if (!row || row.enabled_at) throw conflict('Start the setup again.');
-    const secret = openSecret(row.secret);
-    const step = secret ? matchStep(secret, code) : null;
-    if (step === null) return failedCode(ctx.user.id, req);
-    const { codes, hashes } = newRecoveryCodes();
-    await withTx(async (db) => {
-      await db.query('update admin_mfa set enabled_at = now(), last_step = $2, recovery_hashes = $3 where user_id = $1', [ctx.user.id, step, hashes]);
+    const codes = await withTx(async (db) => {
+      const c = await finishEnrolment(db, ctx.user.id, code);
+      if (!c) return null;
       await db.query('update sessions set mfa_verified_at = now() where id = $1', [ctx.sessionId]);
       await logPlatformAction(db, ctx, 'Set up the second sign-in step', null, '', req.ip);
-      securityEvent(req, 'mfa_enrolled');
+      return c;
     });
+    if (!codes) return failedCode(ctx.user.id, req);
+    securityEvent(req, 'mfa_enrolled');
     return { ok: true, recoveryCodes: codes };
   });
 
@@ -134,28 +122,18 @@ export default async function managerRoutes(app: FastifyInstance) {
     const ctx = requireAdminUser(req);
     const { code } = z.object({ code: z.string().trim().min(1).max(20) }).parse(req.body);
     await checkNotLocked(ctx.user.id);
-    const row = await one<{ secret: string; enabled_at: Date | null; last_step: string; recovery_hashes: string[] }>(
-      pool, 'select secret, enabled_at, last_step, recovery_hashes from admin_mfa where user_id = $1', [ctx.user.id]);
-    if (!row?.enabled_at) throw conflict('Set up the second step first.');
-    let how = '';
-    await withTx(async (db) => {
-      const secret = openSecret(row.secret);
-      const step = secret && /^\d{6}$/.test(code) ? matchStep(secret, code) : null;
-      if (step !== null && step > Number(row.last_step)) {
-        await db.query('update admin_mfa set last_step = $2 where user_id = $1', [ctx.user.id, step]);
-        how = 'authenticator code';
-      } else if (!/^\d{6}$/.test(code) && row.recovery_hashes.includes(hashRecovery(code))) {
-        await db.query('update admin_mfa set recovery_hashes = array_remove(recovery_hashes, $2) where user_id = $1', [ctx.user.id, hashRecovery(code)]);
-        how = 'recovery code';
-      }
-      if (how) {
+    if (!(await mfaEnabled(pool, ctx.user.id))) throw conflict('Set up the second step first.');
+    const how = await withTx(async (db) => {
+      const h = await consumeMfaCode(db, ctx.user.id, code);
+      if (h) {
         await db.query('update sessions set mfa_verified_at = now() where id = $1', [ctx.sessionId]);
         await db.query('update users set failed_login_count = 0, locked_until = null where id = $1', [ctx.user.id]);
-        await logPlatformAction(db, ctx, 'Signed in to the manager portal', null, `with ${how}`, req.ip);
-        securityEvent(req, 'mfa_verified', { method: how });
+        await logPlatformAction(db, ctx, 'Signed in to the manager portal', null, `with ${h}`, req.ip);
       }
+      return h;
     });
     if (!how) return failedCode(ctx.user.id, req);
+    securityEvent(req, 'mfa_verified', { method: how });
     return { ok: true, usedRecoveryCode: how === 'recovery code' };
   });
 
@@ -263,7 +241,8 @@ export default async function managerRoutes(app: FastifyInstance) {
       many(pool,
         `select u.id, u.name, u.email, m.role, u.email_verified_at is not null as verified, u.created_at as "joinedAt",
                 (select max(s.last_seen_at) from sessions s where s.user_id = u.id) as "lastSeen",
-                exists (select 1 from email_outbox e where e.to_email = u.email and e.status = 'failed' and e.created_at > now() - interval '30 days') as "emailProblem"
+                exists (select 1 from email_outbox e where e.to_email = u.email and e.status = 'failed' and e.created_at > now() - interval '30 days') as "emailProblem",
+                exists (select 1 from user_mfa f where f.user_id = u.id and f.enabled_at is not null) as "mfa"
            from memberships m join users u on u.id = m.user_id where m.org_id = $1 order by m.created_at`, [id]),
       orgCounts(id),
       many(pool, `select reference, kind, plan_id as "planId", amount_cents as "amountCents", status, failure_reason as "failureReason", created_at as "createdAt", paid_at as "paidAt" from payments where org_id = $1 order by created_at desc limit 10`, [id]),
@@ -404,6 +383,27 @@ export default async function managerRoutes(app: FastifyInstance) {
       await logPlatformAction(db, ctx, 'Sent a password reset email', u.org_id, `to ${u.email}`, req.ip);
       return { ok: true };
     });
+  });
+
+  /** A customer lost their phone and recovery codes: remove their second step after checking who they are. */
+  app.post('/api/manager/users/:id/reset-mfa', rl(10), async (req) => {
+    const ctx = await requireManager(req);
+    const { id } = req.params as { id: string };
+    if (!isUuid(id)) throw notFound();
+    const { reason } = z.object({ reason: z.string().trim().min(3).max(300) }).parse(req.body);
+    const u = await withTx(async (db) => {
+      const user = await one<{ id: string; name: string; email: string; org_id: string | null }>(db,
+        `select u.id, u.name, u.email, (select m.org_id from memberships m where m.user_id = u.id limit 1) as org_id from users u where u.id = $1 and not u.is_demo`, [id]);
+      if (!user) throw notFound();
+      const r = await db.query('delete from user_mfa where user_id = $1', [id]);
+      if (!r.rowCount) throw conflict('This person does not have two-step sign-in on.');
+      await db.query('delete from sessions where user_id = $1', [id]);
+      await mfaNotice(db, user, false, 'COMVERA support');
+      await logPlatformAction(db, ctx, 'Reset two-step sign-in', user.org_id, `${user.email}: ${reason}`, req.ip);
+      return user;
+    });
+    securityEvent(req, 'mfa_reset_by_platform', { userId: u.id });
+    return { ok: true };
   });
 
   app.post('/api/manager/orgs/:id/extend-trial', rl(20), async (req) => {
