@@ -15,9 +15,10 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { many, one, pool, withTx } from '../db/pool.js';
-import { config, features, isPlatformAdmin, platformAdminCount } from '../config.js';
+import { config, features, platformAdminCount } from '../config.js';
 import { conflict, forbidden, HttpError, notFound, unauthorized } from '../lib/errors.js';
-import { isUuid, requireUser, type Ctx } from '../lib/authz.js';
+import { isUuid, type Ctx } from '../lib/authz.js';
+import { ANY_ORG, REAL_ORG, requireAdminUser, requireManager } from '../lib/managerAuth.js';
 import { PLANS, defaultPlanFor, type OrgKind } from '../lib/plans.js';
 import { logPlatformAction } from '../lib/platformLog.js';
 import { securityEvent } from '../lib/securityLog.js';
@@ -27,22 +28,6 @@ import { consumeMfaCode, finishEnrolment, lockedOut, mfaEnabled, recordMfaFailur
 import { queueResetEmail, rl } from './auth.js';
 
 const MFA_MAX_AGE_MS = 12 * 3600_000;
-const REAL_ORG = `not o.is_demo and o.managed_by_org is null`;
-
-function requireAdminUser(req: FastifyRequest): Ctx {
-  const ctx = requireUser(req.ctx);
-  if (!isPlatformAdmin(ctx.user)) throw notFound();
-  return ctx;
-}
-
-/** A platform admin whose session has passed the second step recently. */
-async function requireManager(req: FastifyRequest): Promise<Ctx> {
-  const ctx = requireAdminUser(req);
-  const mfa = await one<{ enabled_at: Date | null }>(pool, 'select enabled_at from user_mfa where user_id = $1', [ctx.user.id]);
-  const fresh = ctx.mfaVerifiedAt && Date.now() - new Date(ctx.mfaVerifiedAt).getTime() < MFA_MAX_AGE_MS;
-  if (!mfa?.enabled_at || !fresh) throw new HttpError(403, 'mfa_required', 'Enter your authenticator code to continue.');
-  return ctx;
-}
 
 const num = (v: unknown) => Number(v ?? 0);
 const page = z.coerce.number().int().min(0).max(1000).default(0);
@@ -164,96 +149,106 @@ export default async function managerRoutes(app: FastifyInstance) {
       one(pool, `select (select count(*) from feedback where handled_at is null)::int + (select count(*) from enquiries where handled_at is null)::int as open`),
     ]);
     const past = await q(`select count(*)::int as n from organisations o where ${REAL_ORG} and o.subscription_status = 'past_due'`);
-    return { orgs, status, paidPlans: plans, users, content, exchanges: exch, email: mail, payments: pay, openInbox: (inbox as { open: number }).open, pastDue: past };
+    const [accounts, recentOrgs, recentlyActive, recentActions] = await Promise.all([
+      one(pool, `select (select count(*) from organisations o where ${REAL_ORG})::int as orgs,
+                        (select count(*) from organisations o where ${REAL_ORG} and o.kind = 'host' and o.status = 'active')::int as "activeHosts",
+                        (select count(*) from organisations o where ${REAL_ORG} and o.kind = 'contractor' and o.status = 'active')::int as "activeContractors",
+                        (select count(*) from organisations o where ${REAL_ORG} and o.status <> 'active')::int as closed,
+                        (select count(*) from organisations o where ${ANY_ORG} and not o.is_demo and o.account_class <> 'customer')::int as "internalTest",
+                        (select count(*) from organisations o where ${ANY_ORG} and o.is_demo)::int as demo,
+                        (select count(*) from organisations o where ${ANY_ORG} and o.flag_kind is not null)::int + (select count(*) from users where flag_kind is not null)::int as flagged,
+                        (select count(*) from users where not is_demo and account_class = 'customer' and email_verified_at is null)::int as unverified,
+                        (select count(*) from user_invites where accepted_at is null and revoked_at is null and expires_at > now())::int
+                          + (select count(*) from site_invitations where status = 'pending')::int as "pendingInvites",
+                        (select count(*) from deletion_requests where status = 'scheduled')::int as "deletionsScheduled"`),
+      many(pool, `select o.id, o.name, o.kind, o.created_at as "at" from organisations o where ${REAL_ORG} order by o.created_at desc limit 6`),
+      many(pool, `select o.id, o.name, o.kind, max(s.last_seen_at) as "at" from organisations o join memberships m on m.org_id = o.id join sessions s on s.user_id = m.user_id
+                   where ${REAL_ORG} group by o.id order by max(s.last_seen_at) desc limit 6`),
+      many(pool, `select a.admin_email as "by", a.action, a.detail, a.created_at as "at", a.org_id as "orgId" from platform_actions a order by a.id desc limit 8`),
+    ]);
+    return { orgs, status, paidPlans: plans, users, content, exchanges: exch, email: mail, payments: pay, openInbox: (inbox as { open: number }).open, pastDue: past,
+      accounts, recentOrgs, recentlyActive, recentActions };
   });
 
-  // ---------- setup checklist: what is switched on, and what still needs doing ----------
+  // ---------- setup checklist: every item says what it is, why it matters, where to act, and its real state ----------
+  type Item = { id: string; title: string; status: 'done' | 'todo' | 'attention' | 'optional' | 'manual'; detail: string; why: string;
+    how: string; go: { view: string; label: string } | null; auto: boolean };
   app.get('/api/manager/setup', rl(30), async (req, reply) => {
     await requireManager(req);
     reply.header('cache-control', 'no-store');
     const host = new URL(config.APP_URL).hostname;
-    const [failedMail, priced, customers] = await Promise.all([
+    const [failedMail, priced, customers, ticked] = await Promise.all([
       one<{ n: number }>(pool, `select count(*)::int as n from email_outbox where status = 'failed' and created_at > now() - interval '30 days'`),
       one<{ n: number }>(pool, `select count(*)::int as n from plan_settings`),
       one<{ n: number }>(pool, `select count(*)::int as n from organisations o where ${REAL_ORG}`),
+      many<{ item_id: string; done_by: string; done_at: Date }>(pool, `select item_id, done_by, done_at from platform_checklist`),
     ]);
-    type Item = { id: string; title: string; status: 'done' | 'todo' | 'attention' | 'optional' | 'manual'; detail: string };
+    const tick = new Map(ticked.map((t) => [t.item_id, t]));
+    const onRender = /^localhost$|\.onrender\.com$/.test(host);
+    const mail = failedMail?.n ?? 0;
+    const manual = (id: string, title: string, detail: string, why: string, how: string): Item => {
+      const t = tick.get(id);
+      return { id, title, status: t ? 'done' : 'manual', detail: t ? `Ticked off by ${t.done_by} on ${t.done_at.toISOString().slice(0, 10)}.` : detail, why, how, go: null, auto: false };
+    };
     const items: Item[] = [
-      { id: 'domain', title: 'Your own web address', status: /^localhost$|\.onrender\.com$/.test(host) ? 'todo' : 'done',
-        detail: /^localhost$|\.onrender\.com$/.test(host) ? 'Links in emails still use ' + host + '. Connect comvera.co.za in Render (Settings → Custom Domains), then set APP_URL to https://comvera.co.za.' : 'Links in emails use ' + host + '.' },
-      { id: 'email', title: 'Email sending', status: !features.email ? 'todo' : (failedMail?.n ?? 0) > 0 ? 'attention' : 'done',
-        detail: !features.email ? 'Not switched on, so password resets, invitations and document requests cannot reach anyone. Set SMTP_URL and EMAIL_FROM in Render → Environment.' : (failedMail?.n ?? 0) > 0 ? (failedMail!.n + ' email(s) failed in the last 30 days. Open Needs attention.') : 'Switched on, and no failed emails in 30 days.' },
-      { id: 'support', title: 'A support email address on the site', status: config.SUPPORT_EMAIL ? 'done' : 'todo',
-        detail: config.SUPPORT_EMAIL ? 'Shown to customers: ' + config.SUPPORT_EMAIL : 'Set SUPPORT_EMAIL in Render so customers know where to write.' },
-      { id: 'mfakey', title: 'Authenticator secrets are encrypted', status: config.MFA_SECRET_KEY ? 'done' : 'todo',
-        detail: config.MFA_SECRET_KEY ? 'MFA_SECRET_KEY is set.' : 'Set MFA_SECRET_KEY in Render (16+ random characters), then set up your authenticator again.' },
-      { id: 'admins', title: 'Who can open this portal', status: platformAdminCount > 0 ? 'done' : 'todo',
-        detail: platformAdminCount + ' address' + (platformAdminCount === 1 ? '' : 'es') + ' on the list. Keep it to the people who really need it.' },
-      { id: 'payments', title: 'Taking payments', status: features.payments ? 'done' : 'optional',
-        detail: features.payments ? 'Switched on through ' + features.paymentProvider + '. Do a test purchase and a cancel before real customers pay.' : 'Not needed for a free pilot. To charge, open a Paystack account and set PAYSTACK_SECRET_KEY (test key first).' },
-      { id: 'plans', title: 'Plans and limits enforced', status: features.billing ? 'done' : 'optional',
-        detail: features.billing ? 'Trials and plan limits are on.' : 'Off: everyone has full access with no limits. Fine for a free pilot.' },
-      { id: 'prices', title: 'Prices reviewed', status: (priced?.n ?? 0) > 0 ? 'done' : 'optional',
-        detail: (priced?.n ?? 0) > 0 ? 'You have set your own prices.' : 'Still the starting prices. Review them under the Prices tab.' },
-      { id: 'storage', title: 'Where uploaded files are kept', status: config.STORAGE_DRIVER === 's3' ? 'done' : 'optional',
-        detail: config.STORAGE_DRIVER === 's3' ? 'Private cloud storage.' : 'On the server’s own disk. Fine to start; move to private cloud storage before you have many customers.' },
-      { id: 'ai', title: 'AI drafting', status: features.ai ? 'done' : 'optional',
-        detail: features.ai ? 'Switched on.' : 'Off: documents use the built-in templates. Add ANTHROPIC_API_KEY to switch AI on.' },
-      { id: 'firstcustomer', title: 'A first real customer', status: (customers?.n ?? 0) > 1 ? 'done' : 'optional',
-        detail: (customers?.n ?? 0) > 1 ? (customers!.n + ' organisations so far.') : 'Invite 2–3 friendly mines and their contractors for a free pilot.' },
-      { id: 'legal', title: 'Privacy and Terms checked by a lawyer', status: 'manual', detail: 'The pages are drafts. Have a South African attorney review them before public launch.' },
-      { id: 'popia', title: 'POPIA paperwork', status: 'manual', detail: 'Register an Information Officer, and sign data agreements with Render, your email provider and Paystack.' },
-      { id: 'backup', title: 'A backup restore test', status: 'manual', detail: 'In Render, restore the latest database backup into a NEW database and open a site. 15 minutes, once a month.' },
+      { id: 'domain', title: 'Your own web address', status: onRender ? 'todo' : 'done', auto: true,
+        detail: onRender ? 'Links in emails still use ' + host + '.' : 'Links in emails use ' + host + '.',
+        why: 'Customers trust a comvera.co.za link far more than a technical one, and emails link back to this address.',
+        how: 'In Render: Settings → Custom Domains → add comvera.co.za. Then set APP_URL to https://comvera.co.za under Environment.', go: null },
+      { id: 'email', title: 'Email sending', status: !features.email ? 'todo' : mail > 0 ? 'attention' : 'done', auto: true,
+        detail: !features.email ? 'Not switched on.' : mail > 0 ? mail + ' email(s) failed in the last 30 days.' : 'Switched on, and no failed emails in 30 days.',
+        why: 'Without email, sign-up confirmation, password resets, invitations and document requests cannot reach anyone.',
+        how: 'In Render → Environment set SMTP_URL and EMAIL_FROM. Failed emails can be re-sent from Needs attention.', go: mail > 0 ? { view: 'attention', label: 'Open needs attention' } : null },
+      { id: 'support', title: 'A support email address on the site', status: config.SUPPORT_EMAIL ? 'done' : 'todo', auto: true,
+        detail: config.SUPPORT_EMAIL ? 'Shown to customers: ' + config.SUPPORT_EMAIL : 'Not set.',
+        why: 'Customers need somewhere to write when something goes wrong.', how: 'In Render → Environment set SUPPORT_EMAIL.', go: null },
+      { id: 'mfakey', title: 'Authenticator secrets are encrypted', status: config.MFA_SECRET_KEY ? 'done' : 'todo', auto: true,
+        detail: config.MFA_SECRET_KEY ? 'MFA_SECRET_KEY is set.' : 'MFA_SECRET_KEY is not set, so authenticator secrets are stored unencrypted.',
+        why: 'If the database were ever copied, encrypted secrets could not be used to generate your sign-in codes.',
+        how: 'In Render → Environment set MFA_SECRET_KEY to 16 or more random characters, then set up your authenticator again.', go: null },
+      { id: 'admins', title: 'Who can open this portal', status: platformAdminCount > 0 ? 'done' : 'todo', auto: true,
+        detail: platformAdminCount + ' address' + (platformAdminCount === 1 ? '' : 'es') + ' on the list.',
+        why: 'Everyone on this list can see every customer and suspend accounts, so keep it to the people who truly need it.',
+        how: 'The list is PLATFORM_ADMIN_EMAILS in Render → Environment. Each address must also have confirmed their email.', go: null },
+      { id: 'payments', title: 'Taking payments', status: features.payments ? 'done' : 'optional', auto: true,
+        detail: features.payments ? 'Switched on through ' + features.paymentProvider + '.' : 'Not switched on.',
+        why: 'Needed only when you start charging. A free pilot works without it.',
+        how: 'Open a Paystack account and set PAYSTACK_SECRET_KEY in Render (test key first). Do a test purchase and a cancel before real customers pay.', go: { view: 'pricing', label: 'Review prices' } },
+      { id: 'plans', title: 'Plans and limits enforced', status: features.billing ? 'done' : 'optional', auto: true,
+        detail: features.billing ? 'Trials and plan limits are on.' : 'Off: everyone has full access with no limits.',
+        why: 'Fine for a free pilot. Switch it on when you want trials to end and limits to apply.', how: 'Set ENFORCE_PLANS=true in Render → Environment.', go: null },
+      { id: 'prices', title: 'Prices reviewed', status: (priced?.n ?? 0) > 0 ? 'done' : 'optional', auto: true,
+        detail: (priced?.n ?? 0) > 0 ? 'You have set your own prices.' : 'Still the starting prices.',
+        why: 'The public pricing page and what customers are charged both come from these prices.', how: 'Open Prices and save each plan once you are happy with it.', go: { view: 'pricing', label: 'Open prices' } },
+      { id: 'storage', title: 'Where uploaded files are kept', status: config.STORAGE_DRIVER === 's3' ? 'done' : 'optional', auto: true,
+        detail: config.STORAGE_DRIVER === 's3' ? 'Private cloud storage.' : 'On the server’s own disk.',
+        why: 'Files on the server disk are lost if the server is rebuilt. Fine to start; move to private cloud storage before you have many customers.', how: 'Set STORAGE_DRIVER=s3 and the bucket settings in Render → Environment.', go: null },
+      { id: 'ai', title: 'AI drafting', status: features.ai ? 'done' : 'optional', auto: true,
+        detail: features.ai ? 'Switched on.' : 'Off: documents use the built-in templates.',
+        why: 'Switches on the AI assistant and AI-assisted drafting. Everything still works without it.', how: 'Add ANTHROPIC_API_KEY in Render → Environment.', go: null },
+      { id: 'firstcustomer', title: 'A first real customer', status: (customers?.n ?? 0) > 1 ? 'done' : 'optional', auto: true,
+        detail: (customers?.n ?? 0) > 1 ? (customers!.n + ' customer organisations so far.') : 'No customers yet apart from your own.',
+        why: 'Real use is the only way to learn what matters. Test accounts do not count here.', how: 'Invite two or three friendly mines and their contractors for a free pilot.', go: { view: 'customers', label: 'Open customers' } },
+      manual('testaccounts', 'Your own test accounts are marked as tests', 'Tick when your own test organisations are marked Internal test.',
+        'Marked test accounts leave your customer counts and statistics, so the numbers you read are real.', 'Open Customers, open each of your own test organisations and choose Mark as internal test.'),
+      manual('legal', 'Privacy and Terms checked by a lawyer', 'The pages are drafts.', 'You are collecting personal information. A South African attorney should confirm the pages say what is true and legal.', 'Send /privacy and /terms to your attorney, then tick this when they have signed off.'),
+      manual('popia', 'POPIA paperwork', 'Not done yet.', 'POPIA expects an Information Officer and written agreements with the companies that handle customer data for you.', 'Register an Information Officer, and sign data agreements with Render, your email provider and Paystack.'),
+      manual('backup', 'A backup restore test', 'Not done yet.', 'A backup you have never restored is only a hope.', 'In Render, restore the latest database backup into a NEW database and open a site. 15 minutes, once a month.'),
     ];
     return { items };
   });
 
-  // ---------- customers ----------
-  app.get('/api/manager/orgs', rl(60), async (req, reply) => {
-    await requireManager(req);
-    reply.header('cache-control', 'no-store');
-    const f = z.object({ q: z.string().trim().max(100).default(''), kind: z.enum(['', 'host', 'contractor']).default(''), status: z.string().max(30).default(''), page }).parse(req.query);
-    const rows = await many(pool,
-      `select o.id, o.name, o.kind, o.plan, coalesce(o.subscription_status, 'none') as status, o.trial_ends_at as "trialEndsAt", o.created_at as "createdAt",
-              (select count(*) from memberships m where m.org_id = o.id)::int as members,
-              (select max(s.last_seen_at) from sessions s join memberships m on m.user_id = s.user_id where m.org_id = o.id) as "lastActive",
-              (select count(*) from workplaces w where w.org_id = o.id and w.archived_at is null)::int as workplaces,
-              (select count(*) from sites s where s.org_id = o.id and s.status <> 'declined')::int as files
-         from organisations o
-        where ${REAL_ORG} and ($1 = '' or o.name ilike '%' || $1 || '%' or exists (select 1 from memberships m join users u on u.id = m.user_id where m.org_id = o.id and u.email ilike '%' || $1 || '%'))
-          and ($2 = '' or o.kind = $2) and ($3 = '' or coalesce(o.subscription_status, 'none') = $3)
-        order by o.created_at desc limit 26 offset $4`, [f.q, f.kind, f.status, f.page * 25]);
-    return { orgs: rows.slice(0, 25), more: rows.length > 25 };
-  });
-
-  app.get('/api/manager/orgs/:id', rl(60), async (req, reply) => {
-    await requireManager(req);
-    reply.header('cache-control', 'no-store');
-    const { id } = req.params as { id: string };
-    if (!isUuid(id)) throw notFound();
-    const org = await one<Record<string, unknown>>(pool,
-      `select o.id, o.name, o.kind, o.plan, coalesce(o.subscription_status, 'none') as status, o.trial_ends_at as "trialEndsAt", o.current_period_end as "periodEnd",
-              o.grant_plan as "grantPlan", o.grant_until as "grantUntil", o.grant_source as "grantSource", o.seat_limit as "seatLimit", o.created_at as "createdAt",
-              o.billing_provider as "billingProvider", (o.paystack_subscription_code is not null) as "hasPaystackSubscription", (o.stripe_subscription_id is not null) as "hasStripeSubscription"
-         from organisations o where o.id = $1 and ${REAL_ORG}`, [id]);
-    if (!org) throw notFound();
-    const [members, counts, payments, actions, grant] = await Promise.all([
-      many(pool,
-        `select u.id, u.name, u.email, m.role, u.email_verified_at is not null as verified, u.created_at as "joinedAt",
-                (select max(s.last_seen_at) from sessions s where s.user_id = u.id) as "lastSeen",
-                exists (select 1 from email_outbox e where e.to_email = u.email and e.status = 'failed' and e.created_at > now() - interval '30 days') as "emailProblem",
-                exists (select 1 from user_mfa f where f.user_id = u.id and f.enabled_at is not null) as "mfa"
-           from memberships m join users u on u.id = m.user_id where m.org_id = $1 order by m.created_at`, [id]),
-      orgCounts(id),
-      many(pool, `select reference, kind, plan_id as "planId", amount_cents as "amountCents", status, failure_reason as "failureReason", created_at as "createdAt", paid_at as "paidAt" from payments where org_id = $1 order by created_at desc limit 10`, [id]),
-      many(pool, `select admin_email as "by", action, detail, created_at as "at" from platform_actions where org_id = $1 order by created_at desc limit 10`, [id]),
-      activeGrant(id),
-    ]);
-    return {
-      org: { ...org, planName: (PLANS as Record<string, { name: string }>)[org.plan as string]?.name ?? org.plan },
-      members, counts, payments, actions,
-      supportAccess: grant ? { expiresAt: grant.expires_at, grantedBy: grant.granted_by_name, reason: grant.reason } : null,
-    };
+  /** Only items that are done by hand can be ticked here; the rest are worked out from the real settings. */
+  app.post('/api/manager/setup/:id', rl(30), async (req) => {
+    const ctx = await requireManager(req);
+    const { id } = z.object({ id: z.enum(['testaccounts', 'legal', 'popia', 'backup']) }).parse(req.params);
+    const { done } = z.object({ done: z.boolean() }).parse(req.body);
+    return withTx(async (db) => {
+      if (done) await db.query(`insert into platform_checklist (item_id, done_by) values ($1, $2) on conflict (item_id) do update set done_by = $2, done_at = now()`, [id, ctx.user.email]);
+      else await db.query('delete from platform_checklist where item_id = $1', [id]);
+      await logPlatformAction(db, ctx, (done ? 'Ticked' : 'Un-ticked') + ' a setup item', null, id, req.ip);
+      return { ok: true };
+    });
   });
 
   /**
@@ -265,9 +260,11 @@ export default async function managerRoutes(app: FastifyInstance) {
     reply.header('cache-control', 'no-store');
     const { id } = req.params as { id: string };
     if (!isUuid(id)) throw notFound();
+    // Every look needs a stated reason, which goes into both the platform log and the customer's own audit trail.
+    const { reason } = z.object({ reason: z.string().trim().min(3).max(200) }).parse(req.query);
     const grant = await activeGrant(id);
     if (!grant) throw forbidden('This customer has not switched on support access. Ask them to turn it on under Settings.');
-    const org = await one<{ id: string; name: string }>(pool, `select o.id, o.name from organisations o where o.id = $1 and ${REAL_ORG}`, [id]);
+    const org = await one<{ id: string; name: string }>(pool, `select o.id, o.name from organisations o where o.id = $1 and ${ANY_ORG}`, [id]);
     if (!org) throw notFound();
     const [sites, docs, audit] = await Promise.all([
       many(pool,
@@ -285,10 +282,10 @@ export default async function managerRoutes(app: FastifyInstance) {
       many(pool, `select actor_name as "who", actor_role as "role", action, detail, created_at as "at" from audit_events where org_id = $1 order by created_at desc limit 50`, [id]),
     ]);
     await withTx(async (db) => {
-      await logPlatformAction(db, ctx, 'Viewed customer account (support access)', id, `${org.name}; grant until ${new Date(grant.expires_at).toISOString()}`, req.ip);
+      await logPlatformAction(db, ctx, 'Viewed customer account (support access)', id, `${org.name}; ${reason}; grant until ${new Date(grant.expires_at).toISOString()}`, req.ip);
       await db.query(
         `insert into audit_events (org_id, actor_id, actor_name, actor_role, action, detail) values ($1, $2, $3, 'COMVERA support', 'COMVERA support viewed this account', $4)`,
-        [id, ctx.user.id, ctx.user.name, 'Read-only, using the support access you switched on.'],
+        [id, ctx.user.id, ctx.user.name, 'Reason: ' + reason + '. Read-only, using the support access you switched on.'],
       );
     });
     return { org, grantExpiresAt: grant.expires_at, sites, documents: docs, recentActivity: audit };
@@ -377,7 +374,7 @@ export default async function managerRoutes(app: FastifyInstance) {
     return withTx(async (db) => {
       const u = await one<{ id: string; name: string; email: string; org_id: string }>(db,
         `select u.id, u.name, u.email, m.org_id from users u join memberships m on m.user_id = u.id join organisations o on o.id = m.org_id
-          where u.id = $1 and not u.is_demo and ${REAL_ORG} limit 1`, [id]);
+          where u.id = $1 and not u.is_demo and ${ANY_ORG} limit 1`, [id]);
       if (!u) throw notFound();
       await queueResetEmail(db, u);
       await logPlatformAction(db, ctx, 'Sent a password reset email', u.org_id, `to ${u.email}`, req.ip);
@@ -413,7 +410,7 @@ export default async function managerRoutes(app: FastifyInstance) {
     if (!isUuid(id)) throw notFound();
     return withTx(async (db) => {
       const o = await one<{ id: string; kind: OrgKind; status: string; name: string }>(db,
-        `select o.id, o.kind, coalesce(o.subscription_status, 'none') as status, o.name from organisations o where o.id = $1 and ${REAL_ORG} for update`, [id]);
+        `select o.id, o.kind, coalesce(o.subscription_status, 'none') as status, o.name from organisations o where o.id = $1 and ${ANY_ORG} for update`, [id]);
       if (!o) throw notFound();
       if (['active', 'past_due'].includes(o.status)) throw conflict('This customer has a paid subscription, so there is no trial to extend.');
       const plan = defaultPlanFor(o.kind).plan;

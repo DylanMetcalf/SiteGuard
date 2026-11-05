@@ -81,28 +81,29 @@ describe('manager portal: what it shows', () => {
     assert.equal(list.length, 1);
     const d = (await ops.get(`/api/manager/orgs/${mineOrg}`)).body;
     assert.equal(d.org.name, 'Manager Test Mining');
-    assert.equal(d.counts.workplaces, 1);
-    assert.equal(d.counts.documentsByStatus.missing ?? 1, 1);
-    assert.ok(d.members.some((m: { email: string }) => m.email === 'owner.mgr@example.com'));
+    assert.equal(d.sites.length, 1);
+    const people = (await ops.get(`/api/manager/users?orgId=${mineOrg}`)).body.users;
+    assert.ok(people.some((m: { email: string }) => m.email === 'owner.mgr@example.com'));
     assert.equal(d.supportAccess, null);
     assert.equal(JSON.stringify(d).includes('Letter of Good Standing'), false, 'no document names without support access');
   });
 
   it('keeps the inside of an account closed until the customer opens it, then records every look', async () => {
-    assert.equal((await ops.get(`/api/manager/orgs/${mineOrg}/support-view`)).status, 403);
+    assert.equal((await ops.get(`/api/manager/orgs/${mineOrg}/support-view?reason=Helping+with+setup`)).status, 403);
     assert.equal((await other.post('/api/support-access', { hours: 1 })).status, 200, 'its own admin may');
     const g = await mine.post('/api/support-access', { hours: 2, reason: 'Help setting up requirements' });
     assert.equal(g.status, 200, JSON.stringify(g.body));
-    const v = await ops.get(`/api/manager/orgs/${mineOrg}/support-view`);
+    assert.equal((await ops.get(`/api/manager/orgs/${mineOrg}/support-view`)).status, 400, 'a reason is required');
+    const v = await ops.get(`/api/manager/orgs/${mineOrg}/support-view?reason=Helping+with+setup`);
     assert.equal(v.status, 200, JSON.stringify(v.body));
     assert.ok(v.body.documents.some((x: { name: string }) => x.name === 'Letter of Good Standing (COID)'));
     assert.ok(!('storage_key' in (v.body.documents[0] ?? {})), 'never file contents');
     const trail = (await pool.query(`select action from audit_events where org_id = $1 order by created_at desc limit 5`, [mineOrg])).rows.map((r) => r.action);
     assert.ok(trail.includes('COMVERA support viewed this account'));
     // Another customer's grant never opens this one.
-    assert.equal((await ops.get(`/api/manager/orgs/${otherOrg}/support-view`)).status, 200, 'its own grant works');
+    assert.equal((await ops.get(`/api/manager/orgs/${otherOrg}/support-view?reason=Checking+its+own+grant`)).status, 200, 'its own grant works');
     assert.equal((await mine.post('/api/support-access/revoke')).status, 200);
-    assert.equal((await ops.get(`/api/manager/orgs/${mineOrg}/support-view`)).status, 403);
+    assert.equal((await ops.get(`/api/manager/orgs/${mineOrg}/support-view?reason=Helping+with+setup`)).status, 403);
   });
 
   it('customers cannot use the portal, and cannot grant for someone else', async () => {

@@ -5,6 +5,12 @@ Newest first.
 
 ---
 
+**DECISION** Account control for the platform owner: status (active/suspended/deactivated), flags, test classification and permanent deletion are separate operations. Deletion waits 14 days after scheduling, needs password + fresh authenticator code + typed name, keeps a permanent ledger including payment records, and is never triggered automatically. The console may show site and contractor names without a customer grant; documents and activity still need one, plus a stated reason.
+**REASON** Gives the owner real authority over customer accounts (spam, test accounts, deletion requests) without a hidden backdoor, an accident-prone delete, or loss of financial records. The 14-day wait and retention periods are working defaults for the owner to confirm; a lawyer should confirm retention.
+**DATE** 2026-11-05
+
+---
+
 **DECISION** Two-step sign-in for customers is optional per person and can be required per organisation by its admin; there is no SMS option, and support resets it only through the manager portal with a reason.
 **REASON** Closes SEC-010 with the authenticator code system already used for platform admins; SMS codes are weaker and cost money; one organisation's rule applies to its members only, never to other organisations they belong to beyond blocking access until set up.
 **DATE** 2026-11-04

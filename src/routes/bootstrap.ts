@@ -392,7 +392,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
     const orgs = await many(
       pool,
       `select o.id, o.name, o.kind, m.role, o.is_demo from memberships m join organisations o on o.id = m.org_id
-        where m.user_id = $1 order by o.name`,
+        where m.user_id = $1 and o.status = 'active' order by o.name`,
       [ctx.user.id],
     );
     const me = {

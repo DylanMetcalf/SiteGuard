@@ -44,6 +44,7 @@ import workforceRoutes from './routes/workforce.js';
 import exchangeRoutes from './routes/exchange.js';
 import templateRoutes from './routes/templates.js';
 import managerRoutes from './routes/manager.js';
+import managerAccountRoutes from './routes/managerAccounts.js';
 import mfaRoutes from './routes/mfa.js';
 import { mustSetUpMfa } from './lib/mfa.js';
 import supportAccessRoutes from './routes/supportAccess.js';
@@ -225,6 +226,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(exchangeRoutes);
   await app.register(templateRoutes);
   await app.register(managerRoutes);
+  await app.register(managerAccountRoutes);
   await app.register(mfaRoutes);
   await app.register(supportAccessRoutes);
   await app.register(exchangePortalRoutes);
