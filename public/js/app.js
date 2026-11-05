@@ -15,6 +15,9 @@ import './builder.js';
 import './safetyfiles.js';
 import { maybeOfferTour } from './tour.js';
 import { renderMfaGate } from './mfa.js';
+import { renderVerifyGate, renderOnboarding, renderOnboardingWait } from './onboarding.js';
+import { mountOscar } from './assistant.js';
+import { invalidateDocstore } from './docstore.js';
 
 const app = document.getElementById('app');
 
@@ -71,7 +74,10 @@ function render(){
     wasOutside = true;
     return;
   }
+  // The server decides these; the page only shows the matching screen (every API call is refused meanwhile).
+  if(b.verifyRequired){ app.innerHTML = renderVerifyGate(); stopLive(); return; }
   if(b.mfaSetupRequired){ app.innerHTML = renderMfaGate(); stopLive(); return; }
+  if(b.onboardingRequired){ app.innerHTML = b.canSetUp ? renderOnboarding(false) : renderOnboardingWait(); stopLive(); wasOutside = true; return; }
   if(!b.org){ app.innerHTML = renderNoOrg(); stopLive(); return; }
   // Don't yank the page out from under someone typing in it.
   const active = document.activeElement;
@@ -87,6 +93,7 @@ function render(){
   syncHistory();
   if(arriving) window.scrollTo(0, 0); else if(S.keepScroll || typing) window.scrollTo(0, y);
   if(typing){ const n = document.querySelector('[data-search="'+typing.key+'"]'); if(n){ n.focus(); try{ n.setSelectionRange(typing.pos, typing.pos); }catch{ /* search inputs in some browsers */ } } }
+  if(S.nav==='oscar') mountOscar();
   startLive();
   maybeOfferTour();
 }
@@ -142,7 +149,7 @@ function startLive(){
   es.addEventListener('open', ()=>{ if(!S.live){ S.live = true; updateLiveDot(); } });
   es.addEventListener('change', ()=>{
     clearTimeout(refetchTimer);
-    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>{ refreshReview(); refreshStudio(); refreshGuide(); refreshExchanges(); }).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
+    refetchTimer = setTimeout(()=>{ S.keepScroll = true; S.deferRender = true; reload().then(()=>{ refreshReview(); invalidateDocstore(); refreshStudio(); refreshGuide(); refreshExchanges(); }).catch(()=>{}).finally(()=>{ S.keepScroll = false; S.deferRender = false; }); }, 250);
   });
   es.addEventListener('error', ()=>{
     S.live = false; updateLiveDot();

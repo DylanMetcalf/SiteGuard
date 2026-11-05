@@ -3,6 +3,7 @@
 
 let csrfToken = '';
 export function setCsrf(token) { csrfToken = token || ''; }
+export const csrf = () => csrfToken;
 
 export class ApiError extends Error {
   constructor(status, code, message) {

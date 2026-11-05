@@ -27,7 +27,7 @@ describe('lifetime access with a promo code at sign-up', () => {
     const org = (await pool.query(`select o.id, o.grant_plan, o.grant_until from organisations o where o.name = 'Mom Consulting'`)).rows[0];
     assert.equal(org.grant_plan, 'contractor_pro');
     assert.equal(org.grant_until, null);
-    await pool.query(`update organisations set trial_ends_at = now() - interval '30 days' where id = $1`, [org.id]);
+    await pool.query(`update organisations set trial_ends_at = now() - interval '30 days', onboarding_completed_at = now() where id = $1`, [org.id]);
     const a = new Agent(app);
     await a.post('/api/auth/login', { email, password: PASSWORD });
     const s = await a.state();

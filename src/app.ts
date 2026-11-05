@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ZodError } from 'zod';
-import { config, isProd } from './config.js';
+import { config, features, isProd } from './config.js';
 import { HttpError } from './lib/errors.js';
 import type { Ctx } from './lib/authz.js';
 import { renewCookie, resolveSession, SESSION_COOKIE } from './lib/sessions.js';
@@ -47,6 +47,9 @@ import managerRoutes from './routes/manager.js';
 import managerAccountRoutes from './routes/managerAccounts.js';
 import mfaRoutes from './routes/mfa.js';
 import { mustSetUpMfa } from './lib/mfa.js';
+import { mustOnboard } from './lib/onboarding.js';
+import onboardingRoutes from './routes/onboarding.js';
+import orgDocumentRoutes from './routes/orgDocuments.js';
 import supportAccessRoutes from './routes/supportAccess.js';
 import exchangePortalRoutes from './routes/exchangePortal.js';
 
@@ -62,6 +65,13 @@ const publicDir = path.resolve(here, '../public');
 /** Paths that authenticate some other way (e.g. Stripe signature) and skip CSRF checks. */
 const MFA_SETUP_ALLOWED = ['/api/bootstrap', '/api/me/mfa', '/api/auth/logout', '/api/auth/switch-org', '/api/auth/verify-email',
   '/api/auth/resend-verification', '/api/auth/invite', '/api/client-errors', '/api/events'];
+
+/** Before the email is confirmed: only signing in and out, confirming, and the minimal start-up data. */
+const VERIFY_ALLOWED = ['/api/bootstrap', '/api/auth', '/api/me/mfa', '/api/client-errors', '/api/events'];
+/** Before set-up is finished: set-up itself and what it needs (creating a site, uploading documents, joining a site). */
+const ONBOARDING_ALLOWED = ['/api/bootstrap', '/api/onboarding', '/api/auth', '/api/me', '/api/org-docs', '/api/workplaces', '/api/templates', '/api/requirement-templates', '/api/sites/join',
+  '/api/files', '/api/client-errors', '/api/events', '/api/support-access', '/api/billing', '/api/org/require-mfa', '/api/org/invites'];
+const allowed = (list: string[], p: string) => list.some((x) => p === x || p.startsWith(x + '/'));
 
 const CSRF_EXEMPT = new Set(['/api/billing/webhook', '/api/billing/paystack/webhook']);
 /** The Exchange portal has its own short sessions and CSRF header (routes/exchangePortal.ts). */
@@ -144,6 +154,12 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     if (req.ctx) req.ctx.write = mutating;
     const pathOnly = req.url.split('?')[0];
     // An organisation that requires the second step: members without it can only set it up (or sign out/switch).
+    if (req.ctx && features.verifyEmail && !req.ctx.user.email_verified_at && !req.ctx.user.is_demo && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !allowed(VERIFY_ALLOWED, pathOnly)) {
+      throw new HttpError(403, 'email_unverified', 'Confirm your email address first: open the link we emailed you.');
+    }
+    if (req.ctx?.org && mustOnboard(req.ctx as { org: { onboarding_completed_at?: unknown; is_demo?: boolean } }) && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !allowed(ONBOARDING_ALLOWED, pathOnly)) {
+      throw new HttpError(403, 'onboarding_required', 'Finish setting up your organisation first.');
+    }
     if (req.ctx?.org && mustSetUpMfa(req.ctx) && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !MFA_SETUP_ALLOWED.some((p) => pathOnly === p || pathOnly.startsWith(p + '/'))) {
       throw new HttpError(403, 'mfa_setup_required', 'Your organisation requires two-step sign-in. Set it up under Profile → Security to continue.');
     }
@@ -228,6 +244,8 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(managerRoutes);
   await app.register(managerAccountRoutes);
   await app.register(mfaRoutes);
+  await app.register(onboardingRoutes);
+  await app.register(orgDocumentRoutes);
   await app.register(supportAccessRoutes);
   await app.register(exchangePortalRoutes);
 
