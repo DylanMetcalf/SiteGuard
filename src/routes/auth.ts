@@ -151,6 +151,7 @@ export default async function authRoutes(app: FastifyInstance) {
         );
         if (!inv) throw badRequest('That invitation link has expired or was already used. Ask for a new one.', 'invalid_invite');
         if (inv.email.toLowerCase() !== body.email) throw badRequest(`This invitation was sent to ${inv.email}. Sign up with that address.`, 'invite_email_mismatch');
+        if (!(await one(db, `select 1 from organisations where id = $1 and status = 'active'`, [inv.org_id]))) throw badRequest('That organisation is not accepting new people right now.', 'invalid_invite');
         orgId = inv.org_id;
         role = inv.role;
         verified = true; // they proved control of the address by opening the link
@@ -336,7 +337,7 @@ export default async function authRoutes(app: FastifyInstance) {
       await db.query('delete from login_challenges where user_id = $1', [row.user_id]);
       securityEvent(req, 'password_reset_completed', { userId: row.user_id });
       const u = await one<{ last_active_org_id: string | null }>(db, 'select last_active_org_id from users where id = $1', [row.user_id]);
-      const m = await one<{ org_id: string }>(db, 'select org_id from memberships where user_id = $1 order by (org_id = $2) desc limit 1', [row.user_id, u?.last_active_org_id]);
+      const m = await one<{ org_id: string }>(db, `select m.org_id from memberships m join organisations o on o.id = m.org_id where m.user_id = $1 and o.status = 'active' order by (m.org_id = $2) desc limit 1`, [row.user_id, u?.last_active_org_id]);
       // With a second step on, the reset alone never signs anyone in: an email inbox is not two factors.
       const st = await one<{ status: string }>(db, 'select status from users where id = $1', [row.user_id]);
       if (keepLock || st?.status !== 'active') return { signIn: true };

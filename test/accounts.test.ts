@@ -262,6 +262,86 @@ describe('permanent deletion of an organisation', () => {
   });
 });
 
+describe('review fixes: deletion edge cases and closed-organisation surfaces', () => {
+  let dee: Agent, deeId = '', deeEmail = '';
+  before(async () => {
+    ({ agent: dee, email: deeEmail } = await signup(app, { orgName: 'Dee Haulage', orgKind: 'contractor' }));
+    deeId = (await dee.state()).org.id;
+  });
+
+  it('an organisation that received an exchange upload can still be deleted (restricting foreign key)', async () => {
+    // Dee has sent an exchange whose recipient uploaded a file: the submission references the file with ON DELETE RESTRICT.
+    await storage.put('acct-test/dee-upload.pdf', PDF, 'application/pdf');
+    const f = (await pool.query(`insert into files (org_id, storage_key, filename, content_type, size_bytes, sha256) values ($1, 'acct-test/dee-upload.pdf', 'u.pdf', 'application/pdf', $2, 'x') returning id`, [deeId, PDF.length])).rows[0].id;
+    const x = (await pool.query(`insert into exchanges (direction, sender_org_id, recipient_email, link_token_hash, access_expires_at) values ('request', $1, 'guest@example.com', 'tok-dee-1', now() + interval '1 day') returning id`, [deeId])).rows[0].id;
+    const item = (await pool.query(`insert into exchange_items (exchange_id, document_type) values ($1, 'COID letter') returning id`, [x])).rows[0].id;
+    await pool.query(`insert into exchange_submissions (item_id, version, file_id, submitted_by_email) values ($1, 1, $2, 'guest@example.com')`, [item, f]);
+    assert.equal((await ops.post(`/api/manager/orgs/${deeId}/status`, { status: 'deactivated', reason: 'Customer asked to close', confirmName: 'Dee Haulage' })).status, 200);
+    const sched = await ops.post(`/api/manager/orgs/${deeId}/deletion/schedule`, stepUp({ reason: 'Customer request', confirmName: 'Dee Haulage' }));
+    assert.equal(sched.status, 200, JSON.stringify(sched.body));
+    const stored = (await pool.query(`select impact from deletion_requests where org_id = $1`, [deeId])).rows[0].impact;
+    assert.deepEqual(stored.people.list, [], 'no names or emails kept in the request');
+    await pool.query(`update deletion_requests set scheduled_for = now() - interval '1 minute' where org_id = $1`, [deeId]);
+    const r = await ops.post(`/api/manager/orgs/${deeId}/deletion/execute`, stepUp({ confirmName: 'Dee Haulage' }));
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal((await pool.query('select 1 from organisations where id = $1', [deeId])).rowCount, 0);
+    await assert.rejects(storage.read('acct-test/dee-upload.pdf'));
+    assert.deepEqual((await pool.query(`select impact from deletion_requests where org_id = $1`, [deeId])).rows[0].impact, {}, 'cleared once complete');
+  });
+
+  it('shows documents at other organisations that would lose their file', async () => {
+    const p = await ops.get(`/api/manager/orgs/${ceeId}/deletion-preview`);
+    assert.equal(typeof p.body.impact.relationships.documentsAtOtherOrganisationsLoseTheirFile, 'number');
+  });
+
+  it('refuses to close or delete an organisation that contains a platform owner, even before the owner confirms their email', async () => {
+    await pool.query(`update users set email_verified_at = null where email = 'ops@comvera.test'`);
+    const opsOrg = (await ops.state()).org?.id ?? (await pool.query(`select m.org_id from memberships m join users u on u.id = m.user_id where u.email = 'ops@comvera.test'`)).rows[0].org_id;
+    await pool.query(`update users set email_verified_at = now() where email = 'ops@comvera.test'`);
+    const r = await ops.post(`/api/manager/orgs/${opsOrg}/status`, { status: 'deactivated', reason: 'Testing it', confirmName: 'COMVERA Ops' });
+    assert.equal(r.status, 409);
+  });
+
+  it('a person in two organisations lands in the open one when the other is closed, and cannot switch into the closed one', async () => {
+    const dual = (await signup(app, { orgName: 'Dual Closed Co', orgKind: 'host' })).email;
+    const dualAgent = new Agent(app);
+    await dualAgent.post('/api/auth/login', { email: dual, password: PASSWORD });
+    const closedId = (await dualAgent.state()).org.id;
+    const open = await dualAgent.post('/api/orgs', { name: 'Dual Open Co', kind: 'host' });
+    assert.equal(open.status, 200);
+    assert.equal((await ops.post(`/api/manager/orgs/${closedId}/status`, { status: 'suspended', reason: 'Testing multi-org', confirmName: 'Dual Closed Co' })).status, 200);
+    const fresh = new Agent(app);
+    assert.equal((await fresh.post('/api/auth/login', { email: dual, password: PASSWORD })).body.ok, true);
+    assert.equal((await fresh.state()).org.name, 'Dual Open Co');
+    assert.equal((await fresh.post('/api/auth/switch-org', { orgId: closedId })).status, 404);
+    assert.ok(!(await fresh.state()).orgs.some((o: { id: string }) => o.id === closedId), 'closed organisation is not offered');
+  });
+
+  it('a suspended organisation’s public exchange link stops working and works again when reactivated', async () => {
+    const hash = 'tok-ceelink-1'.padEnd(20, 'x');
+    const raw = hash;
+    const crypto = await import('node:crypto');
+    await pool.query(`insert into exchanges (direction, sender_org_id, recipient_email, link_token_hash, access_expires_at) values ('request', $1, 'g@example.com', $2, now() + interval '1 day')`, [ceeId, crypto.createHash('sha256').update(raw).digest('hex')]).catch(() => {});
+    const open = () => new Agent(app).post('/api/x/open', { token: raw });
+    const before = (await open()).status;
+    assert.equal((await ops.post(`/api/manager/orgs/${ceeId}/status`, { status: 'suspended', reason: 'Testing links', confirmName: 'Cee Quarries' })).status, 200);
+    assert.ok([404, 410, 400].includes((await open()).status), 'closed organisation: link is dead');
+    assert.equal((await ops.post(`/api/manager/orgs/${ceeId}/status`, { status: 'active', reason: 'Testing links' })).status, 200);
+    assert.equal((await open()).status, before);
+  });
+
+  it('an invitation into a closed organisation is refused', async () => {
+    const o = (await signup(app, { orgName: 'Invite Closed Co', orgKind: 'host' }));
+    const oid = (await o.agent.state()).org.id;
+    const email = uniqueEmail('late');
+    assert.equal((await o.agent.post('/api/org/invites', { email, role: 'member' })).status, 200);
+    assert.equal((await ops.post(`/api/manager/orgs/${oid}/status`, { status: 'suspended', reason: 'Testing invites', confirmName: 'Invite Closed Co' })).status, 200);
+    const r = await new Agent(app).post('/api/auth/signup', { name: 'Late Joiner', email, password: PASSWORD, inviteToken: await lastEmailToken(email, '/invite') });
+    assert.equal(r.status, 400);
+    assert.equal((await pool.query(`select 1 from users where email = $1`, [email])).rowCount, 0);
+  });
+});
+
 describe('setup checklist', () => {
   it('shows what each item means, and manual items can be ticked and un-ticked', async () => {
     const items = (await ops.get('/api/manager/setup')).body.items;

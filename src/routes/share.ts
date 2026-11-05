@@ -62,7 +62,7 @@ async function resolveLink(token: string) {
   return one<{ id: string; site_id: string; kind: string; expires_at: Date; revoked_at: Date | null; label: string; org_name: string }>(
     pool,
     `select l.id, l.site_id, l.kind, l.expires_at, l.revoked_at, l.label, o.name as org_name
-       from share_links l join organisations o on o.id = l.org_id where l.token_hash = $1`,
+       from share_links l join organisations o on o.id = l.org_id where l.token_hash = $1 and o.status = 'active'`,
     [sha256(token)],
   );
 }

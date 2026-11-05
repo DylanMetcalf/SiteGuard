@@ -42,7 +42,7 @@ async function loadOrg(db: Db, id: string, lock = false): Promise<OrgBrief> {
   return o;
 }
 
-const isOwnerAddress = (m: { email: string; email_verified_at: unknown }) => isPlatformAdmin({ email: m.email, email_verified_at: m.email_verified_at, is_demo: false });
+const isOwnerAddress = (m: { email: string; email_verified_at?: unknown }) => isPlatformAdmin({ email: m.email, email_verified_at: new Date(), is_demo: false }); // protected even if unverified
 
 async function orgHasPlatformAdmin(db: Db, orgId: string) {
   const ms = await many<{ email: string; email_verified_at: Date | null }>(db, `select u.email, u.email_verified_at from memberships m join users u on u.id = m.user_id where m.org_id = $1`, [orgId]);
@@ -67,8 +67,10 @@ export async function deletionImpact(db: Db, orgId: string) {
               (select count(*) from exchanges where sender_org_id = $1)::int as exchanges,
               (select count(*) from user_invites where org_id = $1 and accepted_at is null and revoked_at is null)::int as "pendingInvites",
               (select count(*) from audit_events where org_id in (select id from scope))::int as "auditEvents"`, [orgId]),
-    one<{ linkedAtOthers: number; contractorsLinked: number }>(db,
-      `select (select count(*) from contractors c join sites s on s.contractor_id = c.id where c.linked_org_id = $1 and s.org_id <> $1)::int as "linkedAtOthers",
+    one<{ linkedAtOthers: number; contractorsLinked: number; docsAtOthers: number }>(db,
+      `select (select count(distinct d.id) from documents d join files f on f.id = d.current_file_id where f.org_id = any(array(select id from organisations where id = $1 or managed_by_org = $1))
+                 and d.requirement_id in (select r.id from requirements r join sites s on s.id = r.site_id where s.org_id <> $1 and s.org_id <> all(array(select id from organisations where managed_by_org = $1))))::int as "docsAtOthers",
+              (select count(*) from contractors c join sites s on s.contractor_id = c.id where c.linked_org_id = $1 and s.org_id <> $1)::int as "linkedAtOthers",
               (select count(*) from contractors where org_id = $1 and linked_org_id is not null)::int as "contractorsLinked"`, [orgId]),
     one<{ payments: number; actions: number }>(db,
       `select (select count(*) from payments where org_id = $1)::int as payments, (select count(*) from platform_actions where org_id = $1)::int as actions`, [orgId]),
@@ -80,6 +82,7 @@ export async function deletionImpact(db: Db, orgId: string) {
     relationships: {
       contractorsLinkedFromThisOrganisation: others?.contractorsLinked ?? 0,
       sitesAtOtherOrganisationsKeepTheirRecordsButLoseTheLink: others?.linkedAtOthers ?? 0,
+      documentsAtOtherOrganisationsLoseTheirFile: others?.docsAtOthers ?? 0,
     },
     kept: {
       paymentRecords: retained?.payments ?? 0,
@@ -258,6 +261,7 @@ export default async function managerAccountRoutes(app: FastifyInstance) {
       await loadOrg(db, id, true);
       if (await one(db, `select 1 from deletion_requests where org_id = $1 and status = 'scheduled'`, [id])) throw conflict('Deletion is already scheduled.');
       const impact = await deletionImpact(db, id);
+      impact.people.list = []; // counts only: names and emails must not outlive the deletion
       const r = (await one<{ id: string; scheduled_for: Date }>(db,
         `insert into deletion_requests (org_id, org_name, org_kind, reason, requested_by, scheduled_for, impact) values ($1, $2, $3, $4, $5, now() + make_interval(days => $6), $7)
          returning id, scheduled_for`, [id, o.name, o.kind, b.reason, ctx.user.email, DELETION_WAIT_DAYS, JSON.stringify(impact)]))!;
@@ -294,7 +298,11 @@ export default async function managerAccountRoutes(app: FastifyInstance) {
     const keys: string[] = [];
     const removed = await withTx(async (db) => {
       await db.query(`set local siteguard.purge = 'on'`); // lets this one transaction remove the organisation's own audit trail
-      await loadOrg(db, id, true);
+      const live = await loadOrg(db, id, true);
+      const still = await one<{ scheduled_for: Date }>(db, `select scheduled_for from deletion_requests where id = $1 and status = 'scheduled' for update`, [dr.id]);
+      if (!still || new Date(still.scheduled_for) > new Date()) throw conflict('The deletion was cancelled or is not due. Nothing was deleted.');
+      const nowBlocked = await deletionBlockers(live);
+      if (nowBlocked.length) throw conflict(nowBlocked[0]);
       const impact = await deletionImpact(db, id);
       const scope = (await many<{ id: string }>(db, `select id from organisations where id = $1 or managed_by_org = $1`, [id])).map((r) => r.id);
       for (const f of await many<{ storage_key: string }>(db, `select storage_key from files where org_id = any($1::uuid[])`, [scope])) keys.push(f.storage_key);
@@ -304,13 +312,14 @@ export default async function managerAccountRoutes(app: FastifyInstance) {
         `select u.id, u.email, u.email_verified_at from memberships m join users u on u.id = m.user_id
           where m.org_id = $1 and not u.is_demo and not exists (select 1 from memberships x where x.user_id = u.id and x.org_id <> $1)`, [id])).filter((u) => !isOwnerAddress(u)).map((u) => u.id);
       await db.query(`update audit_events set actor_name = 'Deleted user', actor_id = null where actor_id = any($1::uuid[])`, [gone]);
+      await db.query(`delete from exchanges where sender_org_id = any($1::uuid[])`, [scope]); // their uploads reference files with ON DELETE RESTRICT
       await db.query(`delete from sites where org_id = any($1::uuid[])`, [scope]); // sites reference contractors with ON DELETE RESTRICT
       await db.query(`delete from organisations where id = any($1::uuid[])`, [scope]);
       if (gone.length) await db.query(`delete from users where id = any($1::uuid[])`, [gone]);
       await db.query(
         `insert into deletion_ledger (request_id, org_id, org_name, org_kind, deleted_by, reason, removed, payments) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [dr.id, id, o.name, o.kind, ctx.user.email, dr.reason, JSON.stringify({ ...impact.removed, peopleDeleted: gone.length, membershipsRemoved: impact.people.total }), JSON.stringify(payments)]);
-      await db.query(`update deletion_requests set status = 'completed', closed_by = $2, closed_at = now() where id = $1`, [dr.id, ctx.user.email]);
+      await db.query(`update deletion_requests set status = 'completed', impact = '{}'::jsonb, closed_by = $2, closed_at = now() where id = $1`, [dr.id, ctx.user.email]);
       await logPlatformAction(db, ctx, 'Permanently deleted an organisation', null, `${o.name} (${o.kind}); ${gone.length} people deleted; ${keys.length} files`, req.ip);
       return { people: gone.length, files: keys.length };
     });
