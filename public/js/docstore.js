@@ -14,16 +14,16 @@ const SCOPES_HOST = [['company', 'Company-wide'], ['site', 'One site']];
 const SCOPES_CONTRACTOR = [['company', 'Company document (reusable)'], ['site', 'For one site'], ['project', 'For a project'], ['personnel', 'About a person'], ['equipment', 'About equipment']];
 const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.heic,.txt,.csv';
 
-let store = { docs: null, shared: null, archived: null, loading: false };
-export function invalidateDocstore(){ store = { docs: null, shared: null, archived: null, loading: false }; }
+let store = { docs: null, shared: null, folders: null, archived: null, loading: false };
+export function invalidateDocstore(){ store = { docs: null, shared: null, folders: null, archived: null, loading: false }; }
 export async function loadDocstore(force){
   if(store.loading && !force) return store;
   if(store.docs && !force) return store;
   store.loading = true;
   try{
     const kind = S.boot.org && S.boot.org.kind;
-    const [d, sh] = await Promise.all([api.get('/api/org-docs'), kind === 'contractor' ? api.get('/api/org-docs/shared') : Promise.resolve({ documents: [] })]);
-    store.docs = d.documents; store.shared = sh.documents;
+    const [d, sh, fo] = await Promise.all([api.get('/api/org-docs'), kind === 'contractor' ? api.get('/api/org-docs/shared') : Promise.resolve({ documents: [] }), api.get('/api/doc-folders')]);
+    store.docs = d.documents; store.shared = sh.documents; store.folders = fo.folders;
   } finally { store.loading = false; }
   return store;
 }
@@ -62,6 +62,7 @@ function drawUpload(){
     + '<label class="field-label" for="upVis">Who can see it</label><select id="upVis"><option value="internal">Everyone in ' + escapeHtml(S.boot.org.name) + '</option>'
       + (kind === 'host' ? '<option value="contractors"' + (uploadOpts.visibility === 'contractors' ? ' selected' : '') + '>Also contractors working on the site</option>' : '')
       + (admin ? '<option value="restricted">Only owners and admins (e.g. medical or personal records)</option>' : '') + '</select>'
+    + ((store.folders || []).length ? '<label class="field-label" for="upFolder">Folder (optional)</label><select id="upFolder"><option value="">No folder</option>' + store.folders.map((f) => '<option value="' + f.id + '"' + ((uploadOpts.folderId || S.studioFolder) === f.id ? ' selected' : '') + '>' + escapeHtml(f.name) + '</option>').join('') + '</select>' : '')
     + '<label class="field-label" for="upOwner">Responsible person (optional)</label><input type="text" id="upOwner" maxlength="120">'
     + '<label class="field-label" for="upDesc">Description (optional)</label><textarea id="upDesc" rows="2" maxlength="1000"></textarea>'
     + '<button class="btn primary block" style="margin-top:14px;" data-action="up-start"' + (queue.some((q) => q.state === 'ready' || q.state === 'failed') ? '' : ' disabled') + '>Upload ' + (queue.filter((q) => q.state !== 'done').length || '') + '</button>'
@@ -78,7 +79,7 @@ function areaOptions(wpId){
   return w ? (w.areas || []).map((a) => '<option value="' + a.id + '">' + escapeHtml(a.name) + '</option>').join('') : '';
 }
 function keepForm(){ // the sheet is redrawn as files are added; keep what was typed
-  const ids = ['upType', 'upScope', 'upWp', 'upArea', 'upSubject', 'upIssue', 'upExpiry', 'upReq', 'upVis', 'upOwner', 'upDesc'];
+  const ids = ['upType', 'upScope', 'upWp', 'upArea', 'upSubject', 'upIssue', 'upExpiry', 'upReq', 'upVis', 'upOwner', 'upDesc', 'upFolder'];
   const saved = Object.fromEntries(ids.map((id) => [id, document.getElementById(id) ? document.getElementById(id).value : null]));
   document.querySelectorAll('.up-name').forEach((el) => { const q = queue[Number(el.dataset.i)]; if(q) q.name = el.value; });
   return () => { for(const [id, v] of Object.entries(saved)) { const el = document.getElementById(id); if(el && v !== null) el.value = v; } };
@@ -92,7 +93,7 @@ function metaFor(q){
   const g = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
   return { name: q.name.trim() || q.file.name, docType: g('upType') || 'other', scope: g('upScope') || 'company', workplaceId: g('upWp') || null, areaId: g('upArea') || null,
     subject: g('upSubject'), issueDate: g('upIssue') || null, expiryDate: g('upExpiry') || null, requirement: g('upReq') || 'informational',
-    visibility: g('upVis') || 'internal', ownerName: g('upOwner'), description: g('upDesc') };
+    visibility: g('upVis') || 'internal', ownerName: g('upOwner'), description: g('upDesc'), folderId: g('upFolder') || null };
 }
 /** XMLHttpRequest, not fetch, so each file shows real upload progress. */
 function sendOne(q, meta){
@@ -157,8 +158,82 @@ export async function openDocSheet(id){
     + (mine ? '<button class="btn secondary small" data-action="doc-archive" data-id="' + d.id + '" data-on="' + (d.archivedAt ? '0' : '1') + '">' + (d.archivedAt ? 'Restore' : 'Archive') + '</button>' : '') + '</div>'
     + (mine && r.versions.length ? '<div class="section-title">Versions</div><div class="card">' + r.versions.map((v) => '<div class="menu-row" style="cursor:default;"><div style="flex:1;"><div class="qa-title">Version ' + v.version + (v.version === d.version ? ' (current)' : '') + '</div><div class="qa-sub">'
       + escapeHtml(v.filename) + ' · ' + escapeHtml(v.by) + ' · ' + new Date(v.at).toLocaleDateString('en-ZA') + (v.note ? ' · ' + escapeHtml(v.note) : '') + '</div></div><a class="btn secondary small" href="/api/org-docs/' + d.id + '/file?v=' + v.version + '" target="_blank" rel="noopener">Open</a></div>').join('') + '</div>' : '')
-    + (admin || !mine ? '' : ''));
+    + (mine && r.requiredAt.length ? '<div class="section-title">Contractors must submit this at</div><div class="card" style="padding:4px 14px;">' + r.requiredAt.map((w) => '<div class="dkv"><span>' + escapeHtml(w.name) + '</span><span>as “' + escapeHtml(w.requirement) + '”</span></div>').join('') + '</div>' : '')
+    + (mine && !d.archivedAt ? '<div class="section-title">Organise</div><div class="card" style="padding:12px 14px;">'
+      + '<label class="field-label" for="docFolder" style="margin-top:0;">Folder</label><select id="docFolder" data-action-change="doc-move" data-id="' + d.id + '"><option value="">No folder</option>'
+      + (store.folders || []).map((f) => '<option value="' + f.id + '"' + (f.id === d.folderId ? ' selected' : '') + '>' + escapeHtml(f.name) + '</option>').join('') + '</select>'
+      + (S.boot.org.kind === 'host' && admin ? '<button class="btn secondary block" style="margin-top:12px;" data-action="doc-require" data-id="' + d.id + '">Ask contractors to complete and submit this…</button>' : '')
+      + '<button class="btn danger block" style="margin-top:10px;" data-action="doc-delete-ask" data-id="' + d.id + '" data-name="' + escapeHtml(d.name) + '">Delete permanently…</button></div>' : ''));
 }
+
+/* ---------- delete, require, move ---------- */
+on('doc-delete-ask', (el) => {
+  openSheet(sheetHead('Delete “' + el.dataset.name + '”?', 'This cannot be undone.')
+    + '<p>The document, every earlier version and the stored files are deleted. If contractors were asked to submit it, that requirement stays (with what they already submitted) but no longer offers the template.</p>'
+    + '<p class="site-card-sub">To keep it but hide it, use Archive instead.</p>'
+    + '<button class="btn danger block" data-action="doc-delete" data-id="' + el.dataset.id + '">Delete permanently</button><button class="btn secondary block" style="margin-top:8px;" data-action="close-sheet">Cancel</button>');
+});
+on('doc-delete', async (el) => {
+  el.disabled = true;
+  try{ await api.del('/api/org-docs/' + el.dataset.id); showToast('Deleted'); invalidateDocstore(); closeSheet(); render(); }
+  catch(e){ el.disabled = false; showToast(e.message); }
+});
+on('doc-move', async (el) => {
+  try{ await api.post('/api/org-docs/' + el.dataset.id + '/folder', { folderId: el.value || null }); showToast(el.value ? 'Moved to the folder' : 'Taken out of the folder'); invalidateDocstore(); render(); }
+  catch(e){ showToast(e.message); }
+});
+on('doc-require', async (el) => {
+  const r = await api.get('/api/org-docs/' + el.dataset.id);
+  const d = r.document;
+  const wps = Object.values((S.state && S.state.workplaces) || {}).filter((w) => !d.workplaceId || w.id === d.workplaceId);
+  if(!wps.length){ showToast('Add a site first'); return; }
+  openSheet(sheetHead('Ask contractors to submit this', escapeHtml(d.name))
+    + '<p class="site-card-sub">It becomes a requirement in the safety file of every contractor at the site, and of anyone who joins later. They download your template, complete it, and submit it for your review. Contractors at that site can then see this document.</p>'
+    + '<label class="field-label" for="rqWp">Site</label><select id="rqWp">' + wps.map((w) => '<option value="' + w.id + '">' + w.name + '</option>').join('') + '</select>'
+    + '<label class="field-label" for="rqName">Name contractors see</label><input type="text" id="rqName" maxlength="200" value="' + escapeHtml(d.name) + '">'
+    + '<label class="field-label" for="rqCat">Category</label><input type="text" id="rqCat" maxlength="80" value="Site documents">'
+    + '<label class="toggle-row" style="border:none;padding:10px 0;"><span>Optional (welcome, but does not hold up Site Ready)</span><input type="checkbox" id="rqOpt"></label>'
+    + '<button class="btn primary block" data-action="doc-require-go" data-id="' + d.id + '">Add to every contractor’s file</button>');
+});
+on('doc-require-go', async (el) => {
+  el.disabled = true;
+  try{
+    const x = await api.post('/api/org-docs/' + el.dataset.id + '/require', { workplaceId: val('rqWp'), name: val('rqName'), category: val('rqCat') || 'Site documents', optional: !!val('rqOpt') });
+    showToast('Added to ' + x.contractorsUpdated + ' contractor file' + (x.contractorsUpdated === 1 ? '' : 's')); invalidateDocstore(); closeSheet(); render();
+  }catch(e){ el.disabled = false; showToast(e.message); }
+});
+
+/* ---------- folders ---------- */
+export function openFolderSheet(f){
+  const host = S.boot.org.kind === 'host';
+  const st = S.state || {};
+  const opts = host
+    ? Object.values(st.workplaces || {}).map((w) => ['wp:' + w.id, 'Site: ' + w.name]).concat(Object.values(st.contractors || {}).map((c) => ['c:' + c.id, 'Contractor: ' + c.name]))
+    : Object.values(st.sites || {}).filter((x) => x.status !== 'declined').map((x) => ['s:' + x.id, (x.hostName ? x.hostName + ' — ' : '') + x.name]);
+  const cur = f ? (f.workplaceId ? 'wp:' + f.workplaceId : f.contractorId ? 'c:' + f.contractorId : f.siteId ? 's:' + f.siteId : '') : '';
+  openSheet(sheetHead(f ? 'Folder settings' : 'New folder', host ? 'A folder for a site, a contractor, or anything else.' : 'A folder for a site or mine you work on, or anything else.')
+    + '<label class="field-label" for="flName">Name</label><input type="text" id="flName" maxlength="120" value="' + escapeHtml(f ? f.name : '') + '" placeholder="e.g. Kathu North — permits">'
+    + '<label class="field-label" for="flLink">Linked to (optional)</label><select id="flLink" data-action-change="fl-link"><option value="">Nothing in particular</option>' + opts.map(([v, l]) => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>'
+    + '<button class="btn primary block" style="margin-top:14px;" data-action="fl-save" data-id="' + (f ? f.id : '') + '">' + (f ? 'Save' : 'Create folder') + '</button>'
+    + (f ? '<button class="btn danger block" style="margin-top:8px;" data-action="fl-delete" data-id="' + f.id + '">Delete folder (documents are kept)</button>' : ''));
+}
+on('fl-link', (el) => { const n = document.getElementById('flName'); if(n && !n.value.trim() && el.value){ n.value = el.options[el.selectedIndex].text.replace(/^(Site|Contractor): /, ''); } });
+on('fl-new', () => openFolderSheet(null));
+on('fl-edit', () => { const f = (store.folders || []).find((x) => x.id === S.studioFolder); if(f) openFolderSheet(f); });
+on('fl-save', async (el) => {
+  const link = val('flLink'), [k, id] = link ? link.split(':') : ['', ''];
+  const body = { name: val('flName'), workplaceId: k === 'wp' ? id : null, contractorId: k === 'c' ? id : null, siteId: k === 's' ? id : null };
+  el.disabled = true;
+  try{
+    if(el.dataset.id) await api.patch('/api/doc-folders/' + el.dataset.id, body); else { const r = await api.post('/api/doc-folders', body); S.studioFolder = r.id; }
+    showToast(el.dataset.id ? 'Folder saved' : 'Folder created'); invalidateDocstore(); closeSheet(); render();
+  }catch(e){ el.disabled = false; showToast(e.message); }
+});
+on('fl-delete', async (el) => {
+  try{ await api.del('/api/doc-folders/' + el.dataset.id); S.studioFolder = ''; showToast('Folder deleted; its documents are kept'); invalidateDocstore(); closeSheet(); render(); }
+  catch(e){ showToast(e.message); }
+});
+on('fl-pick', (el) => { S.studioFolder = el.dataset.id || ''; S.keepScroll = true; render(); S.keepScroll = false; });
 export function expiryText(date){
   const days = Math.round((new Date(date) - Date.now()) / 86400000);
   return days < 0 ? ' · <span style="color:var(--red)">expired</span>' : days <= 30 ? ' · <span style="color:var(--amber)">expires in ' + days + ' days</span>' : '';
@@ -173,5 +248,5 @@ on('doc-archive', async (el) => {
   try{ await api.post('/api/org-docs/' + el.dataset.id + '/archive', { archived: el.dataset.on === '1' }); showToast(el.dataset.on === '1' ? 'Archived' : 'Restored'); invalidateDocstore(); closeSheet(); render(); }
   catch(e){ showToast(e.message); }
 });
-on('open-upload', (el) => openUploadSheet({ docType: el && el.dataset ? el.dataset.type : undefined, workplaceId: el && el.dataset ? el.dataset.wp : undefined, visibility: el && el.dataset ? el.dataset.vis : undefined, onUploaded: () => render() }));
+on('open-upload', (el) => openUploadSheet({ folderId: el && el.dataset ? el.dataset.folder : undefined, docType: el && el.dataset ? el.dataset.type : undefined, workplaceId: el && el.dataset ? el.dataset.wp : undefined, visibility: el && el.dataset ? el.dataset.vis : undefined, onUploaded: () => render() }));
 void val;

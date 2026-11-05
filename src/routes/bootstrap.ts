@@ -207,8 +207,13 @@ export async function buildState(db: Db, ctx: OrgCtx) {
     }
 
     // ---- requirements ----
-    for (const r of await many(db, `select * from requirements where site_id = any($1::uuid[]) order by position, created_at`, [activeIds])) {
-      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, optional: !!r.optional, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name) });
+    // A requirement made from a mine's uploaded document carries that document as its template (looked up live, so it never drifts).
+    for (const r of await many(db, `select r.*, t.id as template_doc_id, t.name as template_name from requirements r
+                                      left join lateral (select d.id, d.name from sites s join workplaces w on w.id = s.workplace_id, jsonb_array_elements(w.requirements) e
+                                                           join org_documents d on d.id::text = e->>'templateDocId' and d.archived_at is null
+                                                          where s.id = r.site_id and lower(e->>'name') = lower(r.name) limit 1) t on true
+                                     where r.site_id = any($1::uuid[]) order by r.position, r.created_at`, [activeIds])) {
+      state.requirements[r.site_id].push({ id: r.id, category: r.category, name: r.name, source: r.source, why: r.why, optional: !!r.optional, blueprint: blueprintForRequirement(r.name)?.id ?? null, library: libraryTypeFor(r.name), template: r.template_doc_id ? { id: r.template_doc_id, name: r.template_name } : null });
     }
 
     // ---- the mine's own templates for requirements ----

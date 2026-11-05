@@ -27,7 +27,7 @@ export interface Field {
 
 export interface BuildInput {
   values: Record<string, string>;
-  company: { name: string; reg?: string; address?: string; coid?: string };
+  company: { name: string; reg?: string; address?: string; coid?: string; industry?: string };
   preparer: { name: string; title?: string };
   site?: { name: string; location?: string; clientName?: string; emergency?: Record<string, string> };
 }
@@ -110,6 +110,24 @@ function purposeScope(i: BuildInput, purpose: string): Section[] {
     sec('Purpose', para(purpose)),
     sec('Scope', para(`This document applies to all ${i.company.name} employees, subcontractors and visitors involved in ${scopeText(i)} at ${siteLabel(i)} for ${clientLabel(i)}.`)),
   ];
+}
+
+const MHSA = 'Mine Health and Safety Act 29 of 1996 (MHSA) and its regulations';
+const CONSTRUCTION = 'Construction Regulations, 2014';
+/**
+ * Makes the legal references match the industry: mines and quarries are under the MHSA, construction work under the
+ * Construction Regulations, and other industries under the OHS Act. Only the reference lines change; nothing is invented.
+ */
+export function tailorLegalForIndustry(content: DocContent, industry: string): DocContent {
+  const mining = industry === 'mining' || industry === 'quarrying', construction = industry === 'construction';
+  const fix = (item: string): string | null => {
+    if (item.startsWith(MHSA)) return mining ? `${MHSA}${industry === 'quarrying' ? ' (quarries are mines under the Act)' : ''}` : construction ? null : null;
+    if (item.startsWith(CONSTRUCTION) && item.includes('where the work is construction work')) return construction ? CONSTRUCTION : mining ? item : null;
+    return item;
+  };
+  return { ...content, sections: content.sections.map((s) => s.heading !== 'Legal and other requirements' ? s : ({
+    ...s, blocks: s.blocks.map((bl) => (bl.type === 'bullets' ? { ...bl, items: bl.items.map(fix).filter((x): x is string => x !== null) } : bl)),
+  })) };
 }
 
 function legalSection(extra: string[] = []): Section {

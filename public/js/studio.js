@@ -62,7 +62,7 @@ export function renderStudio(){
     +(ai ? ' AI tailors drafts to the job.' : '')+' An upload is received, not approved: approval stays with the site.</p>'
     +(ro ? '' : '<div class="hero-actions studio-primary"><button class="btn primary" data-action="open-upload">'+ICONS.upload+' Upload documents</button>'
       +'<button class="btn primary" data-action="studio-tab" data-tab="templates">'+ICONS.plus+' Create document</button>'
-      +(contractor ? '<button class="btn secondary" data-action="sfb-start">'+ICONS.passport+' Create safety file</button>' : '')+'</div>')+'</div>';
+      +(contractor ? '<button class="btn secondary" data-action="sfb-start">'+ICONS.passport+' Create safety file</button>' : '')+'<button class="btn secondary" data-action="open-docstyle">Document style</button></div>')+'</div>';
   html += '<div class="tabs studio-tabs" role="tablist">'+tabs.map(([k,l,n])=>'<button role="tab" data-action="studio-tab" data-tab="'+k+'" class="'+(tab===k?'active':'')+'" aria-selected="'+(tab===k)+'">'+l+(n!==null?' <b>'+n+'</b>':'')+'</button>').join('')+'</div>';
   if(tab==='all'){
     const tile = (n, label, t, warn) => '<button class="attn-card '+(warn && n ? 'amber' : 'blue')+'" data-action="studio-tab" data-tab="'+t+'"><div class="attn-num">'+n+'</div><div class="attn-label">'+label+'</div></button>';
@@ -96,6 +96,7 @@ export function renderStudio(){
   }
   return html;
 }
+const FOLDER_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
 function emptyUploads(){
   return '<div class="list-empty">No uploads yet. Upload the policies, procedures, certificates and templates you already have.'
     +(S.boot.org.standing === 'lapsed' ? '' : ' <button class="btn secondary small" data-action="open-upload">'+ICONS.upload+' Upload documents</button>')+'</div>';
@@ -111,15 +112,23 @@ function upRow(d){
 function uploadedHtml(up){
   const f = S.upFilter || { type:'', wp:'', scope:'' };
   const wps = [...new Map(up.filter(d=>d.workplaceId).map(d=>[d.workplaceId, d.workplaceName])).entries()];
-  const rows = up.filter(d=>(!f.type || d.docType===f.type) && (!f.wp || d.workplaceId===f.wp) && (!f.scope || d.scope===f.scope) && matchSearch('uploads', d.name, d.filename, d.subject, d.workplaceName, d.description, typeLabel(d.docType)));
+  const folders = docstore().folders || [];
+  const fo = folders.some(x=>x.id===S.studioFolder) ? S.studioFolder : '';
+  const ro = S.boot.org.standing === 'lapsed' || (S.boot.org.kind === 'host' && S.boot.org.role === 'member');
+  const folderBar = '<div class="folder-bar"><button class="folder-chip'+(fo?'':' active')+'" data-action="fl-pick" data-id="">'+ICONS.passport+' All documents <b>'+up.length+'</b></button>'
+    + folders.map(x=>'<button class="folder-chip'+(fo===x.id?' active':'')+'" data-action="fl-pick" data-id="'+x.id+'" title="'+escapeHtml(x.workplaceName||x.contractorName||x.siteName||'')+'">'+FOLDER_ICON+' '+escapeHtml(x.name)+' <b>'+x.documents+'</b></button>').join('')
+    + (ro ? '' : '<button class="folder-chip add" data-action="fl-new">+ New folder</button>') + '</div>'
+    + (fo ? (()=>{ const x = folders.find(y=>y.id===fo); const link = x.workplaceName ? 'Site: '+escapeHtml(x.workplaceName) : x.contractorName ? 'Contractor: '+escapeHtml(x.contractorName) : x.siteName ? escapeHtml((x.siteOwner?x.siteOwner+' — ':'')+x.siteName) : 'Not linked to a site or contractor';
+        return '<div class="folder-head"><div><b>'+escapeHtml(x.name)+'</b><div class="site-card-sub">'+link+'</div></div>'+(ro?'':'<div style="display:flex;gap:6px;"><button class="btn secondary small" data-action="open-upload" data-folder="'+x.id+'">'+ICONS.upload+' Upload here</button><button class="btn secondary small" data-action="fl-edit">Folder settings</button></div>')+'</div>'; })() : '');
+  const rows = up.filter(d=>(!fo || d.folderId===fo) && (!f.type || d.docType===f.type) && (!f.wp || d.workplaceId===f.wp) && (!f.scope || d.scope===f.scope) && matchSearch('uploads', d.name, d.filename, d.subject, d.workplaceName, d.description, typeLabel(d.docType)));
   const sort = S.upSort || 'updated';
   rows.sort((a,b)=> sort==='name' ? a.name.localeCompare(b.name) : sort==='expiry' ? String(a.expiryDate||'9999').localeCompare(String(b.expiryDate||'9999')) : String(b.updatedAt).localeCompare(String(a.updatedAt)));
-  return searchBox('uploads', 'Search uploaded documents')
+  return folderBar + searchBox('uploads', 'Search uploaded documents')
     +'<div class="studio-filters"><select data-action-change="up-filter" data-k="type" aria-label="Type"><option value="">All types</option>'+DOC_TYPES.map(([v,l])=>'<option value="'+v+'"'+(f.type===v?' selected':'')+'>'+l+'</option>').join('')+'</select>'
     +(wps.length ? '<select data-action-change="up-filter" data-k="wp" aria-label="Site"><option value="">All sites</option>'+wps.map(([id,n])=>'<option value="'+id+'"'+(f.wp===id?' selected':'')+'>'+escapeHtml(n)+'</option>').join('')+'</select>' : '')
     +'<select data-action-change="up-filter" data-k="scope" aria-label="Belongs to"><option value="">Company and site</option>'+[['company','Company-wide'],['site','Site'],['project','Project'],['personnel','Personnel'],['equipment','Equipment']].map(([v,l])=>'<option value="'+v+'"'+(f.scope===v?' selected':'')+'>'+l+'</option>').join('')+'</select>'
     +'<select data-action-change="up-sort" aria-label="Sort"><option value="updated"'+(sort==='updated'?' selected':'')+'>Newest first</option><option value="name"'+(sort==='name'?' selected':'')+'>Name</option><option value="expiry"'+(sort==='expiry'?' selected':'')+'>Expiry date</option></select></div>'
-    +(rows.length ? '<div class="card">'+rows.map(upRow).join('')+'</div>' : up.length ? '<div class="list-empty">Nothing matches. Try clearing a filter.</div>' : emptyUploads());
+    +(rows.length ? '<div class="card">'+rows.map(upRow).join('')+'</div>' : fo ? '<div class="list-empty">This folder is empty. Upload into it, or move a document here from its details.</div>' : up.length ? '<div class="list-empty">Nothing matches. Try clearing a filter.</div>' : emptyUploads());
 }
 on('studio-tab', (el)=>{ S.studioTab = el.dataset.tab; render(); window.scrollTo(0,0); });
 on('up-filter', (el)=>{ S.upFilter = { ...(S.upFilter||{type:'',wp:'',scope:''}), [el.dataset.k]: el.value }; S.keepScroll = true; render(); S.keepScroll = false; });

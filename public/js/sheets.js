@@ -202,6 +202,10 @@ function renderReqSheet(reqId){
   if(canSetOptional) body += '<div class="toggle-row" style="border:none;padding:0 0 6px;"><span>'+(req.optional ? 'Optional — welcome in the file but doesn\'t hold up readiness' : 'Required — counts towards '+(site.project?'the file being complete':'Site Ready'))+'</span>'
     +'<button class="btn secondary small" data-action="req-optional" data-req="'+reqId+'" data-optional="'+(req.optional?'0':'1')+'">'+(req.optional?'Make required':'Make optional')+'</button></div>';
   if(req.why) body += '<p style="font-size:13.5px;color:var(--ink-soft);">'+req.why+'</p>';
+  // A requirement made from the site's own uploaded document: download it, complete it, upload it back below.
+  if(req.template) body += '<div class="card req-template"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;min-width:0;"><div class="qa-title">'+req.template.name+'</div>'
+    +'<div class="qa-sub">'+(isContractor() ? 'The site\'s own form. Download it, complete it, then upload and submit your completed copy here.' : 'Your template. Contractors download it, complete it and submit it here for your review.')+'</div></div>'
+    +'<a class="btn primary small" href="/api/org-docs/'+req.template.id+'/file?download=1">Download</a></div>';
   body += templateCard(req, site, siteId, ro);
   if(doc.version){
     body += '<div class="divider"></div><div class="site-card-sub">Version '+doc.version+' · updated '+timeAgo(doc.updatedAt)+'</div>';

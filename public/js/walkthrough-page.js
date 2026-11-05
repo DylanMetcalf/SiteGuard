@@ -123,6 +123,42 @@ const VALUES = [
   { id: 'coordination', t: 'Coordination', s: 'Who did what, and whose move it is' },
 ];
 
+// Help icons: one "i" button per heading, keyed into this map. `name` completes the button's
+// label ("What is <name>?"); `text` is the explanation. Every line describes a real COMVERA
+// feature or what that part of this walkthrough shows (docs/INTERACTIVE_WALKTHROUGH.md).
+const HELP = {
+  intro: { name: 'this walkthrough', text: 'A six-minute story of one fictional contractor safety file, from scattered emails and folders to one tracked file in COMVERA. Nothing you click here changes real records.' },
+  problem: { name: 'the problem chapter', text: 'Shows the places a safety file usually ends up: an email thread, a WhatsApp group, a shared folder, a tracker and the site\'s requirements PDF. Open each one to see what is hard to confirm.' },
+  process: { name: 'the current process', text: 'The usual way a safety file comes together by email and folders, in eight stages. Select a stage, or play it to see where it slows down and loops back.' },
+  meet: { name: 'Meet COMVERA', text: 'COMVERA keeps one safety file per contractor per site, with each document filed against the requirement it answers and a clear status.' },
+  overview: { name: 'the safety file overview', text: 'The mine and the contractor look at the same file: how complete it is, and which items still need someone to act.' },
+  readiness: { name: 'the readiness percentage', text: 'The share of this site\'s requirements that are complete, meaning approved and in date. The site can mark the file Site Ready only when every one is.' },
+  attention: { name: 'Needs attention', text: 'Every item that is missing, expired, waiting for review or sent back, with whose move it is next. COMVERA\'s compliance agent checks files in the background and lists items like these.' },
+  workflow: { name: 'the workflow chapter', text: 'Try the steps a mine\'s reviewer follows in COMVERA: open a contractor\'s file, check the requirements and statuses, act on what needs attention and follow it to approval.' },
+  'stage-0': { name: 'the Sites screen', text: 'Each site lists its contractors, one card per contractor\'s safety file, showing how complete it is. Open a card to see that contractor\'s file for the site.' },
+  'stage-1': { name: 'the requirements list', text: 'Everything this site asks of this contractor, each with its source: the law, the client or a site rule. A site starts from a researched list and edits it.' },
+  'stage-2': { name: 'document statuses', text: 'Each requirement has one status: Missing, Awaiting review, Complete, Expired or Correction required. Select a document to see its version, expiry and who submitted it.' },
+  'stage-3': { name: 'the needs-attention view', text: 'Points out the item holding the file back, and says what is wrong, why it matters and whose move it is.' },
+  'stage-4': { name: 'the action options', text: 'From an item you can open the document, ask the contractor for a new copy with a note, or go back to the overview. A request reaches them by email and as a notice in COMVERA.' },
+  'stage-5': { name: 'the progress screen', text: 'Follows the item from requested to received to approved, with the activity history alongside. A received copy only counts once the site approves it.' },
+  source: { name: 'the Source column', text: 'Where each requirement comes from: the law, the client or a site rule.' },
+  status: { name: 'the Status column', text: 'The state of each document. Each status means one specific thing, so nobody has to guess.' },
+  activity: { name: 'the activity history', text: 'A dated record of who submitted, requested, reviewed or approved what, from both companies. It stays on the file, not in someone\'s inbox.' },
+  siteready: { name: 'Site Ready', text: 'The site\'s own sign-off that a contractor\'s file is ready, given only when every requirement is complete. Workers are cleared at the gate only while their company\'s file is Site Ready.' },
+  issue: { name: 'the issue chapter', text: 'A practice decision: a medical certificate is waiting for review but is older than the site accepts. Choose what to do and watch the outstanding list.' },
+  validity: { name: 'validity rules', text: 'A mine decides how long it accepts documents such as medicals, counted from their issue date. Its rules can only shorten how long a document counts, never extend it.' },
+  outstanding: { name: 'Outstanding work', text: 'Everything in this file that isn\'t complete yet, with the next step for each. An item leaves the list only once it is approved.' },
+  outcome: { name: 'the before-and-after view', text: 'Compares the same file the usual way and with COMVERA. The COMVERA side shows the statuses from what you did earlier.' },
+  before: { name: 'the Before list', text: 'The usual email-and-folders way of managing a safety file, as seen in chapters 01 and 02.' },
+  after: { name: 'the With COMVERA list', text: 'The same file in COMVERA: documents filed against requirements, clear statuses, and requests recorded on the item.' },
+  value: { name: 'the business value chapter', text: 'Four things that get easier with COMVERA, each shown on the file you just worked on. Select one to see where it shows up.' },
+  next: { name: 'the next step', text: 'Talk to the COMVERA team about your own process, restart the walkthrough, or explore COMVERA.' },
+  done: { name: 'your walkthrough checklist', text: 'Shows which chapters you have seen. Select one to go back to it.' },
+};
+const helpBtn = (key) => HELP[key]
+  ? `<button type="button" class="wt-help" data-act="help" data-help-key="${esc(key)}" aria-label="${esc('What is ' + HELP[key].name + '?')}" aria-describedby="wt-tip-${esc(key)}"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 7.2v4.3"/><circle class="dot" cx="8" cy="4.6" r=".6"/></svg></button>`
+  : '';
+
 /* ================= state ================= */
 
 const INITIAL_ACTIVITY = [
@@ -350,10 +386,10 @@ function overviewHtml(opts = {}) {
   const out = outstanding();
   const file = `<div class="ov-file ${opts.lit === 'file' ? 'lit' : opts.lit ? 'dimmed' : ''}">
       <div class="ov-file-head"><div class="ring" style="--p:${pct}"><b>${pct}%</b></div>
-        <div><h4>Voltrix Electrical Contractors</h4><p class="sub">Leeuwpan Colliery — Shaft 3 Conveyor Rewire · starts Monday</p></div></div>
+        <div><h4>Voltrix Electrical Contractors${helpBtn('readiness')}</h4><p class="sub">Leeuwpan Colliery — Shaft 3 Conveyor Rewire · starts Monday</p></div></div>
       <div class="ov-counts">${Object.entries(counts).filter(([, n]) => n).map(([k, n]) => pill(k, ` · ${n}`)).join('')}</div>
       <p class="sub" style="font-size:12.5px;color:var(--grey);margin-top:10px">${completeCount()} of ${BASE_DOCS.length} requirements complete. Site Ready can be given only when every one is.</p></div>`;
-  const attn = `<div class="ov-attn ${opts.lit === 'attn' ? 'lit' : opts.lit ? 'dimmed' : ''}"><h4>Needs attention <span class="count">${out.length}</span></h4>
+  const attn = `<div class="ov-attn ${opts.lit === 'attn' ? 'lit' : opts.lit ? 'dimmed' : ''}"><h4>Needs attention <span class="count">${out.length}</span>${helpBtn('attention')}</h4>
       ${out.length ? out.map((d) => `<div class="attn-item">${pill(S.docs[d.id].status)}<span><b>${esc(docLabel(d))}</b><span class="who">${esc(nextStepFor(d.id))}</span></span></div>`).join('') : '<p class="attn-empty">Nothing outstanding.</p>'}</div>`;
   return `<div class="ov">${file}${attn}</div>`;
 }
@@ -378,7 +414,7 @@ function reqTable(mode) {
       : `<td>${pill(st.status)}${st.requested && st.status === 'expired' ? ' <span class="pill requested">Update requested</span>' : ''}</td>`;
     return `<tr class="${cls}" ${clickable ? `data-act="doc" data-id="${d.id}"` : ''}><td>${name}</td><td class="hide-sm">${srcPill(d)}</td>${statusCell}</tr>`;
   }).join('');
-  return `<div class="table-scroll"><table class="req-table"><thead><tr><th>Requirement</th><th class="hide-sm">Source</th><th${mode === 'requirements' ? ' class="hide-sm"' : ''}>${mode === 'requirements' ? 'Who' : 'Status'}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="table-scroll"><table class="req-table"><thead><tr><th>Requirement</th><th class="hide-sm">Source${helpBtn('source')}</th><th${mode === 'requirements' ? ' class="hide-sm"' : ''}>${mode === 'requirements' ? 'Who' : 'Status' + helpBtn('status')}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function drawerHtml(id) {
@@ -412,6 +448,7 @@ function renderDemo() {
   const body = $('#demoBody');
   const crumbs = ['COMVERA · Sites', 'COMVERA · Shaft 3 Conveyor Rewire · Voltrix', 'COMVERA · Shaft 3 · Voltrix · Documents', 'COMVERA · Shaft 3 · Voltrix · Needs attention', 'COMVERA · Shaft 3 · Voltrix · Working at Heights', 'COMVERA · Shaft 3 · Voltrix · Progress'];
   $('#demoCrumb').textContent = crumbs[S.stage];
+  $('#demoHelp').innerHTML = helpBtn('stage-' + S.stage);
   let h = '';
   const d = S.docs.heights;
 
@@ -469,8 +506,8 @@ function renderDemo() {
           <div class="${phase >= 1 ? 'on' : ''}"><b>Requested</b><p>Voltrix knows what's needed, with your note.</p></div>
           <div class="${phase >= 2 ? 'on' : ''}"><b>Received</b><p>A new copy is on file. Received isn't the same as accepted.</p></div>
           <div class="${phase >= 3 ? 'on' : ''}"><b>Approved</b><p>You checked it and accepted it for this site's file.</p></div>
-          <div><b>Site Ready</b><p>A separate decision, only when every requirement is complete.</p></div></div></div>
-        <div class="drawer"><h4 style="margin-bottom:8px">Activity</h4>${activityHtml(6)}</div></div>`;
+          <div><b>Site Ready${helpBtn('siteready')}</b><p>A separate decision, only when every requirement is complete.</p></div></div></div>
+        <div class="drawer"><h4 style="margin-bottom:8px">Activity${helpBtn('activity')}</h4>${activityHtml(6)}</div></div>`;
   }
   body.innerHTML = `<div class="demo-fade">${h}</div>`;
   S.freshActivity = 0;
@@ -543,7 +580,7 @@ function renderIssue() {
   }
   $('#issueMain').innerHTML = `<div class="issue-doc">
       <div class="cert" aria-hidden="true"><b>Certificate of fitness</b><span>Name: S. Dlamini</span><span>Occupation: Electrician</span><span>Date of issue: 04/08/2025</span><span>Fit for: work at heights, confined spaces</span><span class="stamp">OHP</span></div>
-      <div><h3>Medical certificate of fitness — Sipho Dlamini</h3>
+      <div><h3>Medical certificate of fitness — Sipho Dlamini${helpBtn('validity')}</h3>
         <div class="meta"><span>${pill(st.status)} · submitted by Johan Pretorius today</span><span>Issued 4 August 2025 (14 months ago)</span></div>
         <p class="rule">Highveld rule for this site: medicals count for 12 months from issue.</p></div></div>
     <p style="margin-top:16px; font-weight:600">What do you do?</p>
@@ -612,7 +649,7 @@ function renderValue() {
 
 function renderDone() {
   const n = CHAPTERS.slice(1).filter((_, i) => S.seen.has(i + 1)).length;
-  $('#doneCard').innerHTML = `<h3>Your walkthrough</h3><ul class="done-list">${CHAPTERS.slice(1).map((c, i) => {
+  $('#doneCard').innerHTML = `<h3>Your walkthrough${helpBtn('done')}</h3><ul class="done-list">${CHAPTERS.slice(1).map((c, i) => {
     const seen = S.seen.has(i + 1);
     return `<li class="${seen ? 'seen' : ''}"><span class="tick" aria-hidden="true">${seen ? '✓' : c.n}</span><button data-act="goto" data-ch="${i + 1}">${esc(c.t)}${seen ? '<span class="sr-only"> (seen)</span>' : ''}</button></li>`;
   }).join('')}</ul>
@@ -637,6 +674,92 @@ function applyConfig() {
   if (cfg.exploreUrl) explore.href = cfg.exploreUrl; else explore.hidden = true;
 }
 
+/* ================= help tooltips ================= */
+// One tooltip per HELP key, kept at the end of <body> so no scrolling or clipped container
+// hides it. Every help button points at its key's tooltip with aria-describedby. Hover and
+// keyboard focus show it; a click or tap pins it open (tap again or tap elsewhere to close);
+// Escape hides it. It sits below the icon (above when there is no room), never over it,
+// and is kept inside the viewport.
+
+const tip = { el: null, anchor: null, pinned: false, hideTimer: null };
+
+function buildTips() {
+  const host = document.createElement('div');
+  host.className = 'wt-tips';
+  host.innerHTML = Object.entries(HELP).map(([k, h]) => `<div class="wt-tip" role="tooltip" id="wt-tip-${esc(k)}" hidden>${esc(h.text)}</div>`).join('');
+  document.body.append(host);
+  $$('[data-help]').forEach((el) => el.insertAdjacentHTML('beforeend', helpBtn(el.dataset.help)));
+}
+
+function placeTip() {
+  const { el, anchor } = tip;
+  if (!el || !anchor) return;
+  if (!anchor.isConnected) { hideTip(); return; }
+  const r = anchor.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth, vh = window.innerHeight, gap = 8, edge = 12;
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const left = Math.max(edge, Math.min(r.left + r.width / 2 - w / 2, vw - w - edge));
+  const below = r.bottom + gap;
+  const side = below + h > vh - edge && r.top - gap - h >= edge ? 'top' : 'bottom';
+  el.style.left = left + 'px';
+  el.style.top = (side === 'top' ? r.top - gap - h : below) + 'px';
+  el.dataset.side = side;
+  el.style.setProperty('--ax', Math.max(10, Math.min(r.left + r.width / 2 - left, w - 10)) + 'px');
+}
+
+function showTip(anchor, pinned = false) {
+  clearTimeout(tip.hideTimer);
+  const el = document.getElementById('wt-tip-' + anchor.dataset.helpKey);
+  if (!el) return;
+  if (tip.anchor && tip.anchor !== anchor) hideTip();
+  tip.el = el; tip.anchor = anchor; tip.pinned = tip.pinned || pinned;
+  anchor.classList.add('open');
+  el.hidden = false;
+  placeTip();
+}
+
+function hideTip() {
+  clearTimeout(tip.hideTimer);
+  if (tip.el) tip.el.hidden = true;
+  if (tip.anchor) tip.anchor.classList.remove('open');
+  tip.el = null; tip.anchor = null; tip.pinned = false;
+}
+
+function toggleTip(anchor) {
+  if (tip.anchor === anchor && tip.pinned) hideTip();
+  else { showTip(anchor); tip.pinned = true; }
+}
+
+function wireTips() {
+  const isHelp = (t) => t instanceof Element && t.closest('.wt-help');
+  // Mouse hover (touch is handled by click, so a tap doesn't open and close at once).
+  document.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const b = isHelp(e.target);
+    if (b) showTip(b);
+    else if (tip.el && tip.el.contains(e.target)) clearTimeout(tip.hideTimer);
+  });
+  document.addEventListener('pointerout', (e) => {
+    if (e.pointerType !== 'mouse' || !tip.anchor || tip.pinned) return;
+    const from = e.target, to = e.relatedTarget;
+    const inside = (n) => n instanceof Node && (tip.anchor.contains(n) || tip.el.contains(n));
+    if (inside(from) && !inside(to)) {
+      clearTimeout(tip.hideTimer);
+      tip.hideTimer = setTimeout(() => { if (!tip.pinned && document.activeElement !== tip.anchor) hideTip(); }, 150);
+    }
+  });
+  document.addEventListener('focusin', (e) => { const b = isHelp(e.target); if (b) showTip(b); });
+  document.addEventListener('focusout', (e) => { if (isHelp(e.target) && tip.anchor === e.target) hideTip(); });
+  // A click or tap anywhere else closes it.
+  document.addEventListener('click', (e) => {
+    if (tip.anchor && !isHelp(e.target) && !(tip.el && tip.el.contains(e.target))) hideTip();
+  }, true);
+  let raf = 0;
+  const follow = () => { if (tip.anchor && !raf) raf = requestAnimationFrame(() => { raf = 0; placeTip(); }); };
+  window.addEventListener('scroll', follow, { passive: true });
+  window.addEventListener('resize', follow);
+}
+
 /* ================= wiring ================= */
 
 function renderAll() {
@@ -656,6 +779,7 @@ const ACTIONS = {
   prev: () => goto(S.chapter - 1),
   next: () => goto(S.chapter + 1),
   restart,
+  help: (el) => toggleTip(el),
   source: (el) => { S.source = el.dataset.id; S.explored.add(el.dataset.id); renderExplore(); },
   'flow-node': (el) => { stopFlow(); S.flowSel = Number(el.dataset.i); S.flowLit = -1; renderFlow(); },
   'flow-play': () => playFlow(),
@@ -703,8 +827,11 @@ document.addEventListener('click', (e) => {
   if (el.tagName === 'A' && el.getAttribute('href') && el.dataset.act !== 'goto') return;
   e.preventDefault();
   fn(el, e);
+  // A redraw can remove the icon an open tooltip belongs to.
+  if (tip.anchor && !tip.anchor.isConnected) hideTip();
 });
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && tip.anchor) { e.preventDefault(); hideTip(); return; }
   // Arrow keys move between tabs in the two tab lists.
   const tab = e.target.closest('[role="tab"]');
   if (tab && ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
@@ -724,6 +851,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 applyConfig();
+buildTips();
+wireTips();
 S.explored.add(S.source);
 renderAll();
 watchChapters();

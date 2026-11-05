@@ -12,6 +12,7 @@ import {
 import { computeTasks, sessionLabel } from './sheets.js';
 import { renderStudio } from './studio.js';
 import { renderOscar } from './assistant.js';
+import { docStyleBody } from './docstyle.js';
 import { renderOnboarding } from './onboarding.js';
 import { buildButton } from './safetyfiles.js';
 import { renderPlatform, invalidatePlatform } from './platform.js';
@@ -481,7 +482,7 @@ function renderSiteDetail(siteId){
     grouped[cat].forEach(it=>{
       html += '<div class="reqrow" data-action="open-req" data-req="'+it.req.id+'" role="button" tabindex="0" style="cursor:pointer;"><div class="reqrow-main">'
         +'<div class="reqrow-name">'+it.req.name+'</div>'
-        +'<div class="reqrow-meta">'+(it.req.optional && !it.counted ? '<span class="badge grey">Optional</span>' : badge(it.status))+'<span class="srctag">'+SOURCE_LABEL[it.req.source]+(it.req.optional?' · optional':'')+'</span>'+(it.doc.expiryDate?'<span class="srctag">expires '+timeAgo(it.doc.expiryDate)+'</span>':'')+'</div>'
+        +'<div class="reqrow-meta">'+(it.req.optional && !it.counted ? '<span class="badge grey">Optional</span>' : badge(it.status))+'<span class="srctag">'+SOURCE_LABEL[it.req.source]+(it.req.optional?' · optional':'')+'</span>'+(it.req.template?'<span class="badge sage">Site form to complete</span>':'')+(it.doc.expiryDate?'<span class="srctag">expires '+timeAgo(it.doc.expiryDate)+'</span>':'')+'</div>'
         +'</div><div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
     });
     html += '</div>';
@@ -1161,28 +1162,9 @@ on('org-require-mfa', async (el)=>{
 on('support-allow', async (el)=>{ el.disabled = true; try{ supportCache = await api.post('/api/support-access', { hours: parseInt(document.getElementById('supHours').value,10), reason: document.getElementById('supReason').value.trim() }); showToast('Support access is on'); render(); }catch(e){ showToast(e.message); el.disabled = false; } });
 on('support-end', async (el)=>{ el.disabled = true; try{ supportCache = await api.post('/api/support-access/revoke'); showToast('Support access turned off'); render(); }catch(e){ showToast(e.message); el.disabled = false; } });
 
-const BRAND_SWATCHES = [['#16325C','Navy'],['#3F6E55','Sage'],['#0F6B6B','Teal'],['#B8430F','Safety orange'],['#A51C24','Red'],['#5B2A86','Purple'],['#1C1C1C','Black']];
 function brandingCard(ro){
-  const b = org().branding || {};
-  const color = b.brandColor || '#16325C';
-  return '<div class="section-title">Document branding</div><div class="card">'
-    +'<div class="site-card-sub">Applied to every document created in Document Studio: your logo on the cover and every page header, your colour on headings and tables, and your document numbers.</div>'
-    +'<label class="field-label">Logo</label><div class="logo-preview">'+(b.logoFileId ? '<img src="/api/files/'+b.logoFileId+'" alt="Company logo">' : '<span class="site-card-sub">No logo yet — documents show your company name instead.</span>')+'</div>'
-    +(ro?'':'<div class="row-actions"><label class="btn secondary small" for="logoInput" style="cursor:pointer;">'+(b.logoFileId?'Replace logo':'Upload logo')+'</label><input type="file" id="logoInput" accept="image/png,image/jpeg" class="sr-only" data-action-change="upload-logo">'
-      +(b.logoFileId?'<button class="btn danger small" data-action="remove-logo">Remove</button>':'')+'</div><div class="site-card-sub" style="margin-top:6px;">PNG or JPG, under 2 MB. A wide logo on a transparent background looks best.</div>')
-    +'<label class="field-label">Brand colour</label><div class="swatch-row">'+BRAND_SWATCHES.map(([c,n])=>'<button class="swatch'+(c.toLowerCase()===color.toLowerCase()?' active':'')+'" style="background:'+c+';" data-action="pick-swatch" data-color="'+c+'" aria-label="'+n+'" title="'+n+'"'+(ro?' disabled':'')+'></button>').join('')
-    +'<input type="color" id="brandColor" value="'+color+'" aria-label="Custom colour" style="width:40px;height:32px;padding:0;border:none;background:none;"'+(ro?' disabled':'')+'></div>'
-    +'<label class="field-label" for="docPrefix">Document number prefix</label><input type="text" id="docPrefix" value="'+(b.docPrefix||'')+'" maxlength="12" style="text-transform:uppercase;" placeholder="e.g. ABC"'+(ro?' disabled':'')+'>'
-    +'<div class="site-card-sub" style="margin-top:4px;">Documents are numbered like '+(b.docPrefix||'ABC')+'-RA-001, '+(b.docPrefix||'ABC')+'-SHEP-001.</div>'
-    +(ro?'':'<button class="btn primary block" style="margin-top:12px;" data-action="save-branding">Save branding</button>')+'</div>';
+  return '<div class="section-title">Document style</div><div class="card">'+docStyleBody(ro)+'</div>';
 }
-on('pick-swatch', (el)=>{ document.getElementById('brandColor').value = el.dataset.color; document.querySelectorAll('.swatch').forEach(s=>s.classList.toggle('active', s===el)); });
-on('save-branding', (el)=>act(()=>api.patch('/api/org/branding', { brandColor: document.getElementById('brandColor').value, docPrefix: document.getElementById('docPrefix').value.trim() }), 'Branding saved', el));
-on('upload-logo', async (el)=>{
-  const f = el.files && el.files[0]; if(!f) return;
-  await act(()=>api.upload('/api/org/logo', f), 'Logo uploaded');
-});
-on('remove-logo', (el)=>act(()=>api.del('/api/org/logo'), 'Logo removed', el));
 
 /* ============ EXPORTS ============ */
 export function exportSafetyFile(siteId){

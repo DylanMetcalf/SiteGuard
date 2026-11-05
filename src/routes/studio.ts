@@ -1,3 +1,4 @@
+import { INDUSTRIES } from '../lib/studio/generate.js';
 import type { FastifyInstance } from 'fastify';
 import { TOOLS } from '../lib/knowledge.js';
 import { z } from 'zod';
@@ -133,6 +134,10 @@ export default async function studioRoutes(app: FastifyInstance) {
       .object({
         brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #16325C').optional(),
         docPrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{0,12}$/, 'Letters, numbers and dashes only, up to 12').optional(),
+        /** Empty clears it (a lighter shade of the brand colour is used). */
+        accentColor: z.string().regex(/^(#[0-9a-fA-F]{6})?$/, 'Use a colour like #6E9C80').optional(),
+        monochrome: z.boolean().optional(),
+        industry: z.enum(INDUSTRIES).optional(),
       })
       .parse(req.body);
     await withTx(async (db) => {
@@ -154,10 +159,13 @@ export default async function studioRoutes(app: FastifyInstance) {
     if (buf.length > 2 * 1024 * 1024) throw badRequest('Use a logo under 2 MB.');
     const type = sniffType(buf, file.mimetype, file.filename);
     if (type !== 'image/png' && type !== 'image/jpeg') throw badRequest('Upload the logo as a PNG or JPG.', 'unsupported_file');
+    // variant=mono: the greyscale copy the browser makes for monochrome documents.
+    const mono = (req.query as { variant?: string }).variant === 'mono';
     const stored = await withTx(async (db) => {
       const f = await storeFile(db, ctx, buf, file.filename, file.mimetype);
-      await db.query(`update organisations set settings = settings || jsonb_build_object('logoFileId', $2::text) where id = $1`, [ctx.org.id, f.id]);
-      await audit(db, ctx, 'Uploaded company logo', f.filename);
+      await db.query(`update organisations set settings = settings || jsonb_build_object($3::text, $2::text) where id = $1`, [ctx.org.id, f.id, mono ? 'logoMonoFileId' : 'logoFileId']);
+      if (!mono) await db.query(`update organisations set settings = settings - 'logoMonoFileId' where id = $1`, [ctx.org.id]);
+      await audit(db, ctx, mono ? 'Made a greyscale logo for monochrome documents' : 'Uploaded company logo', f.filename);
       await publishChange(db, [ctx.org.id]);
       return f;
     });
@@ -169,7 +177,7 @@ export default async function studioRoutes(app: FastifyInstance) {
     requireAdmin(ctx);
     requireWritable(ctx);
     await withTx(async (db) => {
-      await db.query(`update organisations set settings = settings - 'logoFileId' where id = $1`, [ctx.org.id]);
+      await db.query(`update organisations set settings = settings - 'logoFileId' - 'logoMonoFileId' where id = $1`, [ctx.org.id]);
       await audit(db, ctx, 'Removed company logo', '');
       await publishChange(db, [ctx.org.id]);
     });

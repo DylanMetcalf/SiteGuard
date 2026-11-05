@@ -1,5 +1,9 @@
 # COMVERA security changelog
 
+## 2026-11-05: required submissions, delete, folders, document style
+- New write paths are role-checked (host Site Staff read only; requirements only by host admins) and tenant-checked (folders, links, requirements 404 across organisations), with tests in `test/studiodocs.test.ts`.
+- Permanent delete erases only files no other record references.
+
 ## 2026-11-05: set-up, email confirmation and the document store
 - New customers confirm their email (when email sending is on) and finish a guided set-up before the app opens; both enforced on the server. Existing accounts are not gated (migration 027).
 - Uploaded documents with three visibility levels. An independent review found 8 issues (two high: archived shared documents stayed readable by direct link; Site Staff could share internal documents with contractors). All fixed with regression tests; the two high ones were confirmed to fail without the fix.
