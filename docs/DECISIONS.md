@@ -5,6 +5,12 @@ Newest first.
 
 ---
 
+**DECISION** Customers confirm their email (not an authenticator app) and complete a guided set-up before the app opens; both are enforced on the server. Only genuinely required steps block (organisation details, a safety contact, a first site for a mine or the trade for a contractor, and an answer about existing documents). Uploads are a separate document store, "received" and never "approved", with three visibility levels. Document Studio and Oscar join the main navigation; Contractors / safety file documents move into Studio and More.
+**REASON** The owner's brief: customers should be guided rather than dropped into an empty app, should not need an authenticator, and need an obvious place to upload what they already have. Verification is only required when email sending is on, so nobody can be locked out by a missing email setup. Existing customers are not forced through set-up.
+**DATE** 2026-11-05
+
+---
+
 **DECISION** Account control for the platform owner: status (active/suspended/deactivated), flags, test classification and permanent deletion are separate operations. Deletion waits 14 days after scheduling, needs password + fresh authenticator code + typed name, keeps a permanent ledger including payment records, and is never triggered automatically. The console may show site and contractor names without a customer grant; documents and activity still need one, plus a stated reason.
 **REASON** Gives the owner real authority over customer accounts (spam, test accounts, deletion requests) without a hidden backdoor, an accident-prone delete, or loss of financial records. The 14-day wait and retention periods are working defaults for the owner to confirm; a lawyer should confirm retention.
 **DATE** 2026-11-05

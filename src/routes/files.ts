@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { many, one, pool, type Db } from '../db/pool.js';
 import { audit } from '../lib/audit.js';
 import { notFound } from '../lib/errors.js';
-import { isUuid, loadSite, requireOrg, type OrgCtx } from '../lib/authz.js';
+import { canAdminOrg, isUuid, loadSite, requireOrg, type OrgCtx } from '../lib/authz.js';
 import { contentDisposition, storage } from '../lib/storage.js';
 
 interface FileRow {
@@ -32,7 +32,11 @@ export async function anySiteVisible(db: Db, ctx: OrgCtx, siteIds: string[]): Pr
  * Draft attachments that were never submitted stay private to the uploader.
  */
 export async function canReadFile(db: Db, ctx: OrgCtx, file: FileRow): Promise<boolean> {
-  if (file.org_id === ctx.org.id) return true;
+  if (file.org_id === ctx.org.id) {
+    if (canAdminOrg(ctx)) return true;
+    // A restricted upload (e.g. medical records) is for owners and admins, even by file id.
+    return !(await one(db, `select 1 from org_documents d where d.visibility = 'restricted' and (d.current_file_id = $1 or exists (select 1 from org_document_versions v where v.document_id = d.id and v.file_id = $1))`, [file.id]));
+  }
   const sites = await many<{ site_id: string }>(
     db,
     `select r.site_id from document_versions v join documents d on d.id = v.document_id join requirements r on r.id = d.requirement_id

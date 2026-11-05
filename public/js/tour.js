@@ -40,9 +40,11 @@ function hostSteps(){
     );
   }
   out.push(
-    { title: 'Contractors', body: 'Every contractor you work with, searchable and filtered by trade. Their company details are theirs to keep up to date. From a contractor\'s profile you can suspend them on all your sites at once if you need to.', go: go({ nav: 'passport', activeSiteId: null, activeWorkplaceId: null }), target: '[data-action="nav"][data-nav="passport"]' },
+    { title: 'Contractors', body: 'Every contractor you work with, searchable and filtered by trade. Their company details are theirs to keep up to date. From a contractor\'s profile you can suspend them on all your sites at once if you need to.', go: go({ nav: 'passport', activeSiteId: null, activeWorkplaceId: null }), target: '.view-head, .search-wrap' },
     { title: 'Log anything, anywhere', body: 'The + button is always there: report an incident, issue a permit, log the diary or record a toolbox talk from site.', go: go({ nav: 'dashboard' }), target: '.fab' },
-    { title: 'Everything else', body: 'More holds Document Studio, the compliance agent, the assistant, the Safety Centre, the audit trail, verification, your team, and settings — including your validity rules for medicals, inductions, COID letters and insurance, when expiry reminders go out, and a download of all your data.', go: go({ nav: 'more', moreView: null }), target: '[data-action="nav"][data-nav="more"]' },
+    { title: 'Document Studio', body: 'Upload the policies, procedures, induction packs and templates you already have, and share the ones contractors need with them. Create new branded documents too. An upload is received, not approved.', go: go({ nav: 'studio' }), target: '[data-action="open-upload"], .studio-hero' },
+    { title: 'Oscar, your assistant', body: 'Ask Oscar what a job needs, which documents expire soon, or where a document is. Oscar only reads what you can see, and says when it is unsure. It never changes anything by itself.', go: go({ nav: 'oscar' }), target: '.oscar-head' },
+    { title: 'Everything else', body: 'More holds your contractors, the compliance agent, the Safety Centre, the audit trail, verification, your team, and settings — including your validity rules for medicals, inductions, COID letters and insurance, when expiry reminders go out, and a download of all your data.', go: go({ nav: 'more', moreView: null }), target: '[data-action="nav"][data-nav="more"]' },
   );
   return out;
 }
@@ -63,8 +65,9 @@ function contractorSteps(){
     );
   }
   out.push(
-    { title: 'Your document library', body: 'Every document you hold, grouped by status, with expiry dates. Replace one here and COMVERA shows every site file it affects.', go: go({ nav: 'passport', activeSiteId: null }), target: '[data-action="nav"][data-nav="passport"]' },
-    { title: 'Document Studio', body: 'Don\'t have a document? Create it: risk assessments, method statements (tick the work activities and the tools used, and the hazards, controls, PPE and pre-use checks are filled in), policies, appointment letters and more, branded as yours. Drafts are for you to check and sign — they are not a certification.', go: go({ nav: 'more', moreView: 'studio' }), target: '.view-head' },
+    { title: 'Your document library', body: 'Every document you hold, grouped by status, with expiry dates. Replace one here and COMVERA shows every site file it affects.', go: go({ nav: 'passport', activeSiteId: null }), target: '.view-head, .search-wrap' },
+    { title: 'Document Studio', body: 'Upload the documents you already have (registration, insurance, policies, certificates), and create the ones you don\'t: risk assessments, method statements, policies, appointment letters and more, branded as yours. Drafts are for you to check and sign — they are not a certification.', go: go({ nav: 'studio' }), target: '[data-action="open-upload"], .studio-hero' },
+    { title: 'Oscar, your assistant', body: 'Ask Oscar what a site needs, what is missing or expiring, or where a document is. Oscar only reads what you can see, and says when it is unsure.', go: go({ nav: 'oscar' }), target: '.oscar-head' },
     { title: 'Log anything, anywhere', body: 'The + button is always there: upload a document, record a toolbox talk with signatures on one device, report an incident or log the diary.', go: go({ nav: 'dashboard', moreView: null }), target: '.fab' },
   );
   return out;

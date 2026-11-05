@@ -6,6 +6,7 @@
  */
 import { libraryTypeFor } from '../lib/readiness.js';
 import { mustSetUpMfa } from '../lib/mfa.js';
+import { mustOnboard } from '../lib/onboarding.js';
 import { can, entitlementsFor } from '../lib/entitlements.js';
 import { rulesOf } from '../lib/validity.js';
 import { reminderDaysOf } from '../jobs/reminders.js';
@@ -399,12 +400,21 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
       id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, title: ctx.user.title, phone: ctx.user.phone,
       verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo, platformAdmin: isPlatformAdmin(ctx.user), mfaEnabled: !!ctx.user.mfa,
     };
+    // Email not confirmed yet (when email sending is on): only the "check your inbox" page.
+    if (features.verifyEmail && !ctx.user.email_verified_at && ctx.user.verify_required !== false && !ctx.user.is_demo) {
+      return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs: [], org: null, verifyRequired: true, features: baseFeatures };
+    }
     if (!ctx.org || !ctx.role) {
       return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: null, features: baseFeatures };
     }
     // The organisation requires the second step and this person hasn't set it up: nothing else loads until they do.
     if (mustSetUpMfa(ctx)) {
       return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: { id: ctx.org.id, name: ctx.org.name, kind: ctx.org.kind }, mfaSetupRequired: true, features: baseFeatures };
+    }
+    // Set-up not finished: only the set-up screens (admins fill them in; everyone else waits for them).
+    if (mustOnboard(ctx)) {
+      return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: { id: ctx.org.id, name: ctx.org.name, kind: ctx.org.kind, role: ctx.role },
+        onboardingRequired: true, canSetUp: ['owner', 'admin'].includes(ctx.role), features: baseFeatures };
     }
     const c = ctx as OrgCtx;
     const plan = planOf(c.org);

@@ -68,6 +68,13 @@ haven't built.
   files after commit, and is never automatic: suspicious accounts are only listed in the review queue. Platform owners are never targets.
   The console shows site and contractor names without a grant; requirements, documents and activity still need customer-granted support access
   (and a stated reason). Test/demo classification (`account_class`) keeps them out of customer counts only.
+- Before the app opens (`app.ts` gates, mirrored by a minimal bootstrap): a confirmed email when `features.verifyEmail` (email sending on,
+  or `REQUIRE_EMAIL_VERIFICATION=true`), then guided set-up (`lib/onboarding.ts`, `routes/onboarding.ts`, `organisations.onboarding*`). Only steps
+  marked required block; existing organisations were marked done in migration 026. New API routes a new organisation needs during set-up go in
+  `ONBOARDING_ALLOWED`. Test helpers complete set-up unless `keepOnboarding`.
+- Uploaded documents (`routes/orgDocuments.ts`, `org_documents` + versions) are "received", never "approved". Visibility: internal, restricted
+  (owners/admins), contractors (contractors with a live file at that site). Every new read path re-checks it on the server; Oscar's
+  `findDocuments` uses the same rules. Document Studio (`nav=studio`) and Oscar (`nav=oscar`, the assistant page) are in the main navigation.
 - Security: findings live in `docs/security/COMVERA_SECURITY_FINDINGS.md` (add a row and a regression test for each fix). Log security events with
   `securityEvent()` (`lib/securityLog.ts`), never with emails, tokens or codes. Every new upload path goes through `storeFile` or
   `storeExchangeFile` (virus scan, type check). New link-token routes need adding to `redactUrl` in `app.ts`.

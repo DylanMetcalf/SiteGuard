@@ -11,6 +11,8 @@ import {
 } from './core.js';
 import { computeTasks, sessionLabel } from './sheets.js';
 import { renderStudio } from './studio.js';
+import { renderOscar } from './assistant.js';
+import { renderOnboarding } from './onboarding.js';
 import { buildButton } from './safetyfiles.js';
 import { renderPlatform, invalidatePlatform } from './platform.js';
 import { renderReview } from './review.js';
@@ -28,7 +30,7 @@ export function topbar(){
     +'<div class="brand"><button class="brand-home" data-action="nav" data-nav="dashboard" aria-label="COMVERA — go to your dashboard" title="Dashboard" style="display:flex;align-items:center;gap:10px;"><div class="brand-mark"></div></button><div class="brand-text"><div class="brand-name">COMVERA'+(isDemoMode()?' <span class="demo-tag">DEMO</span>':'')+'</div>'
     +'<div class="brand-tag"><span class="live-dot'+(S.live?'':' off')+'" title="'+(S.live?'Live — changes from colleagues appear automatically':'Reconnecting…')+'"></span>'+org().name+'</div></div></div>'
     +'<div class="identity">'
-    +'<button class="identity-avatar" data-action="open-assistant" aria-label="Ask the COMVERA Assistant" title="Ask the COMVERA Assistant" style="background:var(--brand-bg); color:var(--brand-ink);">'+ICONS.sparkle+'</button>'
+    +(readOnly() ? '' : '<button class="identity-avatar" data-action="open-fab" aria-label="Quick actions" title="Quick actions" style="background:var(--brand); color:var(--on-brand);">'+ICONS.plus+'</button>')
     +'<button class="identity-avatar" data-action="open-search" aria-label="Search" style="background:var(--paper-raised); color:var(--ink);">'+ICONS.search+'</button>'
     +(()=>{ const unread = (S.boot.inbox||{}).unread||0; return '<button class="identity-avatar" data-action="open-inbox" aria-label="Inbox'+(unread?', '+unread+' new':'')+'" style="background:var(--paper-raised); color:var(--ink); position:relative;">'+ICONS.bell+(unread?'<span class="bell-count">'+(unread>9?'9+':unread)+'</span>':highCount?'<span class="bell-dot"></span>':'')+'</button>'; })()
     +(personas && personas.length ? '<select class="persona-select" id="personaSel" aria-label="Demo persona" title="Demo persona — switches to another sample user (their real permissions apply)">'
@@ -56,10 +58,11 @@ function banners(){
 }
 
 export function bottomNav(){
-  const tabs = [['dashboard','Dashboard',ICONS.dashboard],['sites',isContractor()?'Safety files':'Sites',ICONS.sites],null,['passport', isContractor()?'Documents':'Contractors', ICONS.passport],['more','More',ICONS.more]];
-  return '<nav class="bottomnav"><div class="bottomnav-row">'
-    + tabs.map(t=> t ? '<button data-action="nav" data-nav="'+t[0]+'" class="'+(S.nav===t[0]?'active':'')+'"'+(S.nav===t[0]?' aria-current="page"':'')+'>'+t[2]+'<span>'+t[1]+'</span></button>'
-      : '<button class="fab" data-action="open-fab" aria-label="Quick actions">'+ICONS.plus+'</button>').join('')
+  // Document Studio and Oscar are core: always one tap away. Contractors / company documents live in Studio and More.
+  const tabs = [['dashboard','Overview',ICONS.dashboard],['sites',isContractor()?'Safety files':'Sites',ICONS.sites],['studio','Studio',ICONS.passport],['oscar','Oscar',ICONS.sparkle],['more','More',ICONS.more]];
+  const on = (k) => S.nav===k || (k==='more' && ['passport','setup'].includes(S.nav)) || (k==='studio' && S.nav==='more' && S.moreView==='studio');
+  return '<nav class="bottomnav" aria-label="Main"><div class="bottomnav-row">'
+    + tabs.map(t=>'<button data-action="nav" data-nav="'+t[0]+'" class="'+(on(t[0])?'active':'')+'"'+(on(t[0])?' aria-current="page"':'')+'>'+t[2]+'<span>'+t[1]+'</span></button>').join('')
     +'</div></nav>';
 }
 
@@ -71,6 +74,9 @@ export function renderView(){
     return renderSitesList();
   }
   if(S.nav==='passport') return isContractor() ? renderPassport() : renderContractorsList();
+  if(S.nav==='studio') return renderStudio();
+  if(S.nav==='oscar') return renderOscar();
+  if(S.nav==='setup') return renderOnboarding(true);
   if(S.nav==='more') return renderMore();
   if(S.nav==='review') return renderReview();
   return '';
@@ -185,8 +191,8 @@ function renderDashboard(){
   const head = '<div class="dash-hero"><div class="flexbetween" style="align-items:flex-start;"><div><p class="hero-eyebrow">'+org().name+'</p><h1>'+greeting()+'</h1>'
     +'<p class="greeting">'+(urgent ? urgent+' urgent item'+(urgent===1?'':'s')+' need'+(urgent===1?'s':'')+' you today.' : findings.length ? findings.length+' item'+(findings.length===1?'':'s')+' to look at — nothing urgent.' : 'Everything is in order across your sites.')+'</p></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn secondary small" data-action="start-tour">Walkthrough</button><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div></div>'
-    +(isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button>'+(isOrgAdmin() ? '<button class="btn secondary" data-action="exchange-share">'+ICONS.link+' Share securely</button>' : '')+'<button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>'
-      : isHost() ? '<div class="hero-actions">'+(isOrgAdmin() && !readOnly() ? '<button class="btn primary" data-action="new-site">'+ICONS.plus+' Add site</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="passport">Contractors</button><button class="btn secondary" data-action="goto-more" data-view="studio">Document Studio</button><button class="btn secondary" data-action="open-assistant">'+ICONS.sparkle+' Assistant</button></div>' : '')
+    +(isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button>'+(isOrgAdmin() ? '<button class="btn secondary" data-action="exchange-share">'+ICONS.link+' Share securely</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="studio">Document Studio</button><button class="btn secondary" data-action="nav" data-nav="oscar">'+ICONS.sparkle+' Oscar</button></div>'
+      : isHost() ? '<div class="hero-actions">'+(isOrgAdmin() && !readOnly() ? '<button class="btn primary" data-action="new-site">'+ICONS.plus+' Add site</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="passport">Contractors</button><button class="btn secondary" data-action="nav" data-nav="studio">Document Studio</button><button class="btn secondary" data-action="nav" data-nav="oscar">'+ICONS.sparkle+' Oscar</button></div>' : '')
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
   const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
@@ -815,14 +821,15 @@ function renderMore(){
   let html = '<div class="view-head"><h1>More</h1><p>'+org().name+' · '+org().roleLabel+'</p></div>'
     +'<button class="tour-cta" data-action="start-tour"><span class="tour-cta-ic">'+ICONS.sparkle+'</span><span><strong>Walkthrough</strong><span class="site-card-sub">A guided tour of every page, with auto-play for demos</span></span>'+ICONS.chevron+'</button>'
     +'<div class="card">';
+  html += '<button class="menu-row" data-action="nav" data-nav="passport"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">'+(isContractor()?'Safety file documents':'Contractors')+'</div><div class="qa-sub">'+(isContractor()?'What each site needs from you, and where each document stands':'Every contractor you work with, their files and status')+'</div></div>'+ICONS.chevron+'</button>';
   if(isContractor() && !readOnly()) html += '<button class="menu-row" data-action="sfb-start"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">Create a safety file</div><div class="qa-sub">For a site on COMVERA or any client</div></div>'+ICONS.chevron+'</button>';
-  html += item('studio', ICONS.passport, 'Document Studio', 'Your documents, plus branded safety documents as PDF and Word');
+  html += '<button class="menu-row" data-action="nav" data-nav="studio"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">Document Studio</div><div class="qa-sub">Upload your documents, and create branded ones as PDF and Word</div></div>'+ICONS.chevron+'</button>';
   if(isContractor() && isOrgAdmin() && !readOnly()) html += '<button class="menu-row" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">New project</div><div class="qa-sub">A safety file for a client who isn\'t on COMVERA</div></div>'+ICONS.chevron+'</button>';
   if(isContractor() && isOrgAdmin()) html += '<button class="menu-row" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Join a site with a code</div><div class="qa-sub">Type the code the site gave you</div></div>'+ICONS.chevron+'</button>';
   html += item('exchanges', ICONS.link, 'Exchanges', isHost() ? 'Request documents from contractors — no account needed' : 'Share documents securely, and answer requests');
   const nf = (S.boot.agent||{findings:[]}).findings.length;
   html += item('agent', ICONS.verify, 'Compliance agent', nf ? nf+' item'+(nf===1?'':'s')+' need attention' : 'Continuous checks across every site');
-  html += '<button class="menu-row" data-action="open-assistant"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">COMVERA Assistant</div><div class="qa-sub">Ask what a site or job needs, or how your sites are doing</div></div>'+ICONS.chevron+'</button>';
+  html += '<button class="menu-row" data-action="nav" data-nav="oscar"><div class="qa-icon">'+ICONS.sparkle+'</div><div style="flex:1;"><div class="qa-title">Oscar</div><div class="qa-sub">Your assistant: find documents, see what is missing or expiring, and get help preparing documents</div></div>'+ICONS.chevron+'</button>';
   if(isHost()) html += item('safety', ICONS.alert, 'Safety Centre', 'Open incidents and permits across every site');
   html += item('workforce', ICONS.hardhat, 'Workforce', isContractor()?'Your workers\' medicals, inductions and training':'Contractor workers assigned to your sites');
   html += item('appointments', ICONS.passport, 'Appointments register', 'Statutory appointments and their letters');
@@ -832,6 +839,7 @@ function renderMore(){
   html += '</div><div class="section-title">Organisation</div><div class="card">';
   html += item('team', ICONS.people, 'Team & roles', 'Invite colleagues and set what they can do');
   if(isOrgAdmin()) html += item('billing', ICONS.card, 'Plan & billing', org().planName+' · '+org().seatLimit+' seats');
+  if(isOrgAdmin()) html += '<button class="menu-row" data-action="nav" data-nav="setup"><div class="qa-icon">'+ICONS.check+'</div><div style="flex:1;"><div class="qa-title">Organisation set-up</div><div class="qa-sub">Your set-up answers: details, safety contact, sites, departments and areas, documents</div></div>'+ICONS.chevron+'</button>';
   if(isOrgAdmin()) html += item('settings', ICONS.gear, 'Organisation settings', 'Company details, notifications, integrations');
   if(S.boot.me.platformAdmin) html += item('platform', ICONS.dashboard, 'Platform', 'Manager portal: customers, health, support and the activity log');
   html += '</div><div class="section-title">Account</div><div class="card">'
@@ -1225,7 +1233,7 @@ export function exportSafetyFile(siteId){
 }
 
 /* ============ view-level actions ============ */
-on('nav', (el)=>{ S.nav = el.dataset.nav; if(S.nav==='sites'){ S.activeSiteId=null; S.activeWorkplaceId=null; } if(S.nav==='more') S.moreView=null; S.docSelectMode=false; render(); window.scrollTo(0,0); });
+on('nav', (el)=>{ S.nav = el.dataset.nav; if(S.nav==='setup') S.ob = null; if(S.nav==='sites'){ S.activeSiteId=null; S.activeWorkplaceId=null; } if(S.nav==='more') S.moreView=null; S.docSelectMode=false; render(); window.scrollTo(0,0); });
 on('open-site', (el)=>{ S.activeSiteId = el.dataset.site; S.nav='sites'; S.siteTab='compliance'; render(); window.scrollTo(0,0); });
 on('back-sites', ()=>{
   // A contractor's file on a shared site goes back to that site's page on the mine side.
@@ -1235,7 +1243,7 @@ on('back-sites', ()=>{
 });
 on('focus-site', (el, e)=>{ e.stopPropagation(); S.focusSiteId = el.dataset.site; render(); });
 on('site-tab', (el)=>{ S.siteTab = el.dataset.tab; render(); });
-on('goto-more', (el)=>{ if(el.dataset.view==='platform'){ location.href = '/manager'; return; } S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); if(S.moreView==='exchanges'){ invalidateExchanges(); S.exchangeId = null; } render(); window.scrollTo(0,0); });
+on('goto-more', (el)=>{ if(el.dataset.view==='platform'){ location.href = '/manager'; return; } if(el.dataset.view==='studio'){ S.nav='studio'; render(); window.scrollTo(0,0); return; } S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); if(S.moreView==='exchanges'){ invalidateExchanges(); S.exchangeId = null; } render(); window.scrollTo(0,0); });
 on('doc-centre-filter', (el)=>{ S.docCentreFilter = el.dataset.filter; render(); });
 on('doc-centre-jump', (el)=>{ S.docCentreFilter = el.dataset.filter; S.hostPeopleTab = 'documents'; S.nav='passport'; render(); });
 on('safety-filter', (el)=>{ S.safetyFilter = el.dataset.filter; render(); });

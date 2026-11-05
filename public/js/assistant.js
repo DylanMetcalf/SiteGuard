@@ -71,8 +71,8 @@ function safeUrl(u){ try{ const x = new URL(u); return /^https?:$/.test(x.protoc
 function renderLog(packs){
   const c = chat();
   if(!c.items.length){
-    const ex = isContractor() ? EXAMPLES_CONTRACTOR : EXAMPLES_HOST;
-    return '<div class="chat-empty"><p>Ask what a site or job needs, check on your sites, or get a document drafted.</p>'
+    const ex = (isContractor() ? EXAMPLES_CONTRACTOR : EXAMPLES_HOST).concat(EXAMPLES_DOCS);
+    return '<div class="chat-empty"><p>Ask what a site or job needs, find a document, check what is missing or expiring, or get a document drafted.</p>'
       + ex.map((q,i)=>'<button class="chat-chip" data-action="chat-example" data-i="'+i+'">'+escapeHtml(q)+'</button>').join('')
       +'</div>';
   }
@@ -103,22 +103,37 @@ function modeLabel(){
   return S.boot.features.ai ? '<span class="badge green">AI</span>' : '<span class="badge grey">Built-in rules</span>';
 }
 
-export function openAssistant(question){
-  openSheet('<div class="sheet-head"><div><h3>COMVERA Assistant '+modeLabel()+'</h3><div class="site-card-sub">Guidance, not legal advice. Nothing changes until you confirm.</div></div>'
-    +'<div style="display:flex;gap:6px;align-items:center;">'+(chat().items.length?'<button class="btn secondary small" data-action="chat-reset">New chat</button>':'')
-    +'<button class="sheet-close" data-action="close-sheet" aria-label="Close">'+ICONS.cross+'</button></div></div>'
-    +'<div id="chatLog" class="chat-log"></div>'
-    +'<form class="chat-form" id="chatForm"><textarea id="chatInput" rows="2" maxlength="4000" placeholder="e.g. What does the safety file need for welding at Shaft 3?" aria-label="Message"></textarea>'
-    +'<button class="btn primary" id="chatSend" type="submit">Send</button></form>');
-  const sheet = sheetEl();
-  if(sheet) sheet.classList.add('chat-sheet');
+const EXAMPLES_DOCS = ['Which of my documents expire in the next 60 days?', 'What is still missing from my safety files?', 'Find our emergency procedure'];
+
+/** Oscar: COMVERA's assistant, as its own page in the main navigation. */
+export function renderOscar(){
+  const c = chat();
+  return '<div class="oscar">'
+    +'<div class="oscar-head"><div class="oscar-mark">'+ICONS.sparkle+'</div><div><h1>Oscar</h1><p class="site-card-sub">Your COMVERA assistant '+modeLabel()+'. Oscar reads only what you can see in '+escapeHtml(S.boot.org.name.replace(/&amp;/g,'&'))+', and tells you when it is unsure. Guidance, not legal advice: nothing changes until you confirm.</p></div>'
+    +(c.items.length ? '<button class="btn secondary small" data-action="chat-reset">New conversation</button>' : '')+'</div>'
+    +'<div id="chatLog" class="chat-log oscar-log" aria-live="polite"></div>'
+    +'<form class="chat-form oscar-form" id="chatForm"><textarea id="chatInput" rows="2" maxlength="4000" placeholder="Ask Oscar, e.g. What does a contractor need for welding at Shaft 3?" aria-label="Message to Oscar"></textarea>'
+    +'<button class="btn primary" id="chatSend" type="submit">Send</button></form>'
+    +'<p class="site-card-sub" style="text-align:center;margin-top:8px;">The conversation stays in this browser tab only and is not stored.</p></div>';
+}
+/** Called after the Oscar page is drawn: wires the form and shows the conversation. */
+export function mountOscar(){
   const form = document.getElementById('chatForm');
   const input = document.getElementById('chatInput');
+  if(!form || form.dataset.ready) return;
+  form.dataset.ready = '1';
   form.addEventListener('submit', (e)=>{ e.preventDefault(); send(input.value); });
   input.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(input.value); } });
   refresh();
-  if(question) send(question); else setTimeout(()=>input.focus(), 30);
+  const q = S.oscarQ; S.oscarQ = null;
+  if(q) send(q); else if(!chat().items.length) setTimeout(()=>input.focus(), 30);
 }
+export function openAssistant(question){
+  closeSheet();
+  S.nav = 'oscar'; S.oscarQ = question || null;
+  render(); window.scrollTo(0,0);
+}
+void openSheet; void sheetEl;
 
 async function send(text){
   const c = chat();
@@ -144,8 +159,8 @@ async function send(text){
 const cardOf = (el) => { const m = chat().items[Number(el.dataset.mi)]; return m && m.cards ? m.cards[Number(el.dataset.ci)] : null; };
 
 on('open-assistant', (el)=>openAssistant(el && el.dataset ? el.dataset.q : ''));
-on('chat-example', (el)=>{ const ex = isContractor() ? EXAMPLES_CONTRACTOR : EXAMPLES_HOST; send(ex[Number(el.dataset.i)]); });
-on('chat-reset', ()=>{ S.chat = { items: [], busy: false }; openAssistant(); });
+on('chat-example', (el)=>{ const ex = (isContractor() ? EXAMPLES_CONTRACTOR : EXAMPLES_HOST).concat(EXAMPLES_DOCS); send(ex[Number(el.dataset.i)]); });
+on('chat-reset', ()=>{ S.chat = { items: [], busy: false }; render(); });
 on('chat-card-site', (el)=>{
   const card = cardOf(el); if(!card) return;
   if(!canCreateSite()){ showToast('Only admins can add sites'); return; }

@@ -58,6 +58,8 @@ export interface UserRow {
   mfa?: boolean;
   /** active, suspended or deactivated: anything but active cannot use a session. */
   status?: string;
+  /** Signed up after email confirmation became a requirement (migration 027). */
+  verify_required?: boolean;
 }
 
 export interface Ctx {

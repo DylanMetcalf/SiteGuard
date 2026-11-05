@@ -41,6 +41,8 @@ const schema = z.object({
   // Email: SMTP connection URL, e.g. smtps://user:pass@smtp.postmarkapp.com:465.
   // Unset → emails are written to the log (and still recorded in the outbox).
   SMTP_URL: z.string().optional(),
+  /** 'auto' (default): customers must confirm their email before using the app whenever email sending is on. */
+  REQUIRE_EMAIL_VERIFICATION: z.enum(['auto', 'true', 'false']).default('auto'),
   EMAIL_FROM: z.string().default('COMVERA <no-reply@comvera.local>'),
   /** Where "Report a problem" messages are emailed (e.g. your own address). Unset → logged only. */
   SUPPORT_EMAIL: z.string().email().optional(),
@@ -125,6 +127,8 @@ export const features = {
   payments: !!config.STRIPE_SECRET_KEY || !!config.PAYSTACK_SECRET_KEY,
   paymentProvider: (config.PAYSTACK_SECRET_KEY ? 'paystack' : config.STRIPE_SECRET_KEY ? 'stripe' : null) as 'paystack' | 'stripe' | null,
   email: !!config.SMTP_URL,
+  /** Never on without email: nobody could ever receive the link. */
+  verifyEmail: config.REQUIRE_EMAIL_VERIFICATION === 'true' || (config.REQUIRE_EMAIL_VERIFICATION === 'auto' && !!config.SMTP_URL),
   demo: config.DEMO_SANDBOX_ENABLED,
   devRoleSwitcher: config.DEV_ROLE_SWITCHER && !isProd,
 };

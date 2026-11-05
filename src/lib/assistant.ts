@@ -150,6 +150,34 @@ async function siteDetail(ctx: OrgCtx, siteId: string) {
 // Claude tool loop
 // ---------------------------------------------------------------------------
 
+/** Documents this person may see: their organisation's uploads (restricted ones only for owners and admins), documents
+ * written in Document Studio, and (for a contractor) what its sites shared. Names, types, dates and status only. */
+export async function findDocuments(ctx: OrgCtx, query: string, withinDays: number | null) {
+  const admin = ['owner', 'admin'].includes(ctx.role);
+  const q = query.trim().slice(0, 100);
+  const rows = await many<{ name: string; kind: string; type: string; site: string | null; expiry: string | null; version: number; source: string }>(pool,
+    `select d.name, 'uploaded' as kind, d.doc_type as type, w.name as site, to_char(d.expiry_date, 'YYYY-MM-DD') as expiry, d.version, 'your organisation' as source
+       from org_documents d left join workplaces w on w.id = d.workplace_id
+      where d.org_id = $1 and d.archived_at is null and (d.visibility <> 'restricted' or $2)
+     union all
+     select g.title, 'created in Document Studio', g.blueprint, null, to_char(g.review_due, 'YYYY-MM-DD'), g.revision, 'your organisation'
+       from generated_documents g where g.org_id = $1 and g.superseded_at is null
+     union all
+     select d.name, 'shared by a site', d.doc_type, w.name, to_char(d.expiry_date, 'YYYY-MM-DD'), d.version, o.name
+       from org_documents d join organisations o on o.id = d.org_id left join workplaces w on w.id = d.workplace_id
+      where $3 and d.org_id <> $1 and d.visibility = 'contractors' and d.archived_at is null
+        and exists (select 1 from sites s join contractors c on c.id = s.contractor_id where c.linked_org_id = $1 and s.org_id = d.org_id and s.status in ('in_progress', 'site_ready') and ((d.workplace_id is null and d.scope = 'company') or s.workplace_id = d.workplace_id))`,
+    [ctx.org.id, admin, ctx.org.kind === 'contractor']);
+  const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !['the', 'our', 'my', 'find', 'where', 'document', 'documents', 'which', 'what'].includes(w));
+  const today = Date.now();
+  return rows.filter((r) => {
+    if (withinDays !== null && (!r.expiry || (new Date(r.expiry).getTime() - today) / 86400000 > withinDays)) return false;
+    if (!words.length) return true;
+    const hay = `${r.name} ${r.type} ${r.site ?? ''}`.toLowerCase();
+    return words.some((w) => hay.includes(w.replace(/s$/, '')));
+  }).slice(0, 40);
+}
+
 function tools(ctx: OrgCtx): Anthropic.Beta.BetaToolUnion[] {
   const reqItems = {
     type: 'array',
@@ -176,6 +204,11 @@ function tools(ctx: OrgCtx): Anthropic.Beta.BetaToolUnion[] {
       name: 'get_attention_items',
       description: "The compliance agent's current findings for this organisation, most urgent first: expired or expiring documents, reviews waiting, overdue requests, serious incidents, permits past expiry, lapsed worker certificates. Use for 'what needs my attention' or 'what should I do today'.",
       input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'find_documents',
+      description: "Searches the documents this person may see: their organisation's uploads, documents created in Document Studio, and documents sites shared with them. Returns name, kind, type, site, expiry or review date, version and who it is from. Use it to find a document or to list what expires soon.",
+      input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Words to look for, or empty for all' }, expiring_within_days: { type: 'integer', description: 'Only documents expiring within this many days (include already expired)' } } },
     },
     {
       name: 'list_my_sites',
@@ -237,12 +270,13 @@ function tools(ctx: OrgCtx): Anthropic.Beta.BetaToolUnion[] {
 function systemPrompt(ctx: OrgCtx): string {
   const host = isHost(ctx);
   const create = canCreateSites(ctx);
-  return `You are the COMVERA Assistant, built into COMVERA, a contractor compliance and site safety platform for South African mines and industrial sites.
+  return `You are Oscar, the assistant built into COMVERA, a contractor compliance and site safety platform for South African mines and industrial sites.
 You are talking to ${ctx.user.name} (${roleLabel(ctx.org.kind, ctx.role)}) at ${ctx.org.name}, ${host ? 'a site owner (host) that invites contractors onto its sites' : 'a contractor company that works on other companies\' sites'}. Today is ${new Date().toISOString().slice(0, 10)}.
 
 What you help with:
 - Working out what a contractor safety file needs for a particular site or scope of work.
 - Reporting on the user's own sites and what is outstanding. For "what needs my attention" or "what should I do today", call get_attention_items and turn the findings into a short, prioritised to-do list.
+- Finding the user's documents and what expires soon: call find_documents. Never claim a document, approval or certificate exists unless a tool returned it.
 - Suggesting documents to draft.
 
 When someone asks what a site or job needs:
@@ -253,7 +287,7 @@ When someone asks what a site or job needs:
 
 Rules:
 - South African context: the Mine Health and Safety Act 29 of 1996 on mines; the Occupational Health and Safety Act 85 of 1993 and the Construction Regulations 2014 elsewhere; COIDA for injury cover. Never invent section or regulation numbers you are not sure of.
-- Look up the user's sites with the tools; never guess their status.
+- Look up the user's sites and documents with the tools; never guess their status. Say clearly which parts come from their records, which are general guidance, and what you could not check.
 - You cannot create, change or delete anything. Cards you show let the user act.
 - Be concise and practical: short paragraphs and "- " bullet lists, **bold** sparingly, no tables and no # headings.
 - This is guidance, not legal advice; the site's SHE department has the final say.
@@ -286,6 +320,11 @@ async function runTool(ctx: OrgCtx, block: Anthropic.Beta.BetaToolUseBlock, st: 
           }
         }
         return ok({ lastCheckedAt: lastRunAt, findings: findings.map(({ severity, title, detail }) => ({ severity, title, detail })) });
+      }
+      case 'find_documents': {
+        const days = input.expiring_within_days === undefined || input.expiring_within_days === null ? null : Math.max(0, Math.min(3650, Number(input.expiring_within_days) || 0));
+        const docs = await findDocuments(ctx, String(input.query ?? ''), days);
+        return ok(docs.length ? docs : 'No documents match. Say so plainly; do not guess that a document exists.');
       }
       case 'list_my_sites': {
         const sites = await mySites(ctx);
@@ -436,7 +475,8 @@ function guessLocation(text: string): string {
 
 function help(ctx: OrgCtx): string {
   return [
-    "I'm the COMVERA Assistant. Try asking:",
+    "I'm Oscar, your COMVERA assistant. Try asking:",
+    `- "Which of my documents expire in the next 60 days?"`,
     `- "What do I need for a safety file for electrical work at Shaft 3?"`,
     `- "Which of my sites are behind?"`,
     `- "What needs my attention today?"`,
@@ -460,6 +500,14 @@ export async function runAssistantOffline(ctx: OrgCtx, history: ChatMessage[]): 
     const brief = text.replace(/^(please\s+)?(can you\s+|could you\s+)?(draft|write|create|generate|make)\s+(me\s+)?(an?\s+)?[\w\s/-]*?\b(for|on|about|covering)\s+/i, '').trim() || text;
     cards.push({ type: 'draft', docType: draftHint[1], brief: brief.charAt(0).toUpperCase() + brief.slice(1) });
     return reply(`I can draft a ${draftHint[1].toLowerCase()} from that description. Tap below to generate it, then review and edit before use.`);
+  }
+
+  const expiring = /\bexpir\w*\b/i.test(text);
+  if ((expiring || /\b(find|where is|where's|look for|show me)\b.*\b(document|policy|procedure|certificate|template|plan|induction)/i.test(text)) && !profiles.length) {
+    const days = expiring ? Number((/(\d{1,4})\s*days?/i.exec(text) || [])[1] || 60) : null;
+    const found = await findDocuments(ctx, expiring ? '' : text, days);
+    if (!found.length) return reply(expiring ? `None of your documents expire in the next ${days} days.` : "I couldn't find a document matching that in your records. Try other words, or upload it in Document Studio.");
+    return reply((expiring ? `From your records, these expire within ${days} days:` : 'From your records:') + '\n' + found.slice(0, 12).map((d) => `- **${d.name}** (${d.kind}${d.site ? `, ${d.site}` : ''}${d.expiry ? `, ${expiring ? 'expires' : 'date'} ${d.expiry}` : ''}${d.source !== 'your organisation' ? `, from ${d.source}` : ''})`).join('\n'));
   }
 
   if (/\b(attention|priorit\w*|today|to-?do|urgent|focus|what should i|where do i start|agent)\b/i.test(text) && !profiles.length) {
