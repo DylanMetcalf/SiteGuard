@@ -69,9 +69,11 @@ const MFA_SETUP_ALLOWED = ['/api/bootstrap', '/api/me/mfa', '/api/auth/logout', 
 /** Before the email is confirmed: only signing in and out, confirming, and the minimal start-up data. */
 const VERIFY_ALLOWED = ['/api/bootstrap', '/api/auth', '/api/me/mfa', '/api/client-errors', '/api/events'];
 /** Before set-up is finished: set-up itself and what it needs (creating a site, uploading documents, joining a site). */
-const ONBOARDING_ALLOWED = ['/api/bootstrap', '/api/onboarding', '/api/auth', '/api/me', '/api/org-docs', '/api/workplaces', '/api/templates', '/api/requirement-templates', '/api/sites/join',
+const ONBOARDING_ALLOWED = ['/api/bootstrap', '/api/onboarding', '/api/auth', '/api/me', '/api/org-docs', '/api/templates', '/api/requirement-templates', '/api/sites/join', '/api/manager', '/api/admin',
   '/api/files', '/api/client-errors', '/api/events', '/api/support-access', '/api/billing', '/api/org/require-mfa', '/api/org/invites'];
 const allowed = (list: string[], p: string) => list.some((x) => p === x || p.startsWith(x + '/'));
+/** During set-up only creating a site and its departments/areas; not requests, requirements or contractors. */
+const setupAllowed = (p: string, method: string) => allowed(ONBOARDING_ALLOWED, p) || (p === '/api/workplaces' && method === 'POST') || /^\/api\/workplaces\/[0-9a-f-]{36}\/areas(\/[0-9a-f-]{36})?$/.test(p);
 
 const CSRF_EXEMPT = new Set(['/api/billing/webhook', '/api/billing/paystack/webhook']);
 /** The Exchange portal has its own short sessions and CSRF header (routes/exchangePortal.ts). */
@@ -154,10 +156,10 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     if (req.ctx) req.ctx.write = mutating;
     const pathOnly = req.url.split('?')[0];
     // An organisation that requires the second step: members without it can only set it up (or sign out/switch).
-    if (req.ctx && features.verifyEmail && !req.ctx.user.email_verified_at && !req.ctx.user.is_demo && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !allowed(VERIFY_ALLOWED, pathOnly)) {
+    if (req.ctx && features.verifyEmail && !req.ctx.user.email_verified_at && req.ctx.user.verify_required !== false && !req.ctx.user.is_demo && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !allowed(VERIFY_ALLOWED, pathOnly)) {
       throw new HttpError(403, 'email_unverified', 'Confirm your email address first: open the link we emailed you.');
     }
-    if (req.ctx?.org && mustOnboard(req.ctx as { org: { onboarding_completed_at?: unknown; is_demo?: boolean } }) && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !allowed(ONBOARDING_ALLOWED, pathOnly)) {
+    if (req.ctx?.org && mustOnboard(req.ctx as { org: { onboarding_completed_at?: unknown; is_demo?: boolean } }) && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !setupAllowed(pathOnly, req.method)) {
       throw new HttpError(403, 'onboarding_required', 'Finish setting up your organisation first.');
     }
     if (req.ctx?.org && mustSetUpMfa(req.ctx) && pathOnly.startsWith('/api/') && !isPortal(pathOnly) && !MFA_SETUP_ALLOWED.some((p) => pathOnly === p || pathOnly.startsWith(p + '/'))) {

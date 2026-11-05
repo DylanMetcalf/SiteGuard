@@ -59,7 +59,7 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
     pool,
     `select s.id, s.csrf_token, s.org_id, s.last_seen_at, s.mfa_verified_at,
             json_build_object('id', u.id, 'email', u.email, 'name', u.name, 'title', u.title, 'phone', u.phone,
-                              'email_verified_at', u.email_verified_at, 'is_demo', u.is_demo, 'status', u.status,
+                              'email_verified_at', u.email_verified_at, 'is_demo', u.is_demo, 'status', u.status, 'verify_required', u.verify_required,
                               'mfa', exists (select 1 from user_mfa m where m.user_id = u.id and m.enabled_at is not null)) as user
        from sessions s join users u on u.id = s.user_id
       where s.id = $1 and s.expires_at > now() and s.created_at > now() - make_interval(days => $2)`,

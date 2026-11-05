@@ -41,6 +41,20 @@ describe('email confirmation', () => {
   });
 });
 
+describe('existing accounts after the upgrade', () => {
+  it('people who had an account before email confirmation became required are not locked out', async () => {
+    const email = uniqueEmail('olduser');
+    const a = new Agent(app);
+    await a.post('/api/auth/signup', { name: 'Old Timer', email, password: PASSWORD, orgName: 'Old Mining', orgKind: 'host' });
+    await pool.query(`update users set verify_required = false where email = $1`, [email]);
+    await pool.query(`update organisations set onboarding_completed_at = now() where name = 'Old Mining'`);
+    const st = await a.state();
+    assert.equal(st.verifyRequired, undefined);
+    assert.ok(st.state, 'works as before');
+    assert.equal((await pool.query('select email_verified_at from users where email = $1', [email])).rows[0].email_verified_at, null, 'not falsely marked as confirmed');
+  });
+});
+
 describe('guided set-up', () => {
   let host: Agent, hostEmail = '', wpId = '';
   before(async () => { ({ agent: host, email: hostEmail } = await signup(app, { orgName: 'Setup Mining', orgKind: 'host', keepOnboarding: true })); });
@@ -52,6 +66,11 @@ describe('guided set-up', () => {
     assert.equal(st.state, undefined);
     const blocked = await host.post('/api/exchanges/request', { recipientEmail: 'x@example.com', items: [{ documentType: 'COID' }] });
     assert.equal(blocked.status, 403); assert.equal(blocked.body.error, 'onboarding_required');
+    const wpEarly = await host.post('/api/workplaces', { name: 'Early Site', packIds: [] });
+    assert.equal(wpEarly.status, 200, 'creating a site is part of set-up');
+    const req = await host.post(`/api/workplaces/${wpEarly.body.id}/requests`, { title: 'x' });
+    assert.equal(req.body.error, 'onboarding_required', 'sending document requests is not');
+    await pool.query(`update workplaces set archived_at = now() where id = $1`, [wpEarly.body.id]);
     const early = await host.post('/api/onboarding/complete');
     assert.equal(early.status, 409);
     assert.match(early.body.message, /Your organisation.*Safety contact.*Your first site.*Your site documents/);
@@ -193,6 +212,37 @@ describe('the document store', () => {
     assert.doesNotMatch(r.body.reply, /Medical Surveillance/, 'restricted stays hidden from non-admins');
     const x = await ask(stranger, 'Where is the induction document?');
     assert.doesNotMatch(x.body.reply, /Shaft Induction Pack/);
+  });
+
+  it('review fixes: Site Staff read only, archived and site-only documents stop, unaccepted sites see nothing, restricted files stay restricted', async () => {
+    const staffEmail = uniqueEmail('sitestaff');
+    await mine.post('/api/org/invites', { email: staffEmail, role: 'member' });
+    const staff = (await signup(app, { orgName: '', orgKind: 'host', email: staffEmail, inviteToken: await lastEmailToken(staffEmail, '/invite') })).agent;
+    assert.equal((await upload(staff, '/api/org-docs', { name: 'Staff upload' })).status, 403);
+    assert.equal((await staff.patch(`/api/org-docs/${internalId}`, { name: 'Board Risk Register', visibility: 'contractors' })).status, 403);
+    assert.equal((await contractor.get(`/api/org-docs/${internalId}`)).status, 404, 'still not shared');
+    assert.ok((await upload(reviewer, '/api/org-docs', { name: 'Reviewer upload' })).status === 200, 'reviewers manage documents');
+    // a document shared with one site needs that site
+    assert.equal((await upload(mine, '/api/org-docs', { name: 'No site', scope: 'site', visibility: 'contractors' })).status, 400);
+    const siteOnly = (await upload(mine, '/api/org-docs', { name: 'Shaft Rules', scope: 'site', workplaceId: wp, visibility: 'contractors' })).body.id;
+    assert.equal((await contractor.get(`/api/org-docs/${siteOnly}`)).status, 200);
+    await pool.query(`update org_documents set workplace_id = null where id = $1`, [siteOnly]); // what deleting the site does
+    assert.equal((await contractor.get(`/api/org-docs/${siteOnly}`)).status, 404, 'never widens to every site');
+    // archived: gone even by direct link
+    const arch = (await upload(mine, '/api/org-docs', { name: 'Old Induction', workplaceId: wp, visibility: 'contractors' })).body.id;
+    assert.equal((await contractor.get(`/api/org-docs/${arch}/file`)).status, 200);
+    await mine.post(`/api/org-docs/${arch}/archive`, { archived: true });
+    assert.equal((await contractor.get(`/api/org-docs/${arch}`)).status, 404);
+    assert.equal((await contractor.get(`/api/org-docs/${arch}/file`)).status, 404);
+    // a site the contractor has not accepted shows nothing
+    await pool.query(`update sites set status = 'invited' where workplace_id = $1`, [wp]);
+    assert.deepEqual((await contractor.get('/api/org-docs/shared')).body.documents, []);
+    assert.equal((await contractor.get(`/api/org-docs/${docId}`)).status, 404);
+    await pool.query(`update sites set status = 'in_progress' where workplace_id = $1`, [wp]);
+    // restricted: not even through the general file route
+    const fid = (await pool.query(`select current_file_id from org_documents where id = $1`, [restrictedId])).rows[0].current_file_id;
+    assert.equal((await reviewer.get(`/api/files/${fid}`)).status, 404);
+    assert.equal((await mine.get(`/api/files/${fid}`)).status, 200);
   });
 
   it('archiving hides a document from the list and from contractors, and can be undone', async () => {

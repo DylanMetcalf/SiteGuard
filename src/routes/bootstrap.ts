@@ -401,7 +401,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
       verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo, platformAdmin: isPlatformAdmin(ctx.user), mfaEnabled: !!ctx.user.mfa,
     };
     // Email not confirmed yet (when email sending is on): only the "check your inbox" page.
-    if (features.verifyEmail && !ctx.user.email_verified_at && !ctx.user.is_demo) {
+    if (features.verifyEmail && !ctx.user.email_verified_at && ctx.user.verify_required !== false && !ctx.user.is_demo) {
       return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs: [], org: null, verifyRequired: true, features: baseFeatures };
     }
     if (!ctx.org || !ctx.role) {

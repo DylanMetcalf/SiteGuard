@@ -1,5 +1,10 @@
 # COMVERA security changelog
 
+## 2026-11-05: set-up, email confirmation and the document store
+- New customers confirm their email (when email sending is on) and finish a guided set-up before the app opens; both enforced on the server. Existing accounts are not gated (migration 027).
+- Uploaded documents with three visibility levels. An independent review found 8 issues (two high: archived shared documents stayed readable by direct link; Site Staff could share internal documents with contractors). All fixed with regression tests; the two high ones were confirmed to fail without the fix.
+- Site-only documents never widen to every site; unaccepted invitations see nothing; restricted uploads are refused through the general file route too.
+
 ## 2026-11-05: platform account controls
 - Suspend/deactivate/reactivate organisations and people, enforced on the server in every session path; flags and test classification; protected two-stage deletion with step-up proof, a 14-day wait and a permanent ledger; support views now need a stated reason. Migration 025. Tests: `test/accounts.test.ts`.
 

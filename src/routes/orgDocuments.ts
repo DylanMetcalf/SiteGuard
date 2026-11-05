@@ -45,13 +45,13 @@ type DocRow = { id: string; org_id: string; visibility: string; workplace_id: st
 
 /** The documents a contractor may read from the sites it works on. */
 const SHARED_WITH = `exists (select 1 from sites s join contractors c on c.id = s.contractor_id
-                             where c.linked_org_id = $1 and s.org_id = d.org_id and s.status <> 'declined'
-                               and (d.workplace_id is null or s.workplace_id = d.workplace_id))`;
+                             where c.linked_org_id = $1 and s.org_id = d.org_id and s.status in ('in_progress', 'site_ready')
+                               and ((d.workplace_id is null and d.scope = 'company') or s.workplace_id = d.workplace_id))`;
 
 async function canRead(db: Db, ctx: OrgCtx, d: DocRow): Promise<boolean> {
   if (d.org_id === ctx.org.id) return d.visibility !== 'restricted' || canAdminOrg(ctx);
   if (d.visibility !== 'contractors') return false;
-  return !!(await one(db, `select 1 from org_documents d where d.id = $2 and ${SHARED_WITH}`, [ctx.org.id, d.id]));
+  return !!(await one(db, `select 1 from org_documents d where d.id = $2 and d.archived_at is null and ${SHARED_WITH}`, [ctx.org.id, d.id]));
 }
 
 async function own(db: Db, ctx: OrgCtx, id: string, lock = false): Promise<DocRow> {
@@ -62,7 +62,13 @@ async function own(db: Db, ctx: OrgCtx, id: string, lock = false): Promise<DocRo
 }
 
 /** The links must point inside this organisation. */
+/** On a mine's side, Site Staff read only (as everywhere else); owners, admins and reviewers manage documents. */
+function requireDocWriter(ctx: OrgCtx) {
+  if (ctx.org.kind === 'host' && ctx.role === 'member') throw forbidden('Site Staff can read documents but not change them. Ask an admin or reviewer.');
+}
+
 async function checkLinks(db: Db, ctx: OrgCtx, m: Meta) {
+  if (m.visibility === 'contractors' && m.scope !== 'company' && !m.workplaceId) throw badRequest('Choose the site whose contractors may see it, or make it company-wide.');
   if (m.visibility === 'restricted' && !canAdminOrg(ctx)) throw forbidden('Only an owner or admin can restrict a document.');
   if (m.visibility === 'contractors' && ctx.org.kind !== 'host') throw badRequest('Only a site can share documents with its contractors.');
   if (m.workplaceId && !(await one(db, `select 1 from workplaces where id = $1 and org_id = $2`, [m.workplaceId, ctx.org.id]))) throw notFound();
@@ -114,6 +120,7 @@ export default async function orgDocumentRoutes(app: FastifyInstance) {
   app.post('/api/org-docs', rl(60), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
+    requireDocWriter(ctx);
     const { file, buf, parsed } = await readUpload(req);
     const m = meta.parse({ name: (parsed as { name?: string }).name || file.filename.replace(/\.[a-z0-9]+$/i, ''), ...(parsed as object) });
     return withTx(async (db) => {
@@ -150,6 +157,7 @@ export default async function orgDocumentRoutes(app: FastifyInstance) {
   app.patch('/api/org-docs/:id', rl(60), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
+    requireDocWriter(ctx);
     const m = meta.parse(req.body);
     return withTx(async (db) => {
       const d = await own(db, ctx, (req.params as { id: string }).id, true);
@@ -167,6 +175,7 @@ export default async function orgDocumentRoutes(app: FastifyInstance) {
   app.post('/api/org-docs/:id/version', rl(60), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
+    requireDocWriter(ctx);
     const { file, buf, parsed } = await readUpload(req);
     const note = z.object({ note: t(300).default('') }).parse(parsed).note;
     return withTx(async (db) => {
@@ -183,6 +192,7 @@ export default async function orgDocumentRoutes(app: FastifyInstance) {
   app.post('/api/org-docs/:id/archive', rl(60), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireWritable(ctx);
+    requireDocWriter(ctx);
     const { archived } = z.object({ archived: z.boolean() }).parse(req.body);
     return withTx(async (db) => {
       const d = await own(db, ctx, (req.params as { id: string }).id, true);

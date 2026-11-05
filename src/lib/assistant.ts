@@ -166,7 +166,7 @@ export async function findDocuments(ctx: OrgCtx, query: string, withinDays: numb
      select d.name, 'shared by a site', d.doc_type, w.name, to_char(d.expiry_date, 'YYYY-MM-DD'), d.version, o.name
        from org_documents d join organisations o on o.id = d.org_id left join workplaces w on w.id = d.workplace_id
       where $3 and d.org_id <> $1 and d.visibility = 'contractors' and d.archived_at is null
-        and exists (select 1 from sites s join contractors c on c.id = s.contractor_id where c.linked_org_id = $1 and s.org_id = d.org_id and s.status <> 'declined' and (d.workplace_id is null or s.workplace_id = d.workplace_id))`,
+        and exists (select 1 from sites s join contractors c on c.id = s.contractor_id where c.linked_org_id = $1 and s.org_id = d.org_id and s.status in ('in_progress', 'site_ready') and ((d.workplace_id is null and d.scope = 'company') or s.workplace_id = d.workplace_id))`,
     [ctx.org.id, admin, ctx.org.kind === 'contractor']);
   const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !['the', 'our', 'my', 'find', 'where', 'document', 'documents', 'which', 'what'].includes(w));
   const today = Date.now();

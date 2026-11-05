@@ -24,7 +24,7 @@ const redraw = () => { render(); };
 export function renderVerifyGate(){
   return '<div class="ob-wrap">' + brand + '<div class="card ob-narrow"><h1>Confirm your email address</h1>'
     + '<p>We sent a link to <strong>' + S.boot.me.email + '</strong>. Open it on this device to continue setting up COMVERA.</p>'
-    + '<p class="site-card-sub">Can’t find it? Check your spam folder, or ask for a new link. Links work for 24 hours.</p>'
+    + '<p class="site-card-sub">Can’t find it? Check your spam folder, or ask for a new link. Links work for 3 days.</p>'
     + '<button class="btn primary block" data-action="resend-verification">Send the link again</button>'
     + '<button class="btn secondary block" style="margin-top:8px;" data-action="ob-recheck">I have confirmed it</button>'
     + '<button class="btn ghost block" style="margin-top:8px;" data-action="auth-signout">Sign out</button></div></div>';

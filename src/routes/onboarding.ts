@@ -60,6 +60,7 @@ export default async function onboardingRoutes(app: FastifyInstance) {
         next.connectSkipped = z.object({ skipped: z.boolean() }).parse(req.body).skipped;
       }
       await db.query(`update organisations set onboarding = $2 where id = $1`, [ctx.org.id, JSON.stringify(next)]);
+      await audit(db, ctx, 'Updated set-up', step);
       await publishChange(db, [ctx.org.id]);
       return { ok: true };
     });
