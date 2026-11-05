@@ -59,13 +59,15 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
     pool,
     `select s.id, s.csrf_token, s.org_id, s.last_seen_at, s.mfa_verified_at,
             json_build_object('id', u.id, 'email', u.email, 'name', u.name, 'title', u.title, 'phone', u.phone,
-                              'email_verified_at', u.email_verified_at, 'is_demo', u.is_demo,
+                              'email_verified_at', u.email_verified_at, 'is_demo', u.is_demo, 'status', u.status,
                               'mfa', exists (select 1 from user_mfa m where m.user_id = u.id and m.enabled_at is not null)) as user
        from sessions s join users u on u.id = s.user_id
       where s.id = $1 and s.expires_at > now() and s.created_at > now() - make_interval(days => $2)`,
     [id, config.SESSION_MAX_DAYS],
   );
   if (!row) return null;
+  // Suspended or deactivated people have no working session, wherever it was opened.
+  if (row.user.status && row.user.status !== 'active') return null;
 
   let org: OrgRow | null = null;
   let role: Role | null = null;
@@ -76,7 +78,11 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
         where m.org_id = $1 and m.user_id = $2`,
       [row.org_id, row.user.id],
     );
-    if (m) {
+    // A suspended or deactivated organisation is closed to everyone in it until it is reactivated.
+    if (m && (m.org as OrgRow & { status?: string }).status && (m.org as OrgRow & { status?: string }).status !== 'active') {
+      const other = await one(pool, `select 1 from memberships m join organisations o on o.id = m.org_id where m.user_id = $1 and o.status = 'active'`, [row.user.id]);
+      if (!other) return null;
+    } else if (m) {
       org = m.org;
       role = m.role;
       if (org.kind === 'contractor') org.sponsored = await hasActiveSponsorship(pool, org.id);

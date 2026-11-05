@@ -89,7 +89,7 @@ export default async function gateRoutes(app: FastifyInstance) {
     const { token } = req.params as { token: string };
     reply.header('cache-control', 'no-store').header('referrer-policy', 'no-referrer');
     const found = /^[A-Za-z0-9_-]{20,40}$/.test(token)
-      ? await one<{ site_id: string; worker_id: string }>(pool, 'select site_id, worker_id from site_workers where gate_token = $1', [token])
+      ? await one<{ site_id: string; worker_id: string }>(pool, `select sw.site_id, sw.worker_id from site_workers sw join sites s on s.id = sw.site_id join organisations o on o.id = s.org_id where sw.gate_token = $1 and o.status = 'active'`, [token])
       : null;
     const row = found ? (await gateRows(pool, [found.site_id])).find((w) => w.workerId === found.worker_id) : undefined;
     if (!row) return reply.status(404).type('text/html').send(page('Gate check', '<div class="card"><h1>Not recognised</h1><div class="sub">This card isn\'t valid for any site. The worker may have been removed from the site, or the card replaced.</div></div>'));

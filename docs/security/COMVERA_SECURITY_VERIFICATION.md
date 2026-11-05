@@ -81,3 +81,13 @@ lockout); all fixed with regression tests: reset keeps the lock and cancels open
 password, every signed-in MFA route checks the lockout and counts wrong passwords, set-up can't overwrite an active
 key, one live ticket per person, the gate never blocks the Exchange portal or email/invite links.
 `npm test`: 255 passed, 0 failed; typecheck and `node --check` clean.
+
+## Addendum: platform account controls (5 Nov 2026)
+Suspend, deactivate, flag, test classification and protected deletion were built and tested with separate organisations
+(`test/accounts.test.ts`: tenant isolation of every endpoint, status enforcement on every session path, step-up proof,
+waiting period, cascade safety, retained ledger, erased files). An independent review found one high issue (organisations that
+had received an exchange upload could not be deleted) and several medium/low ones (public links of closed organisations, a
+cancel/execute race, personal data kept in the request row, closed organisations chosen at password reset or invite). All fixed
+with regression tests; two were confirmed to fail without the fix. `npm test`: 275 passed, 0 failed.
+Known limits: a contractor's documents that a mine already approved lose their file if the contractor is deleted (shown in the
+preview before anything is scheduled); join codes and site invitations are not yet blocked for a closed mine.

@@ -490,6 +490,7 @@ time-limited transaction) and a **workspace** (an organisation someone signed up
   dependency, secret encrypted with `MFA_SECRET_KEY` when set. A code can't be replayed (`last_step`), failures lock the account
   like password failures, eight single-use recovery codes are stored as hashes. A session counts for 12 hours.
   In production the older `/api/admin/*` routes need the same fresh session.
+- **Account control** (`routes/managerAccounts.ts`, `lib/managerAuth.ts`): organisations and people have a `status` (active, suspended, deactivated), a separate `flag_kind` that blocks nothing, and an `account_class` (customer, internal_test, development; demo is `is_demo`). Non-active status ends sessions and is checked in `resolveSession`, login, the code step, reset and switch-org. Permanent deletion: schedule (organisation deactivated, password + fresh code + typed name) -> 14 days -> execute (same proof). It copies payments to `deletion_ledger`, anonymises people in audit entries, deletes people who belong nowhere else, and erases stored files after commit. People can be deleted 14 days after deactivation.
 - **Customer two-step sign-in** (`routes/mfa.ts`, `lib/mfa.ts`, migration 024): any user can turn it on (Profile → Security).
   With it on, a correct password returns a ticket (`login_challenges`, hashed, 5 minutes, 5 attempts), and
   `POST /api/auth/login/mfa` exchanges ticket + code for a session. Password reset never signs such a user in.

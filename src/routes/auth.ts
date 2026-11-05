@@ -151,6 +151,7 @@ export default async function authRoutes(app: FastifyInstance) {
         );
         if (!inv) throw badRequest('That invitation link has expired or was already used. Ask for a new one.', 'invalid_invite');
         if (inv.email.toLowerCase() !== body.email) throw badRequest(`This invitation was sent to ${inv.email}. Sign up with that address.`, 'invite_email_mismatch');
+        if (!(await one(db, `select 1 from organisations where id = $1 and status = 'active'`, [inv.org_id]))) throw badRequest('That organisation is not accepting new people right now.', 'invalid_invite');
         orgId = inv.org_id;
         role = inv.role;
         verified = true; // they proved control of the address by opening the link
@@ -204,9 +205,9 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post('/api/auth/login', rl(10), async (req, reply) => {
     const body = z.object({ email, password }).parse(req.body);
-    const user = await one<{ id: string; password_hash: string | null; last_active_org_id: string | null; locked_until: Date | null }>(
+    const user = await one<{ id: string; password_hash: string | null; last_active_org_id: string | null; locked_until: Date | null; status: string }>(
       pool,
-      'select id, password_hash, last_active_org_id, locked_until from users where email = $1 and not is_demo',
+      'select id, password_hash, last_active_org_id, locked_until, status from users where email = $1 and not is_demo',
       [body.email],
     );
     if (user?.locked_until && new Date(user.locked_until) > new Date()) {
@@ -226,10 +227,17 @@ export default async function authRoutes(app: FastifyInstance) {
       securityEvent(req, 'login_failed', { userId: user?.id ?? null, emailRef: user ? null : emailRef(body.email) });
       throw unauthorized('Email or password is incorrect.');
     }
+    // A suspended or deactivated person, or one whose organisations are all closed, is told so (only after the password is right).
+    const closed = () => new HttpError(403, 'account_inactive', 'This account is not active. Contact COMVERA support if you think this is a mistake.');
+    if (user.status !== 'active') { securityEvent(req, 'login_failed', { userId: user.id, reason: 'inactive' }); throw closed(); }
+    const mems = await one<{ n: number; active: number }>(pool,
+      `select count(*)::int as n, count(*) filter (where o.status = 'active')::int as active from memberships m join organisations o on o.id = m.org_id where m.user_id = $1`, [user.id]);
+    if (mems && mems.n > 0 && mems.active === 0) { securityEvent(req, 'login_failed', { userId: user.id, reason: 'org_inactive' }); throw closed(); }
     const orgId =
       (await one<{ org_id: string }>(
         pool,
-        `select org_id from memberships where user_id = $1 order by (org_id = $2) desc, created_at limit 1`,
+        `select m.org_id from memberships m join organisations o on o.id = m.org_id where m.user_id = $1 and o.status = 'active'
+          order by (m.org_id = $2) desc, m.created_at limit 1`,
         [user.id, user.last_active_org_id],
       ))?.org_id ?? null;
     // A second step is on: no session yet, only a short-lived single-use ticket for the code.
@@ -257,7 +265,8 @@ export default async function authRoutes(app: FastifyInstance) {
       const ch = await one<{ user_id: string; org_id: string | null; attempts: number }>(
         db, `select user_id, org_id, attempts from login_challenges where token_hash = $1 and expires_at > now() for update`, [sha256(body.ticket)]);
       if (!ch) return { kind: 'expired' as const };
-      await db.query('select 1 from users where id = $1 for update', [ch.user_id]); // serialises parallel tickets
+      const who = await one<{ status: string }>(db, 'select status from users where id = $1 for update', [ch.user_id]); // serialises parallel tickets
+      if (who?.status !== 'active') return { kind: 'inactive' as const };
       if (await lockedOut(db, ch.user_id)) return { kind: 'locked' as const };
       const how = await consumeMfaCode(db, ch.user_id, body.code);
       if (!how) {
@@ -272,6 +281,7 @@ export default async function authRoutes(app: FastifyInstance) {
       return { kind: 'ok' as const, userId: ch.user_id, orgId: ch.org_id, how };
     });
     if (result.kind === 'expired') throw expired();
+    if (result.kind === 'inactive') throw new HttpError(403, 'account_inactive', 'This account is not active. Contact COMVERA support if you think this is a mistake.');
     if (result.kind === 'locked') throw new HttpError(423, 'locked', 'Too many failed attempts. Try again in 15 minutes.');
     if (result.kind === 'wrong') {
       securityEvent(req, 'mfa_failed', { userId: result.userId });
@@ -327,9 +337,10 @@ export default async function authRoutes(app: FastifyInstance) {
       await db.query('delete from login_challenges where user_id = $1', [row.user_id]);
       securityEvent(req, 'password_reset_completed', { userId: row.user_id });
       const u = await one<{ last_active_org_id: string | null }>(db, 'select last_active_org_id from users where id = $1', [row.user_id]);
-      const m = await one<{ org_id: string }>(db, 'select org_id from memberships where user_id = $1 order by (org_id = $2) desc limit 1', [row.user_id, u?.last_active_org_id]);
+      const m = await one<{ org_id: string }>(db, `select m.org_id from memberships m join organisations o on o.id = m.org_id where m.user_id = $1 and o.status = 'active' order by (m.org_id = $2) desc limit 1`, [row.user_id, u?.last_active_org_id]);
       // With a second step on, the reset alone never signs anyone in: an email inbox is not two factors.
-      if (keepLock) return { signIn: true };
+      const st = await one<{ status: string }>(db, 'select status from users where id = $1', [row.user_id]);
+      if (keepLock || st?.status !== 'active') return { signIn: true };
       await createSession(db, reply, req, row.user_id, m?.org_id ?? null);
       return { signIn: false };
     });
@@ -434,7 +445,7 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/switch-org', async (req) => {
     const ctx = requireUser(req.ctx);
     const { orgId } = z.object({ orgId: z.string().uuid() }).parse(req.body);
-    const m = await one(pool, 'select 1 from memberships where org_id = $1 and user_id = $2', [orgId, ctx.user.id]);
+    const m = await one(pool, `select 1 from memberships m join organisations o on o.id = m.org_id where m.org_id = $1 and m.user_id = $2 and o.status = 'active'`, [orgId, ctx.user.id]);
     if (!m) throw notFound();
     await pool.query('update sessions set org_id = $2 where id = $1', [ctx.sessionId, orgId]);
     await pool.query('update users set last_active_org_id = $2 where id = $1', [ctx.user.id, orgId]);

@@ -62,6 +62,12 @@ haven't built.
 - Two-step sign-in (`lib/mfa.ts`, `routes/mfa.ts`, `user_mfa`): a password alone never creates a session for a user with it on (login
   ticket in `login_challenges`); no route may sign such a user in another way (reset, invite, switch). `settings.requireMfa` gates
   members server-side (`MFA_SETUP_ALLOWED` in `app.ts`).
+- Account control (`routes/managerAccounts.ts`, `lib/managerAuth.ts`, migration 025): flag, suspend/deactivate and permanent deletion are
+  four different things. Status is enforced on the server in `resolveSession`, login, login/mfa, reset and switch-org, never only in the UI.
+  Deletion is scheduled (14 days), needs password + a fresh code + the typed name, keeps a permanent `deletion_ledger` (with payments), erases
+  files after commit, and is never automatic: suspicious accounts are only listed in the review queue. Platform owners are never targets.
+  The console shows site and contractor names without a grant; requirements, documents and activity still need customer-granted support access
+  (and a stated reason). Test/demo classification (`account_class`) keeps them out of customer counts only.
 - Security: findings live in `docs/security/COMVERA_SECURITY_FINDINGS.md` (add a row and a regression test for each fix). Log security events with
   `securityEvent()` (`lib/securityLog.ts`), never with emails, tokens or codes. Every new upload path goes through `storeFile` or
   `storeExchangeFile` (virus scan, type check). New link-token routes need adding to `redactUrl` in `app.ts`.

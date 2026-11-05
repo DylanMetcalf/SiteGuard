@@ -1,5 +1,8 @@
 # COMVERA security changelog
 
+## 2026-11-05: platform account controls
+- Suspend/deactivate/reactivate organisations and people, enforced on the server in every session path; flags and test classification; protected two-stage deletion with step-up proof, a 14-day wait and a permanent ledger; support views now need a stated reason. Migration 025. Tests: `test/accounts.test.ts`.
+
 ## 2026-11-04: customer two-step sign-in (SEC-010)
 - Authenticator-app codes for every user, optional; organisation admins can require them for their members.
 - Login with a password returns a single-use ticket when two-step is on; password reset no longer signs such users in.

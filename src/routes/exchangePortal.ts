@@ -39,7 +39,7 @@ async function byToken(db: Db, token: string, lock = false) {
   return one<ExchangeRow & { sender_name: string }>(
     db,
     `select x.*, to_char(x.deadline, 'YYYY-MM-DD') as deadline, o.name as sender_name from exchanges x join organisations o on o.id = x.sender_org_id
-      where x.link_token_hash = $1 ${lock ? 'for update of x' : ''}`,
+      where x.link_token_hash = $1 and o.status = 'active' ${lock ? 'for update of x' : ''}`,
     [sha256(token)],
   );
 }

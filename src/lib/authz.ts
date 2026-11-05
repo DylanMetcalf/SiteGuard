@@ -56,6 +56,8 @@ export interface UserRow {
   is_demo: boolean;
   /** The user has a second sign-in step (authenticator app) turned on. */
   mfa?: boolean;
+  /** active, suspended or deactivated: anything but active cannot use a session. */
+  status?: string;
 }
 
 export interface Ctx {
