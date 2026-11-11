@@ -16,6 +16,7 @@ import { track } from '../lib/events.js';
 import { redeemPromo } from '../lib/promos.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
+import { SlidingWindow } from '../lib/window.js';
 
 export const rl = (max: number) => ({
   config: { rateLimit: { max: config.NODE_ENV === 'test' ? max * 100 : max, timeWindow: '1 minute' } },
@@ -28,6 +29,9 @@ export const rl = (max: number) => ({
  * gets the roomier one. `max` is read after the body is parsed so it can tell the two apart.
  */
 const SHARED_ADDRESS_MAX = 60;
+/** A second layer: one email can be tried at most this many times a minute from anywhere, however many addresses the attacker has. */
+const EMAIL_LOGIN_MAX = config.NODE_ENV === 'test' ? 1000 : 10;
+const emailLogins = new SlidingWindow(60_000);
 export const rlSignup = {
   config: {
     rateLimit: {
@@ -235,6 +239,11 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post('/api/auth/login', rl(SHARED_ADDRESS_MAX), async (req, reply) => {
     const body = z.object({ email, password }).parse(req.body);
+    // Same answer for real and unknown addresses (the key is just the typed email), so this reveals nothing.
+    if (emailLogins.hit(body.email) > EMAIL_LOGIN_MAX) {
+      securityEvent(req, 'login_email_limited', { emailRef: emailRef(body.email) });
+      throw new HttpError(429, 'rate_limited', 'Too many attempts — wait a minute and try again.');
+    }
     const user = await one<{ id: string; password_hash: string | null; last_active_org_id: string | null; locked_until: Date | null; status: string }>(
       pool,
       'select id, password_hash, last_active_org_id, locked_until, status from users where email = $1 and not is_demo',

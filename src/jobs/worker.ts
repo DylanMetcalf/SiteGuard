@@ -12,6 +12,8 @@ import { purgeOldDemos } from '../routes/demo.js';
 import { pool, withTx } from '../db/pool.js';
 import { recheckAllSiteReady } from '../lib/siteready.js';
 import { runAgent, sendWeeklySummaries } from '../lib/agent.js';
+import { checkAlerts } from '../lib/alerts.js';
+import { runFileHygiene } from '../lib/filehygiene.js';
 
 export function startJobs(log: (msg: string) => void = console.log): () => void {
   let stopped = false;
@@ -28,6 +30,17 @@ export function startJobs(log: (msg: string) => void = console.log): () => void 
     }
   }, 5_000);
 
+  // Early-warning check every minute: cheap (in-memory counters), emails only when a threshold is crossed.
+  const alertTimer = setInterval(async () => {
+    if (stopped) return;
+    try {
+      const fired = await withTx((db) => checkAlerts(db));
+      if (fired.length) log(`alerts: sent ${fired.join(', ')}`);
+    } catch (err) {
+      log(`alert check error: ${(err as Error).message}`);
+    }
+  }, 60_000);
+
   const hourly = async () => {
     if (stopped) return;
     try {
@@ -37,6 +50,7 @@ export function startJobs(log: (msg: string) => void = console.log): () => void 
       if (trials) log(`trials: sent ${trials} trial notice(s)`);
       await sendWeeklySummaries();
       await cleanupExpired();
+      await runFileHygiene(log);
       const purged = await purgeOldDemos();
       if (purged) log(`demo: purged ${purged} old sandbox(es)`);
     } catch (err) {
@@ -67,6 +81,7 @@ export function startJobs(log: (msg: string) => void = console.log): () => void 
   return () => {
     stopped = true;
     clearInterval(mailTimer);
+    clearInterval(alertTimer);
     clearInterval(hourlyTimer);
     clearTimeout(startup);
     clearInterval(agentTimer);

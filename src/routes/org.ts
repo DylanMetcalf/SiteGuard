@@ -1,3 +1,4 @@
+import { csvCell } from '../lib/csv.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { track } from '../lib/events.js';
@@ -93,46 +94,31 @@ export default async function orgRoutes(app: FastifyInstance) {
     const body = z
       .object({ email: z.string().trim().toLowerCase().email().max(254), role: z.enum(['owner', 'admin', 'reviewer', 'member']) })
       .parse(req.body);
-    if (!rolesFor(ctx.org.kind).includes(body.role)) throw badRequest('That role is not available for this kind of organisation.');
-    if (body.role === 'owner' && ctx.role !== 'owner') throw forbidden('Only owners can invite another owner.');
-    return withTx(async (db) => {
-      await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
-      if (await one(db, `select 1 from memberships m join users u on u.id = m.user_id where m.org_id = $1 and u.email = $2`, [ctx.org.id, body.email])) {
-        throw conflict('That person is already a member.');
+    return createInvite(ctx, body.email, body.role);
+  });
+
+  /** Several invitations from a pasted list or spreadsheet. Each row succeeds or fails on its own; the answer says which. */
+  app.post('/api/org/invites/bulk', rl(5), async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireAdmin(ctx);
+    requireWritable(ctx);
+    requireVerified(ctx);
+    const body = z
+      .object({ rows: z.array(z.object({ email: z.string().trim().toLowerCase().max(254), role: z.enum(['owner', 'admin', 'reviewer', 'member']) })).min(1).max(100) })
+      .parse(req.body);
+    const seen = new Set<string>();
+    const results: { email: string; ok: boolean; message?: string }[] = [];
+    for (const row of body.rows) {
+      if (!z.string().email().safeParse(row.email).success) { results.push({ email: row.email, ok: false, message: 'Not a valid email address.' }); continue; }
+      if (seen.has(row.email)) { results.push({ email: row.email, ok: false, message: 'Listed more than once.' }); continue; }
+      seen.add(row.email);
+      try { await createInvite(ctx, row.email, row.role); results.push({ email: row.email, ok: true }); }
+      catch (err) {
+        if (err instanceof HttpError) results.push({ email: row.email, ok: false, message: err.message });
+        else throw err;
       }
-      await db.query(
-        `update user_invites set revoked_at = now() where org_id = $1 and email = $2 and accepted_at is null and revoked_at is null`,
-        [ctx.org.id, body.email],
-      );
-      if (limitsEnforced() && (await seatsUsed(db, ctx.org.id)) >= ctx.org.seat_limit) {
-        throw new HttpError(
-          402,
-          'seat_limit',
-          `All ${ctx.org.seat_limit} seats are in use. Add seats under Billing, or remove someone first.`,
-        );
-      }
-      const token = newToken();
-      const inv = (await one<{ id: string }>(
-        db,
-        `insert into user_invites (org_id, email, role, token_hash, invited_by, expires_at)
-         values ($1, $2, $3, $4, $5, now() + interval '7 days') returning id`,
-        [ctx.org.id, body.email, body.role, sha256(token), ctx.user.id],
-      ))!;
-      await queueEmail(db, {
-        orgId: ctx.org.id,
-        to: body.email,
-        subject: `${ctx.user.name} invited you to ${ctx.org.name} on COMVERA`,
-        lines: [
-          `${ctx.user.name} has invited you to join ${ctx.org.name} on COMVERA as ${roleLabel(ctx.org.kind, body.role)}.`,
-          'COMVERA keeps contractor safety files, permits, incidents and site readiness in one place. The link below expires in 7 days.',
-        ],
-        action: { label: 'Accept invitation', url: appUrl(`/invite?token=${token}`) },
-      });
-      await audit(db, ctx, 'Invited user', `${body.email} as ${roleLabel(ctx.org.kind, body.role)}`);
-      await track(db, ctx.org.id, 'invitation_sent');
-      await publishChange(db, [ctx.org.id]);
-      return { id: inv.id };
-    });
+    }
+    return { results, sent: results.filter((r) => r.ok).length };
   });
 
   app.delete('/api/org/invites/:id', async (req) => {
@@ -256,7 +242,7 @@ export default async function orgRoutes(app: FastifyInstance) {
       .send(JSON.stringify(data, null, 2));
   });
 
-  app.get('/api/audit', async (req) => {
+  app.get('/api/audit', async (req, reply) => {
     const ctx = requireOrg(req.ctx);
     const q = z
       .object({
@@ -264,9 +250,21 @@ export default async function orgRoutes(app: FastifyInstance) {
         to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         siteId: z.string().uuid().optional(),
         limit: z.coerce.number().int().min(1).max(5000).default(1000),
+        format: z.enum(['json', 'csv']).default('json'),
       })
       .parse(req.query);
-    return { events: await auditFor(pool, ctx, q) };
+    const events = await auditFor(pool, ctx, q);
+    if (q.format !== 'csv') return { events };
+    // For an inspector or auditor: a spreadsheet of who did what and when. Cells that start with = + - @ are
+    // prefixed so a spreadsheet program cannot run them as a formula.
+    const cell = csvCell;
+    const head = ['When (UTC)', 'Who', 'Role', 'What', 'Detail', 'Site id'];
+    const lines = [head.map(cell).join(','), ...events.map((e: any) => [e.ts, e.actor, e.role, e.action, e.detail, e.siteId].map(cell).join(','))];
+    return reply
+      .type('text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="comvera-audit-${new Date().toISOString().slice(0, 10)}.csv"`)
+      .header('cache-control', 'no-store')
+      .send('\ufeff' + lines.join('\r\n') + '\r\n');
   });
 }
 
@@ -305,4 +303,48 @@ export async function auditFor(
       limit $5`,
     [ctx.org.id, q.from ?? null, q.to ?? null, q.siteId ?? null, q.limit],
   );
+}
+
+/** Creates one invitation for the caller's organisation (role checks, seat limit, email). Shared by the single and bulk routes. */
+async function createInvite(ctx: OrgCtx, email: string, role: Role) {
+  if (!rolesFor(ctx.org.kind).includes(role)) throw badRequest('That role is not available for this kind of organisation.');
+  if (role === 'owner' && ctx.role !== 'owner') throw forbidden('Only owners can invite another owner.');
+  return withTx(async (db) => {
+    await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
+    if (await one(db, `select 1 from memberships m join users u on u.id = m.user_id where m.org_id = $1 and u.email = $2`, [ctx.org.id, email])) {
+      throw conflict('That person is already a member.');
+    }
+    await db.query(
+      `update user_invites set revoked_at = now() where org_id = $1 and email = $2 and accepted_at is null and revoked_at is null`,
+      [ctx.org.id, email],
+    );
+    if (limitsEnforced() && (await seatsUsed(db, ctx.org.id)) >= ctx.org.seat_limit) {
+      throw new HttpError(
+        402,
+        'seat_limit',
+        `All ${ctx.org.seat_limit} seats are in use. Add seats under Billing, or remove someone first.`,
+      );
+    }
+    const token = newToken();
+    const inv = (await one<{ id: string }>(
+      db,
+      `insert into user_invites (org_id, email, role, token_hash, invited_by, expires_at)
+       values ($1, $2, $3, $4, $5, now() + interval '7 days') returning id`,
+      [ctx.org.id, email, role, sha256(token), ctx.user.id],
+    ))!;
+    await queueEmail(db, {
+      orgId: ctx.org.id,
+      to: email,
+      subject: `${ctx.user.name} invited you to ${ctx.org.name} on COMVERA`,
+      lines: [
+        `${ctx.user.name} has invited you to join ${ctx.org.name} on COMVERA as ${roleLabel(ctx.org.kind, role)}.`,
+        'COMVERA keeps contractor safety files, permits, incidents and site readiness in one place. The link below expires in 7 days.',
+      ],
+      action: { label: 'Accept invitation', url: appUrl(`/invite?token=${token}`) },
+    });
+    await audit(db, ctx, 'Invited user', `${email} as ${roleLabel(ctx.org.kind, role)}`);
+    await track(db, ctx.org.id, 'invitation_sent');
+    await publishChange(db, [ctx.org.id]);
+    return { id: inv.id };
+  });
 }

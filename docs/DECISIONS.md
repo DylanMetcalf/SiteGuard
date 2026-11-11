@@ -290,3 +290,11 @@ Newest first.
 **DECISION** The bot swarm has four scenarios: `test:bots` (19 bots, functional and abuse), `test:bots:security` (every API route as a stranger, as another organisation holding real ids, and as read-only Site Staff; headers; sessions; chaos plus database integrity), `test:bots:shared-address` (a whole shift behind one router; server run with TRUST_PROXY=false) and `test:bots:ux` (real browsers at 320/390/768/1280px with an axe-core WCAG 2.2 AA audit; needs `npm i axe-core` somewhere and AXE_PATH).
 **REASON** Round two found: shared-address lock-out (SEC-017, fixed), 2 critical and several serious accessibility problems (fixed: unlabelled button, tab group without tabs, low-contrast green, missing page landmarks, a tab row that scrolled the phone sideways). Known and left: dimmed walkthrough summary (intentional), heading order on a few screens.
 **DATE** 2026-11-11
+
+**DECISION** Per-email sign-in limit (10 a minute, any address), early-warning alert emails to the platform owners, daily orphan-file report (delete only when `ORPHAN_CLEANUP=delete`), bulk invitations (up to 100, per-row results), and a CSV audit export that neutralises spreadsheet formulas.
+**REASON** The backlog from the bot rounds. Deleting files is irreversible, so it is opt-in and re-checks references first; alerts carry counts only so they can never leak personal information.
+**DATE** 2026-11-11
+
+**DECISION** Not built now: WhatsApp reminders (needs a WhatsApp Business provider account, message templates and recipients' consent; email reminders already exist) and offline pages (the app keeps no records on the device by design, for POPIA; see the parking lot).
+**REASON** Both need a customer decision or an external account first.
+**DATE** 2026-11-11

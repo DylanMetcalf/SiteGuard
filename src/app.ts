@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
+import { noteSignal, SLOW_REQUEST_MS } from './lib/alerts.js';
 import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -177,6 +178,12 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
       const type = req.headers['content-type'] ?? '';
       if (!type.startsWith('application/json')) throw new HttpError(415, 'unsupported_media_type', 'Expected JSON.');
     }
+  });
+
+  // Counts for the early-warning alerts (lib/alerts.ts): numbers only.
+  app.addHook('onResponse', async (req, reply) => {
+    if (reply.statusCode >= 500) noteSignal('server_error');
+    else if (reply.elapsedTime > SLOW_REQUEST_MS && !req.url.startsWith('/api/events') && !req.url.startsWith('/healthz')) noteSignal('slow_request');
   });
 
   app.setErrorHandler((err, req, reply) => {
