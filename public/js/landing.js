@@ -52,7 +52,7 @@ function footer(){
     +'<span class="lp-foot-links">'+NAV.map(([k,l])=>go(k,l)).join(' · ')+' · '+go('how','How it works')+' · <a href="/walkthrough">Interactive walkthrough</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>'
     +'<span>Requirement lists are a starting point, not legal advice. COMVERA shows the status held in its records; it does not certify legal compliance.</span></footer>';
 }
-const page = (current, body) => '<div class="lp">'+header(current)+body+footer()+'</div>';
+const page = (current, body) => '<div class="lp">'+header(current)+'<main>'+body+'</main>'+footer()+'</div>';
 const intro = (eyebrow, title, lead) => '<section class="lp-page-head"><p class="lp-eyebrow">'+eyebrow+'</p><h1>'+title+'</h1>'+(lead?'<p class="lp-lead">'+lead+'</p>':'')+'</section>';
 const closing = (title, text) => '<section class="lp-close"><h2>'+title+'</h2><p>'+text+'</p><div class="lp-cta">'+trial()+go('pricing','View pricing','btn secondary')+'</div></section>';
 const list = (items) => '<ul class="lp-list">'+items.map(x=>'<li>'+tick+'<span>'+x+'</span></li>').join('')+'</ul>';

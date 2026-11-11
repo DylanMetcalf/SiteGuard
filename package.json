@@ -2,7 +2,7 @@
   "name": "comvera",
   "version": "0.1.0",
   "private": true,
-  "description": "COMVERA — multi-tenant contractor compliance and site safety platform",
+  "description": "COMVERA \u2014 multi-tenant contractor compliance and site safety platform",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -19,7 +19,10 @@
     "worker:prod": "node dist/jobs/worker.js",
     "test:e2e": "node test/e2e/two-party.e2e.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "test:bots": "tsx scripts/bots.mts"
+    "test:bots": "tsx scripts/bots.mts",
+    "test:bots:security": "tsx scripts/bots2.mts",
+    "test:bots:ux": "tsx scripts/bots-ux.mts",
+    "test:bots:shared-address": "tsx scripts/bots-nat.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

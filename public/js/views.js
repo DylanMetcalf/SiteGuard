@@ -27,7 +27,7 @@ import { suspendedBanner, suspendControls, gateSection, auditsSection, validityC
 export function topbar(){
   const highCount = computeTasks().filter(t=>t.priority==='high').length;
   const personas = S.boot.personas;
-  return '<div class="topbar"><div class="brand-row">'
+  return '<header class="topbar"><div class="brand-row">'
     +'<div class="brand"><button class="brand-home" data-action="nav" data-nav="dashboard" aria-label="COMVERA — go to your dashboard" title="Dashboard" style="display:flex;align-items:center;gap:10px;"><div class="brand-mark"></div></button><div class="brand-text"><div class="brand-name">COMVERA'+(isDemoMode()?' <span class="demo-tag">DEMO</span>':'')+'</div>'
     +'<div class="brand-tag"><span class="live-dot'+(S.live?'':' off')+'" title="'+(S.live?'Live — changes from colleagues appear automatically':'Reconnecting…')+'"></span>'+org().name+'</div></div></div>'
     +'<div class="identity">'
@@ -38,7 +38,7 @@ export function topbar(){
         // In a clean start both people share one name, so lead with the company ("the mine" / "the contractor").
         + personas.map(p=>'<option value="'+p.userId+'"'+(p.current?' selected':'')+' title="'+p.label+'">'+(org().cleanDemo ? p.label.split(' · ')[1] : p.name+' ('+p.label.split(' · ')[1]+')')+'</option>').join('')+'</select>' : '')
     +'<button class="identity-avatar" data-action="open-profile" aria-label="Profile">'+initials(myName())+'</button></div>'
-    +'</div>'+banners()+'</div>';
+    +'</div>'+banners()+'</header>';
 }
 
 function banners(){

@@ -3,6 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { FastifyInstance } from 'fastify';
 import { Agent, setup, signup, teardown } from './helpers.js';
+import { rlSignup } from '../src/routes/auth.js';
 
 let app: FastifyInstance;
 let mine: Agent;
@@ -28,5 +29,22 @@ describe('bot findings', () => {
     assert.equal(f.status, 400, JSON.stringify(f.body));
     const w = await mine.post('/api/workplaces', { name: 'pit\u0000', packIds: [] });
     assert.equal(w.status, 400, JSON.stringify(w.body));
+  });
+
+  it('plain company sign-up keeps the tight per-address limit; invited sign-up gets the roomier one (shared mine router)', () => {
+    const max = rlSignup.config.rateLimit.max;
+    const plain = max({ body: { email: 'a@example.com' } });
+    assert.ok(max({ body: { inviteToken: 'x' } }) >= 6 * plain, 'invited sign-ups need room for a whole shift');
+    assert.equal(max({ body: { siteInviteToken: 'x' } }), plain, 'a site invitation creates a company, so it keeps the tight limit');
+    assert.ok(max({}) === plain, 'a missing body must not crash or loosen the limit');
+  });
+
+  it('a fake invitation token cannot be used to find out whether an email is registered', async () => {
+    const known = (await signup(app, { orgName: 'Oracle Mining', orgKind: 'host' })).email;
+    const a = await new Agent(app).post('/api/auth/signup', { name: 'X', email: known, password: 'correct horse battery staple', inviteToken: 'not-a-real-token' });
+    const b = await new Agent(app).post('/api/auth/signup', { name: 'X', email: 'nobody-here@example.com', password: 'correct horse battery staple', inviteToken: 'not-a-real-token' });
+    const c = await new Agent(app).post('/api/auth/signup', { name: 'X', email: known, password: 'correct horse battery staple', orgName: 'Y', orgKind: 'host', siteInviteToken: 'not-a-real-token' });
+    assert.equal(a.status, 400); assert.equal(b.status, 400); assert.equal(c.status, 400);
+    assert.deepEqual(a.body, b.body, 'registered and unregistered addresses must look identical');
   });
 });
