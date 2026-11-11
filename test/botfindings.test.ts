@@ -35,7 +35,7 @@ describe('bot findings', () => {
     const max = rlSignup.config.rateLimit.max;
     const plain = max({ body: { email: 'a@example.com' } });
     assert.ok(max({ body: { inviteToken: 'x' } }) >= 6 * plain, 'invited sign-ups need room for a whole shift');
-    assert.ok(max({ body: { siteInviteToken: 'x' } }) > plain);
+    assert.equal(max({ body: { siteInviteToken: 'x' } }), plain, 'a site invitation creates a company, so it keeps the tight limit');
     assert.ok(max({}) === plain, 'a missing body must not crash or loosen the limit');
   });
 

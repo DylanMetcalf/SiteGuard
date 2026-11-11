@@ -34,8 +34,9 @@ export const rlSignup = {
       hook: 'preHandler' as const,
       timeWindow: '1 minute',
       max: (req: { body?: unknown }) => {
-        const b = (req.body ?? {}) as { inviteToken?: unknown; siteInviteToken?: unknown };
-        const base = b.inviteToken || b.siteInviteToken ? SHARED_ADDRESS_MAX : 10;
+        // Only a staff invitation (joins an existing company) gets room; a site invitation creates a new company, so it keeps the tight limit.
+        const b = (req.body ?? {}) as { inviteToken?: unknown };
+        const base = b.inviteToken ? SHARED_ADDRESS_MAX : 10;
         return config.NODE_ENV === 'test' ? base * 100 : base;
       },
     },
