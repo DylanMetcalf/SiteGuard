@@ -19,5 +19,6 @@ Dates are 2026. Severity: Critical / High / Medium / Low / Info. Confidence: how
 | SEC-013 | 28 Oct | Sharing | Share links rely on the token alone for their lifetime (read-only, expiring, revocable, view-counted). | Low | High | Accepted | Exchange links already require a one-time email code |
 | SEC-014 | 4 Nov | Database | One database role for the app, migrations and jobs. | Low | High | Accepted for now | Separate migration role when the team grows |
 | SEC-015 | 4 Nov | Email DNS | DMARC is `p=none` (monitoring only). | Low | High | Open, manual | Move to `p=quarantine` with a report address after 2–4 weeks of clean sending |
+| SEC-016 | 11 Nov | Robustness | Found by the bot swarm: six simultaneous sign-ups for one email, or a NUL character in any text field, returned a 500. No data exposed; availability/noise only. | Low | Medium | Fixed | Central error handler maps database unique/encoding errors to 409/400; regression tests in `test/botfindings.test.ts` |
 
 No Critical or High findings are open. Findings are reviewed at each release and whenever the weekly check fails.
