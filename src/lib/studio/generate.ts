@@ -14,24 +14,45 @@ import { badRequest, notFound } from '../errors.js';
 import { anthropic, FALLBACK, recordTokens, reserveAiRequest } from '../ai.js';
 import { storage } from '../storage.js';
 import { storeFile } from '../../routes/documents.js';
-import { blueprintById, joinSite, type Blueprint, type BuildInput } from './blueprints.js';
+import { blueprintById, joinSite, type Blueprint, type BuildInput, tailorLegalForIndustry } from './blueprints.js';
 import { docContentSchema, type DocContent, type DocMeta } from './model.js';
 import { renderPdf } from './render-pdf.js';
 import { renderDocx } from './render-docx.js';
 
 export const DEFAULT_BRAND = '#16325C';
+export const MONO_INK = '#262626';
+export const MONO_ACCENT = '#7A7A7A';
+
+export const INDUSTRIES = ['mining', 'quarrying', 'construction', 'energy', 'manufacturing', 'petrochemical', 'other'] as const;
+export type Industry = (typeof INDUSTRIES)[number];
+const HEX = /^#[0-9a-fA-F]{6}$/;
 
 export interface Branding {
   brandColor: string;
+  /** Second colour for accents (bands, side rules); defaults to a lighter shade of the brand colour. */
+  accentColor: string | null;
+  /** Black and grey only, with the greyscale logo when one was made. */
+  monochrome: boolean;
+  industry: Industry;
   docPrefix: string;
   logoFileId: string | null;
+  logoMonoFileId: string | null;
 }
 
 export function brandingOf(ctx: OrgCtx): Branding {
   const s = (ctx.org.settings ?? {}) as Record<string, unknown>;
   const color = typeof s.brandColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(s.brandColor) ? s.brandColor : DEFAULT_BRAND;
   const prefix = typeof s.docPrefix === 'string' && s.docPrefix ? s.docPrefix : initials(ctx.org.name);
-  return { brandColor: color, docPrefix: prefix, logoFileId: typeof s.logoFileId === 'string' ? s.logoFileId : null };
+  const industry = (INDUSTRIES as readonly string[]).includes(String(s.industry)) ? (s.industry as Industry) : 'mining';
+  return { brandColor: color, accentColor: typeof s.accentColor === 'string' && HEX.test(s.accentColor) ? s.accentColor : null, monochrome: s.monochrome === true, industry,
+    docPrefix: prefix, logoFileId: typeof s.logoFileId === 'string' ? s.logoFileId : null, logoMonoFileId: typeof s.logoMonoFileId === 'string' ? s.logoMonoFileId : null };
+}
+
+/** Monochrome: black and greys only, and the greyscale logo (or the company name when there is none). */
+export function documentColours(b: Branding): { brandColor: string; accentColor: string | undefined; logoFileId: string | null } {
+  return b.monochrome
+    ? { brandColor: MONO_INK, accentColor: MONO_ACCENT, logoFileId: b.logoMonoFileId }
+    : { brandColor: b.brandColor, accentColor: b.accentColor ?? undefined, logoFileId: b.logoFileId };
 }
 
 /** "ABC Electrical Pty Ltd" → "ABC". */
@@ -209,7 +230,7 @@ export async function generateDocument(ctx: OrgCtx, req: GenerateRequest, log: F
 
   const input: BuildInput = {
     values: req.values,
-    company: { name: ctx.org.name, reg: ctx.org.reg_number || undefined, address: ctx.org.address || undefined, coid: ctx.org.coid_number || undefined },
+    company: { name: ctx.org.name, reg: ctx.org.reg_number || undefined, address: ctx.org.address || undefined, coid: ctx.org.coid_number || undefined, industry: brandingOf(ctx).industry },
     preparer: { name: ctx.user.name, title: ctx.user.title || undefined },
     site,
   };
@@ -228,6 +249,8 @@ export async function generateDocument(ctx: OrgCtx, req: GenerateRequest, log: F
     }
   }
 
+  // The law that applies depends on the industry (mines and quarries: MHSA; construction: Construction Regulations).
+  content = tailorLegalForIndustry(content, brandingOf(ctx).industry);
   return withTx((tx) => persist(tx, ctx, bp, req, content, ai, { site, siteId, requirementId, previous }));
 }
 
@@ -239,6 +262,7 @@ async function persist(
   // Lock the organisation row so document numbers are allocated one at a time.
   await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
   const branding = brandingOf(ctx);
+  const colours = documentColours(branding);
   let docNumber: string;
   let revision = 0;
   if (previous) {
@@ -266,8 +290,9 @@ async function persist(
     preparedByTitle: ctx.user.title || undefined,
     siteName: site ? joinSite(site.name, site.location) : req.values.site || undefined,
     clientName: site?.clientName,
-    brandColor: branding.brandColor,
-    logo: await loadLogo(db, ctx, branding.logoFileId),
+    brandColor: colours.brandColor,
+    accentColor: colours.accentColor,
+    logo: await loadLogo(db, ctx, colours.logoFileId),
     blueprintName: bp.name,
     revisions: [...history.map((h) => ({ ...h, description: h.description || (h.revision === 0 ? 'First issue' : 'Revised') })), { revision, date: today.toISOString().slice(0, 10), description: note, by: ctx.user.name }],
   };

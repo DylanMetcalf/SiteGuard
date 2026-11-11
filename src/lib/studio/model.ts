@@ -48,6 +48,8 @@ export interface DocMeta {
   siteName?: string;
   clientName?: string;
   brandColor: string;
+  /** Optional second colour; the renderers fall back to a lighter shade of brandColor. */
+  accentColor?: string;
   logo?: { data: Buffer; type: 'image/png' | 'image/jpeg' };
   blueprintName: string;
   revisions: { revision: number; date: string; description: string; by: string }[];

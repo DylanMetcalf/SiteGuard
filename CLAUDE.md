@@ -75,6 +75,13 @@ haven't built.
 - Uploaded documents (`routes/orgDocuments.ts`, `org_documents` + versions) are "received", never "approved". Visibility: internal, restricted
   (owners/admins), contractors (contractors with a live file at that site). Every new read path re-checks it on the server; Oscar's
   `findDocuments` uses the same rules. Document Studio (`nav=studio`) and Oscar (`nav=oscar`, the assistant page) are in the main navigation.
+- A mine can make an uploaded document a required submission (`POST /api/org-docs/:id/require`): it becomes a workplace requirement
+  (`templateDocId` in `workplaces.requirements`, added through `addWorkplaceRequirements`), its template is looked up live in bootstrap,
+  and submissions use the normal document flow. Deleting an upload erases only files nothing else references. Folders (`doc_folders`)
+  link to one own site, contractor or safety file; deleting a folder keeps its documents.
+- Document style (`brandingOf` / `documentColours` in `lib/studio/generate.ts`): brand + optional accent colour, monochrome (greys and a
+  greyscale logo made in the browser, `POST /api/org/logo?variant=mono`), and `industry`, which only filters the legal reference lines
+  (`tailorLegalForIndustry`). Logo colours are suggested in the browser (`public/js/docstyle.js`); no image library on the server.
 - Security: findings live in `docs/security/COMVERA_SECURITY_FINDINGS.md` (add a row and a regression test for each fix). Log security events with
   `securityEvent()` (`lib/securityLog.ts`), never with emails, tokens or codes. Every new upload path goes through `storeFile` or
   `storeExchangeFile` (virus scan, type check). New link-token routes need adding to `redactUrl` in `app.ts`.

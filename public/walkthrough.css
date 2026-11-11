@@ -480,6 +480,26 @@ img{max-width:100%}
   .fd-row{grid-template-columns:minmax(0,1fr); gap:4px}
 }
 
+/* Help icons and their tooltips (walkthrough-page.js: HELP, buildTips). The icon is 16px and
+   muted; the invisible ::after widens the tap area to 40px without moving the layout. */
+.wt-help{position:relative; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; padding:0; margin:0 0 0 .4em; border:0; border-radius:50%; background:none; color:var(--grey); cursor:pointer; vertical-align:middle; flex:none; font:inherit; line-height:1; letter-spacing:normal; transition:color .12s ease}
+.wt-help::after{content:''; position:absolute; inset:-12px; border-radius:50%}
+.wt-help svg{width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; pointer-events:none}
+.wt-help svg .dot{fill:currentColor; stroke-width:1}
+.wt-help:hover,.wt-help.open{color:var(--brand)}
+.wt-help:focus-visible{outline-offset:3px; border-radius:50%}
+h1 .wt-help{margin-left:.3em; vertical-align:.12em}
+.ch h2 .wt-help{vertical-align:.1em}
+.app-help{display:inline-flex; flex:none}
+.app-help .wt-help{margin:0}
+.app-top .wt-help,.ch-close .wt-help{color:var(--panel-ink-soft)}
+.app-top .wt-help:hover,.app-top .wt-help.open,.ch-close .wt-help:hover,.ch-close .wt-help.open{color:var(--panel-ink)}
+.wt-tip{position:fixed; left:0; top:0; z-index:60; box-sizing:border-box; width:max-content; max-width:min(300px, calc(100vw - 24px)); padding:10px 13px; border-radius:var(--r-sm); background:var(--panel); color:var(--panel-ink); border:1px solid var(--panel-line); box-shadow:var(--shadow-lg); font-family:var(--font); font-size:13.5px; font-weight:400; line-height:1.45; letter-spacing:normal; text-transform:none; text-align:left; white-space:normal; animation:tipIn .12s ease both}
+.wt-tip[hidden]{display:none}
+.wt-tip::before{content:''; position:absolute; left:var(--ax, 50%); top:-6px; width:10px; height:10px; background:inherit; border:inherit; border-right:0; border-bottom:0; transform:translateX(-50%) rotate(45deg)}
+.wt-tip[data-side="top"]::before{top:auto; bottom:-6px; transform:translateX(-50%) rotate(225deg)}
+@keyframes tipIn{from{opacity:0} to{opacity:1}}
+
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation-duration:.001ms!important; animation-delay:0s!important; transition-duration:.001ms!important; transition-delay:0s!important}

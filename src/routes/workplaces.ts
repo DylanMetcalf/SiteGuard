@@ -46,7 +46,7 @@ interface Workplace {
   join_open: boolean;
 }
 
-async function loadWorkplace(db: Db, ctx: OrgCtx, id: string, lock = false): Promise<Workplace> {
+export async function loadWorkplace(db: Db, ctx: OrgCtx, id: string, lock = false): Promise<Workplace> {
   if (!isUuid(id)) throw notFound();
   const w = await one<Workplace>(db, `select * from workplaces where id = $1 and org_id = $2${lock ? ' for update' : ''}`, [id, ctx.org.id]);
   if (!w) throw notFound();
@@ -93,6 +93,22 @@ async function addToFiles(db: Db, workplaceId: string, items: Item[]): Promise<n
     }
     if (i) { touched++; await recheckSiteReady(db, f.id, 'new site requirement'); }
   }
+  return touched;
+}
+
+/**
+ * Adds requirements to a site and to every contractor's file on it, tells each contractor, and records it.
+ * Items may carry templateDocId: an uploaded document contractors download, complete and submit back.
+ */
+export async function addWorkplaceRequirements(db: Db, ctx: OrgCtx, w: { id: string; name: string }, items: (Item & { templateDocId?: string })[]): Promise<number> {
+  await db.query('update workplaces set requirements = requirements || $2::jsonb where id = $1', [w.id, JSON.stringify(items)]);
+  const touched = await addToFiles(db, w.id, items);
+  await audit(db, ctx, 'Added site requirements', `${w.name}: ${items.map((r) => r.name).join(', ').slice(0, 400)}`);
+  const files = await filesOf(db, w.id);
+  for (const f of files) {
+    if (f.linked_org_id) await notifyOrg(db, f.linked_org_id, null, { kind: 'site', title: `${w.name} added ${items.length} requirement${items.length === 1 ? '' : 's'}`, body: items.map((r) => r.name).join(', ').slice(0, 300), link: { kind: 'site', siteId: f.id } });
+  }
+  await publishChange(db, [ctx.org.id, ...files.map((f) => f.linked_org_id).filter((x): x is string => !!x)]);
   return touched;
 }
 
@@ -208,14 +224,7 @@ export default async function workplaceRoutes(app: FastifyInstance) {
       const fresh = body.requirements.filter((r) => !have.some((h) => h.toLowerCase() === r.name.toLowerCase()));
       const items = fresh.concat(itemsFromPacks(body.packIds, [...have, ...fresh.map((r) => r.name), ...body.excludeItems]));
       if (!items.length) throw conflict('Those requirements are already on this site.');
-      await db.query('update workplaces set requirements = requirements || $2::jsonb where id = $1', [w.id, JSON.stringify(items)]);
-      const touched = await addToFiles(db, w.id, items);
-      await audit(db, ctx, 'Added site requirements', `${w.name}: ${items.map((r) => r.name).join(', ').slice(0, 400)}`);
-      const files = await filesOf(db, w.id);
-      for (const f of files) {
-        if (f.linked_org_id) await notifyOrg(db, f.linked_org_id, null, { kind: 'site', title: `${w.name} added ${items.length} requirement${items.length === 1 ? '' : 's'}`, body: items.map((r) => r.name).join(', ').slice(0, 300), link: { kind: 'site', siteId: f.id } });
-      }
-      await publishChange(db, [ctx.org.id, ...files.map((f) => f.linked_org_id).filter((x): x is string => !!x)]);
+      const touched = await addWorkplaceRequirements(db, ctx, w, items);
       return { added: items.length, contractorsUpdated: touched };
     });
   });

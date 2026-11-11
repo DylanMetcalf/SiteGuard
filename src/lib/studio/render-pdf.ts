@@ -118,7 +118,7 @@ export async function renderPdf(content: DocContent, meta: DocMeta): Promise<Buf
     { text: pdfSafe(meta.blueprintName).toUpperCase(), fontSize: 9, bold: true, color: MUTED, characterSpacing: 1.2, margin: [0, 0, 0, 6] },
     { text: title, fontSize: 26, bold: true, color: INK, lineHeight: 1.1, margin: [0, 0, 0, 8] },
     content.subtitle ? { text: pdfSafe(content.subtitle), fontSize: 12.5, color: MUTED, margin: [0, 0, 0, 22] } : { text: '', margin: [0, 0, 0, 14] },
-    { canvas: [{ type: 'rect', x: 0, y: 0, w: 60, h: 4, color: brand }], margin: [0, 0, 0, 22] },
+    { canvas: [{ type: 'rect', x: 0, y: 0, w: 60, h: 4, color: meta.accentColor ?? brand }], margin: [0, 0, 0, 22] },
     {
       table: {
         widths: ['32%', '*'],
@@ -171,7 +171,7 @@ export async function renderPdf(content: DocContent, meta: DocMeta): Promise<Buf
     defaultStyle: { font: 'Helvetica', fontSize: 9.5, lineHeight: 1.3, color: INK },
     background: (page: number, size: { width: number; height: number }) =>
       page === 1
-        ? { canvas: [{ type: 'rect', x: 0, y: 0, w: size.width, h: 12, color: brand }, { type: 'rect', x: 0, y: size.height - 6, w: size.width, h: 6, color: tint(brand, 0.55) }] }
+        ? { canvas: [{ type: 'rect', x: 0, y: 0, w: size.width, h: 12, color: brand }, { type: 'rect', x: 0, y: size.height - 6, w: size.width, h: 6, color: meta.accentColor ?? tint(brand, 0.55) }] }
         : { canvas: [{ type: 'rect', x: 0, y: 0, w: size.width, h: 5, color: brand }] },
     header: (page: number) =>
       page === 1

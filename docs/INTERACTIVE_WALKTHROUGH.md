@@ -26,6 +26,19 @@ safety file for Highveld Mining Group's Shaft 3 conveyor job.
 | 07 Business value | Visibility, Organisation, Follow-through and Coordination, each shown on the same file. |
 | 08 Next step | Contact, restart, or explore COMVERA. Shows which chapters were seen. |
 
+## Help icons
+
+Each chapter heading and the main parts of the screens (the overview, Needs attention, each of
+the six workflow screens, the Source and Status columns, Activity, Site Ready, Outstanding work,
+the Before / With COMVERA lists and the closing checklist) carry a small "i" icon. Hovering it,
+moving to it with the keyboard or tapping it on a phone shows a one- or two-sentence explanation
+of what that part is for. Tap again, tap elsewhere or press Escape to close it.
+
+All the explanations live in one list, `HELP` near the top of `public/js/walkthrough-page.js`
+(a short name for the button's "What is …?" label, plus the text). To add an icon to a heading in
+`walkthrough.html`, give it `data-help="key"`; in a screen drawn by the script, add
+`${helpBtn('key')}` inside the heading. Keep every explanation true to a real COMVERA feature.
+
 ## What is real and what is illustrative
 
 Everything shown matches a real COMVERA feature: requirements per site with their source, the

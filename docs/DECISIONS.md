@@ -5,6 +5,12 @@ Newest first.
 
 ---
 
+**DECISION** A mine turns an uploaded document into a required submission (contractors download it, complete it and submit it through the normal review), never a new parallel workflow. Uploaded documents can be permanently deleted (only files nothing else uses are erased; contractors' submissions stay). Folders organise uploads per site or contractor and never delete documents. Documents can be monochrome, use an accent colour, and follow the organisation's industry for legal references only.
+**REASON** The owner's request, built on what already exists (site requirements, the review flow, branding) so there is one way to do each thing. Industry changes only which confident legal references appear; nothing new is invented. Colour work happens in the browser to avoid adding an image library to the server.
+**DATE** 2026-11-05
+
+---
+
 **DECISION** Customers confirm their email (not an authenticator app) and complete a guided set-up before the app opens; both are enforced on the server. Only genuinely required steps block (organisation details, a safety contact, a first site for a mine or the trade for a contractor, and an answer about existing documents). Uploads are a separate document store, "received" and never "approved", with three visibility levels. Document Studio and Oscar join the main navigation; Contractors / safety file documents move into Studio and More.
 **REASON** The owner's brief: customers should be guided rather than dropped into an empty app, should not need an authenticator, and need an obvious place to upload what they already have. Verification is only required when email sending is on, so nobody can be locked out by a missing email setup. Existing customers are not forced through set-up.
 **DATE** 2026-11-05
