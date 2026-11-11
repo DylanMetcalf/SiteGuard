@@ -9,8 +9,8 @@ create table doc_folders (
   site_id       uuid references sites (id) on delete set null,
   contractor_id uuid references contractors (id) on delete set null,
   created_by    uuid references users (id) on delete set null,
-  created_at    timestamptz not null default now(),
-  unique (org_id, name)
+  created_at    timestamptz not null default now()
 );
+create unique index doc_folders_name_unique on doc_folders (org_id, lower(name));
 alter table org_documents add column folder_id uuid references doc_folders (id) on delete set null;
 create index org_documents_folder_idx on org_documents (folder_id) where folder_id is not null;

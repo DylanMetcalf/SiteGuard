@@ -116,12 +116,14 @@ const MHSA = 'Mine Health and Safety Act 29 of 1996 (MHSA) and its regulations';
 const CONSTRUCTION = 'Construction Regulations, 2014';
 /**
  * Makes the legal references match the industry: mines and quarries are under the MHSA, construction work under the
- * Construction Regulations, and other industries under the OHS Act. Only the reference lines change; nothing is invented.
+ * Construction Regulations, and other industries under the OHS Act. Only the standard reference lines of the
+ * "Legal and other requirements" section change; nothing is invented. Wording elsewhere in a document (for example
+ * a mine mentioned in a procedure step) is left as written, and the SHE department still confirms what applies.
  */
 export function tailorLegalForIndustry(content: DocContent, industry: string): DocContent {
   const mining = industry === 'mining' || industry === 'quarrying', construction = industry === 'construction';
   const fix = (item: string): string | null => {
-    if (item.startsWith(MHSA)) return mining ? `${MHSA}${industry === 'quarrying' ? ' (quarries are mines under the Act)' : ''}` : construction ? null : null;
+    if (item.startsWith(MHSA)) return mining ? `${MHSA}${industry === 'quarrying' ? ' (quarries are mines under the Act)' : ''}` : null;
     if (item.startsWith(CONSTRUCTION) && item.includes('where the work is construction work')) return construction ? CONSTRUCTION : mining ? item : null;
     return item;
   };

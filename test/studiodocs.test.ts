@@ -27,7 +27,9 @@ const invite = async (owner: Agent, role: string) => {
   return (await signup(app, { orgName: '', orgKind: 'host', email, inviteToken: await lastEmailToken(email, '/invite') })).agent;
 };
 const reqFor = async (a: Agent, name: string) => {
-  const st = (await a.state()).state;
+  const b0 = await a.get('/api/bootstrap');
+  assert.equal(b0.status, 200, 'the workspace loads');
+  const st = b0.body.state;
   for (const list of Object.values(st.requirements) as { id: string; name: string; template: { id: string; name: string } | null }[][]) {
     const r = list.find((x) => x.name === name); if (r) return r;
   }
@@ -90,6 +92,64 @@ describe('mine marks an upload as a required submission', () => {
   });
 });
 
+describe('review fixes for required submissions', () => {
+  it('a company-wide document is shared only with the site it is required at, never with every site', async () => {
+    const wp2 = (await mine.post('/api/workplaces', { name: 'Cold Plant', packIds: [] })).body.id;
+    const code2 = (await mine.state()).state.workplaces[wp2].code;
+    const { agent: coldOnly } = await signup(app, { orgName: 'Cold Plant Crew', orgKind: 'contractor' });
+    assert.equal((await coldOnly.post('/api/sites/join', { code: code2 })).status, 200);
+    const doc = (await upload(mine, { name: 'Company Wide Form', scope: 'company' })).body.id; // no site
+    assert.equal((await mine.post(`/api/org-docs/${doc}/require`, { workplaceId: wp })).status, 200);
+    assert.equal((await contractor.get(`/api/org-docs/${doc}/file`)).status, 200, 'the site it is required at');
+    assert.equal((await coldOnly.get(`/api/org-docs/${doc}/file`)).status, 404, 'a contractor at another site of the same mine');
+    assert.equal((await coldOnly.get(`/api/org-docs/${doc}`)).status, 404);
+    assert.equal((await pool.query('select scope, workplace_id from org_documents where id = $1', [doc])).rows[0].scope, 'site');
+  });
+
+  it('a live template cannot be narrowed or moved, and deleting one needs an explicit yes', async () => {
+    const doc = (await upload(mine, { name: 'Live Template', scope: 'site', workplaceId: wp })).body.id;
+    assert.equal((await mine.post(`/api/org-docs/${doc}/require`, { workplaceId: wp })).status, 200);
+    const patch = (over: object) => mine.patch(`/api/org-docs/${doc}`, { name: 'Live Template', scope: 'site', workplaceId: wp, visibility: 'contractors', ...over });
+    assert.equal((await patch({ visibility: 'restricted' })).status, 409);
+    assert.equal((await patch({ visibility: 'internal' })).status, 409);
+    assert.equal((await patch({ workplaceId: null, scope: 'company' })).status, 409);
+    assert.equal((await patch({ description: 'harmless edit' })).status, 200, 'other edits are fine');
+    // the bootstrap never offers a template that stopped being shareable
+    await pool.query(`update org_documents set visibility = 'internal' where id = $1`, [doc]);
+    const req = await reqFor(contractor, 'Live Template');
+    assert.equal(req!.template, null, 'no leaked name');
+    await pool.query(`update org_documents set visibility = 'contractors' where id = $1`, [doc]);
+    const refused = await mine.del(`/api/org-docs/${doc}`);
+    assert.equal(refused.status, 409);
+    assert.match(refused.body.message, /Hot Shaft/);
+    assert.equal((await mine.del(`/api/org-docs/${doc}?force=1`)).status, 200);
+  });
+
+  it('refuses an archived document, an archived site, a duplicate name in any case, and another site’s document', async () => {
+    const doc = (await upload(mine, { name: 'Archived Form' })).body.id;
+    await mine.post(`/api/org-docs/${doc}/archive`, { archived: true });
+    assert.equal((await mine.post(`/api/org-docs/${doc}/require`, { workplaceId: wp })).status, 409);
+    const dup = (await upload(mine, { name: 'Dup Form' })).body.id;
+    assert.equal((await mine.post(`/api/org-docs/${dup}/require`, { workplaceId: wp, name: 'dup form' })).status, 200);
+    const dup2 = (await upload(mine, { name: 'Dup Form Two' })).body.id;
+    assert.equal((await mine.post(`/api/org-docs/${dup2}/require`, { workplaceId: wp, name: 'DUP FORM' })).status, 409, 'same name, different case');
+    const gone = (await mine.post('/api/workplaces', { name: 'Closed Down', packIds: [] })).body.id;
+    await pool.query(`update workplaces set archived_at = now() where id = $1`, [gone]);
+    const d3 = (await upload(mine, { name: 'To Closed Site' })).body.id;
+    assert.equal((await mine.post(`/api/org-docs/${d3}/require`, { workplaceId: gone })).status, 409);
+    const forWp = (await upload(mine, { name: 'Belongs Elsewhere', scope: 'site', workplaceId: gone })).body.id;
+    assert.equal((await mine.post(`/api/org-docs/${forWp}/require`, { workplaceId: wp })).status, 409);
+  });
+
+  it('a requirement that already existed by name does not get a template it never had', async () => {
+    const plain = (await upload(mine, { name: 'Plain Name Form' })).body.id;
+    await pool.query(`update requirements set source = 'legal' where lower(name) = 'hot work permit form'`);
+    const r = await reqFor(contractor, 'Hot Work Permit Form');
+    if (r) assert.equal(r.template, null, 'only site-made requirements carry the template');
+    void plain;
+  });
+});
+
 describe('deleting uploaded documents', () => {
   it('is refused for Site Staff, other organisations and other people’s uploads', async () => {
     const own = (await upload(reviewer, { name: 'Reviewer Notes' })).body.id;
@@ -104,7 +164,8 @@ describe('deleting uploaded documents', () => {
 
   it('erases the stored file and every version, and a requirement made from it keeps working without the template', async () => {
     const key = (await pool.query(`select f.storage_key from org_documents d join files f on f.id = d.current_file_id where d.id = $1`, [tplId])).rows[0].storage_key;
-    const r = await mine.del(`/api/org-docs/${tplId}`);
+    assert.equal((await mine.del(`/api/org-docs/${tplId}`)).status, 409, 'a live template needs an explicit yes');
+    const r = await mine.del(`/api/org-docs/${tplId}?force=1`);
     assert.equal(r.status, 200);
     assert.equal(r.body.filesErased, 1);
     await assert.rejects(storage.read(key));
@@ -124,6 +185,11 @@ describe('folders', () => {
     const f = await mine.post('/api/doc-folders', { name: 'Hot Shaft', workplaceId: wp });
     assert.equal(f.status, 200, JSON.stringify(f.body)); folder = f.body.id;
     assert.equal((await mine.post('/api/doc-folders', { name: 'Hot Shaft' })).status, 409);
+    assert.equal((await mine.post('/api/doc-folders', { name: 'hot shaft' })).status, 409, 'names are not case-sensitive');
+    const other = (await mine.post('/api/doc-folders', { name: 'Second Folder' })).body.id;
+    assert.equal((await mine.patch(`/api/doc-folders/${other}`, { name: 'HOT SHAFT' })).status, 409, 'a rename cannot collide');
+    assert.equal((await mine.patch(`/api/doc-folders/${other}`, { name: 'Second Folder renamed' })).status, 200);
+    assert.equal((await contractor.post('/api/org-docs/' + (await upload(mine, { name: 'x', folderId: other })).body.id + '/folder', { folderId: null })).status, 404);
     assert.equal((await mine.post('/api/doc-folders', { name: 'Theirs', workplaceId: otherWp })).status, 404);
     const contractorRow = (await mine.state()).state.sites[Object.keys((await mine.state()).state.sites)[0]].contractorId;
     assert.equal((await mine.post('/api/doc-folders', { name: 'Welding Co', contractorId: contractorRow })).status, 200);

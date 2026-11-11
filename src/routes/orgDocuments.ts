@@ -166,6 +166,10 @@ export default async function orgDocumentRoutes(app: FastifyInstance) {
     return withTx(async (db) => {
       const d = await own(db, ctx, (req.params as { id: string }).id, true);
       await checkLinks(db, ctx, m);
+      const cur = (await one<{ visibility: string; workplace_id: string | null }>(db, `select visibility, workplace_id from org_documents where id = $1`, [d.id]))!;
+      if ((await requiredAt(db, ctx.org.id, d.id)).length && (m.visibility !== 'contractors' || (cur.workplace_id ?? null) !== (m.workplaceId ?? null))) {
+        throw conflict('Contractors are asked to submit this document, so it must stay shared with them at its site. Remove the requirement first.');
+      }
       await db.query(`update org_documents set name = $2, description = $3, doc_type = $4, scope = $5, workplace_id = $6, area_id = $7, site_id = $8, subject = $9,
                         requirement = $10, visibility = $11, issue_date = $12, expiry_date = $13, owner_name = $14, updated_at = now() where id = $1`,
         [d.id, m.name, m.description, m.docType, m.scope, m.workplaceId, m.areaId, m.siteId, m.subject, m.requirement, m.visibility, m.issueDate, m.expiryDate, m.ownerName]);
@@ -214,14 +218,16 @@ export default async function orgDocumentRoutes(app: FastifyInstance) {
       const d = await own(db, ctx, (req.params as { id: string }).id, true);
       const full = (await one<{ archived_at: Date | null; workplace_id: string | null; scope: string }>(db, `select archived_at, workplace_id, scope from org_documents where id = $1`, [d.id]))!;
       const w = await loadWorkplace(db, ctx, b.workplaceId, true); // 404 for anyone else's site, before anything else is said
+      if (!(await one(db, `select 1 from workplaces where id = $1 and archived_at is null`, [w.id]))) throw conflict('That site is archived.');
       if (full.archived_at) throw conflict('Restore the document before asking contractors for it.');
       if (d.visibility === 'restricted') throw conflict('This document is for owners and admins only. Change who can see it before sharing it with contractors.');
       if (full.workplace_id && full.workplace_id !== b.workplaceId) throw conflict('This document belongs to another site. Upload it for this site, or make it company-wide.');
       const name = (b.name || d.name).trim();
       if (w.requirements.some((r) => r.name.toLowerCase() === name.toLowerCase())) throw conflict('This site already has a requirement with that name.');
       // Contractors need to be able to open the template: it is shared with the site's contractors.
-      await db.query(`update org_documents set visibility = 'contractors', requirement = $2, scope = case when workplace_id is null then 'company' else scope end, updated_at = now() where id = $1`,
-        [d.id, b.optional ? 'recommended' : 'mandatory']);
+      // Shared with this site's contractors only: a document with no site is tied to this one (never to every site).
+      await db.query(`update org_documents set visibility = 'contractors', requirement = $2, workplace_id = coalesce(workplace_id, $3), scope = case when workplace_id is null then 'site' else scope end, updated_at = now() where id = $1`,
+        [d.id, b.optional ? 'recommended' : 'mandatory', w.id]);
       const touched = await addWorkplaceRequirements(db, ctx, w, [{ category: b.category, name, source: 'site', why: b.why || `Use the template from ${ctx.org.name}: download it, complete it and submit it here.`, optional: b.optional, templateDocId: d.id }]);
       await audit(db, ctx, 'Asked contractors to submit a document', `${w.name}: ${name}`);
       return { ok: true, contractorsUpdated: touched };
@@ -240,6 +246,9 @@ export default async function orgDocumentRoutes(app: FastifyInstance) {
     const name = await withTx(async (db) => {
       const d = await own(db, ctx, (req.params as { id: string }).id, true);
       if (!canAdminOrg(ctx) && d.created_by !== ctx.user.id) throw forbidden('Only the person who uploaded it, or an admin, can delete this document.');
+      const live = await requiredAt(db, ctx.org.id, d.id);
+      if (live.length && (req.query as { force?: string }).force !== '1') throw conflict(`Contractors are asked to submit this at ${live.map((x) => x.name).join(', ')}. Deleting it removes the template but keeps the requirement. Confirm to delete anyway.`);
+      await audit(db, ctx, 'Deleting a document', `${d.name}${live.length ? ' (was a required template at ' + live.map((x) => x.name).join(', ') + ')' : ''}`);
       const files = await many<{ id: string; storage_key: string }>(db,
         `select f.id, f.storage_key from files f where f.id in (select file_id from org_document_versions where document_id = $1 union select current_file_id from org_documents where id = $1)`, [d.id]);
       await db.query(`delete from org_documents where id = $1`, [d.id]);
@@ -286,7 +295,7 @@ export default async function orgDocumentRoutes(app: FastifyInstance) {
     const b = folderBody.parse(req.body);
     return withTx(async (db) => {
       await checkFolderLinks(db, ctx, b);
-      const f = await one<{ id: string }>(db, `insert into doc_folders (org_id, name, workplace_id, site_id, contractor_id, created_by) values ($1, $2, $3, $4, $5, $6) on conflict (org_id, name) do nothing returning id`,
+      const f = await one<{ id: string }>(db, `insert into doc_folders (org_id, name, workplace_id, site_id, contractor_id, created_by) values ($1, $2, $3, $4, $5, $6) on conflict do nothing returning id`,
         [ctx.org.id, b.name, b.workplaceId, b.siteId, b.contractorId, ctx.user.id]);
       if (!f) throw conflict('You already have a folder with that name.');
       await audit(db, ctx, 'Created a folder', b.name);

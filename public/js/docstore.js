@@ -168,14 +168,14 @@ export async function openDocSheet(id){
 
 /* ---------- delete, require, move ---------- */
 on('doc-delete-ask', (el) => {
-  openSheet(sheetHead('Delete “' + el.dataset.name + '”?', 'This cannot be undone.')
+  openSheet(sheetHead('Delete “' + escapeHtml(el.dataset.name) + '”?', 'This cannot be undone.')
     + '<p>The document, every earlier version and the stored files are deleted. If contractors were asked to submit it, that requirement stays (with what they already submitted) but no longer offers the template.</p>'
     + '<p class="site-card-sub">To keep it but hide it, use Archive instead.</p>'
     + '<button class="btn danger block" data-action="doc-delete" data-id="' + el.dataset.id + '">Delete permanently</button><button class="btn secondary block" style="margin-top:8px;" data-action="close-sheet">Cancel</button>');
 });
 on('doc-delete', async (el) => {
   el.disabled = true;
-  try{ await api.del('/api/org-docs/' + el.dataset.id); showToast('Deleted'); invalidateDocstore(); closeSheet(); render(); }
+  try{ await api.del('/api/org-docs/' + el.dataset.id + '?force=1'); showToast('Deleted'); invalidateDocstore(); closeSheet(); render(); }
   catch(e){ el.disabled = false; showToast(e.message); }
 });
 on('doc-move', async (el) => {
