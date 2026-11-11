@@ -21,6 +21,27 @@ export const rl = (max: number) => ({
   config: { rateLimit: { max: config.NODE_ENV === 'test' ? max * 100 : max, timeWindow: '1 minute' } },
 });
 
+/**
+ * Sign-in and invited sign-up are limited per address, but many mines connect through one shared router, so a whole shift
+ * arriving at once must get through. Guessing one account is stopped separately (10 failures lock it for 15 minutes).
+ * Plain sign-up (which creates a new company) keeps the tight limit; an invited sign-up needs a valid invitation, so it
+ * gets the roomier one. `max` is read after the body is parsed so it can tell the two apart.
+ */
+const SHARED_ADDRESS_MAX = 60;
+export const rlSignup = {
+  config: {
+    rateLimit: {
+      hook: 'preHandler' as const,
+      timeWindow: '1 minute',
+      max: (req: { body?: unknown }) => {
+        const b = (req.body ?? {}) as { inviteToken?: unknown; siteInviteToken?: unknown };
+        const base = b.inviteToken || b.siteInviteToken ? SHARED_ADDRESS_MAX : 10;
+        return config.NODE_ENV === 'test' ? base * 100 : base;
+      },
+    },
+  },
+};
+
 const email = z.string().trim().toLowerCase().email().max(254);
 const password = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(200);
@@ -116,7 +137,7 @@ async function signInEvent(orgId: string, userId: string, action: string, ip: st
 }
 
 export default async function authRoutes(app: FastifyInstance) {
-  app.post('/api/auth/signup', rl(10), async (req, reply) => {
+  app.post('/api/auth/signup', rlSignup, async (req, reply) => {
     const body = z
       .object({
         name,
@@ -134,6 +155,14 @@ export default async function authRoutes(app: FastifyInstance) {
     if (problem) throw badRequest(problem, 'weak_password');
 
     const result = await withTx(async (db) => {
+      // The roomy invited-sign-up limit must not become an "is this email registered?" oracle: without a live invitation the
+      // answer is the same generic refusal whatever the address, and the email check below is only reached with one.
+      if (body.inviteToken && !(await one(db, `select 1 from user_invites where token_hash = $1 and accepted_at is null and revoked_at is null and expires_at > now()`, [sha256(body.inviteToken)]))) {
+        throw badRequest('That invitation link has expired or was already used. Ask for a new one.', 'invalid_invite');
+      }
+      if (body.siteInviteToken && !body.inviteToken && !(await one(db, `select 1 from site_invitations where token_hash = $1 and status = 'pending'`, [sha256(body.siteInviteToken)]))) {
+        throw badRequest('That site invitation has expired or was already answered.', 'invalid_invite');
+      }
       if (await one(db, 'select 1 from users where email = $1', [body.email])) {
         throw conflict('An account with that email already exists — sign in instead.');
       }
@@ -203,7 +232,7 @@ export default async function authRoutes(app: FastifyInstance) {
     return result;
   });
 
-  app.post('/api/auth/login', rl(10), async (req, reply) => {
+  app.post('/api/auth/login', rl(SHARED_ADDRESS_MAX), async (req, reply) => {
     const body = z.object({ email, password }).parse(req.body);
     const user = await one<{ id: string; password_hash: string | null; last_active_org_id: string | null; locked_until: Date | null; status: string }>(
       pool,
@@ -258,7 +287,7 @@ export default async function authRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  app.post('/api/auth/login/mfa', rl(10), async (req, reply) => {
+  app.post('/api/auth/login/mfa', rl(30), async (req, reply) => {
     const body = z.object({ ticket: z.string().min(10).max(100), code: z.string().trim().min(1).max(20) }).parse(req.body);
     const expired = () => unauthorized('That sign-in has expired. Enter your email and password again.');
     const result = await withTx(async (db) => {

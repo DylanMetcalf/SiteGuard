@@ -286,3 +286,7 @@ Newest first.
 **DECISION** A repeatable bot swarm (`npm run test:bots`, `scripts/bots.mts`) exercises a running server with 19 concurrent actors: 4 mines, 6 contractors, 4 attackers, the platform owner and 4 real browsers. It refuses to run against anything but localhost.
 **REASON** Unit tests cannot show races, rate limits, cross-tenant probing or load. Its first run found two real bugs (duplicate sign-up race and NUL characters returning 500), both fixed. Run it before each release against a throwaway database with `TRUST_PROXY=true`.
 **DATE** 2026-11-11
+
+**DECISION** The bot swarm has four scenarios: `test:bots` (19 bots, functional and abuse), `test:bots:security` (every API route as a stranger, as another organisation holding real ids, and as read-only Site Staff; headers; sessions; chaos plus database integrity), `test:bots:shared-address` (a whole shift behind one router; server run with TRUST_PROXY=false) and `test:bots:ux` (real browsers at 320/390/768/1280px with an axe-core WCAG 2.2 AA audit; needs `npm i axe-core` somewhere and AXE_PATH).
+**REASON** Round two found: shared-address lock-out (SEC-017, fixed), 2 critical and several serious accessibility problems (fixed: unlabelled button, tab group without tabs, low-contrast green, missing page landmarks, a tab row that scrolled the phone sideways). Known and left: dimmed walkthrough summary (intentional), heading order on a few screens.
+**DATE** 2026-11-11

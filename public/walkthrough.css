@@ -7,7 +7,7 @@
   --paper:#F3F6F4; --raised:#FFFFFF; --deep:#EAF0EC;
   --brand:#16325C; --brand-hover:#0F2647; --brand-bg:#E6ECF6; --on-brand:#FFFFFF;
   --sage:#6E9C80; --sage-strong:#3F6E55; --sage-bg:#E4EFE7;
-  --green:#12805A; --green-bg:#E1F4EA;
+  --green:#0E7550; --green-bg:#E1F4EA;
   --amber:#A15F00; --amber-bg:#FFF1DA;
   --red:#C0362C; --red-bg:#FDE9E7;
   --blue:#1E5BB8; --blue-bg:#E7EFFB;
@@ -202,9 +202,9 @@ img{max-width:100%}
 .insight-ic{width:28px; height:28px; border-radius:50%; background:var(--sage-strong); color:#fff; display:grid; place-items:center; font-weight:800; flex:none; font-size:14px}
 .summary{margin-top:28px; padding:24px; border-radius:var(--r); background:var(--raised); border:1px solid var(--line); opacity:.55; transition:opacity .3s}
 .summary.ready{opacity:1}
-.summary-count{font-family:var(--mono); font-size:12.5px; color:var(--grey)}
+.summary-count{font-family:var(--mono); font-size:12.5px; color:var(--ink-soft)}
 .summary-list{list-style:none; padding:0; margin:12px 0 0; display:flex; flex-wrap:wrap; gap:8px}
-.summary-list li{padding:8px 13px; border-radius:999px; background:var(--deep); font-size:14px; font-weight:500}
+.summary-list li{color:var(--ink); padding:8px 13px; border-radius:999px; background:var(--deep); font-size:14px; font-weight:500}
 
 /* ---------- 02 flow ---------- */
 .flow{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:28px; align-items:start}

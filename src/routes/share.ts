@@ -37,7 +37,7 @@ export function page(title: string, body: string, foot = 'Shared from COMVERA. T
 <meta name="robots" content="noindex,nofollow"><title>${esc(title)} · COMVERA</title>
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
 <style>
-:root{--ink:#0E1A2B;--grey:#5E6A7A;--line:#E2E7E4;--paper:#F3F6F4;--raised:#FFFFFF;--brand:#16325C;--sage:#6E9C80;--green:#12805A;--red:#C0362C}
+:root{--ink:#0E1A2B;--grey:#5E6A7A;--line:#E2E7E4;--paper:#F3F6F4;--raised:#FFFFFF;--brand:#16325C;--sage:#6E9C80;--green:#0E7550;--red:#C0362C}
 @media (prefers-color-scheme: dark){:root{--ink:#E9EEF5;--grey:#8C99AB;--line:#243249;--paper:#0A1322;--raised:#111D31;--brand:#8FB2F2;--sage:#8FC0A2;--green:#6CD3A2;--red:#F28B80}}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 .wrap{max-width:760px;margin:0 auto;padding:20px 16px 40px}.brand{font-weight:700;font-size:16px;margin-bottom:16px}
@@ -49,8 +49,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey
 .stamp{display:inline-block;border:2px solid var(--green);color:var(--green);padding:4px 12px;font-size:11px;letter-spacing:.08em;border-radius:999px;font-weight:700}
 .warn{border-color:var(--red);color:var(--red)}a{color:var(--brand)}.foot{font-size:11px;color:var(--grey);margin-top:18px}
 .scroll{overflow-x:auto}
-</style></head><body><div class="wrap"><div class="brand"><img src="/icons/icon-small.svg" alt="">COMVERA</div>${body}
-<div class="foot">${foot}</div></div></body></html>`;
+</style></head><body><div class="wrap"><header class="brand"><img src="/icons/icon-small.svg" alt="">COMVERA</header><main>${body}</main>
+<footer class="foot">${foot}</footer></div></body></html>`;
 }
 
 function gone(reply: FastifyReply, message: string) {

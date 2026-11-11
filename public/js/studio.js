@@ -83,7 +83,7 @@ export function renderStudio(){
     const bps = catalog.blueprints.filter(b=>cat==='All' || b.category===cat);
     if(tpl.length) html += '<div class="section-title">Your uploaded templates</div><div class="card">'+tpl.map(upRow).join('')+'</div>';
     html += '<div class="section-title" id="studio-templates">Create a document from a COMVERA template</div>';
-    html += '<div class="studio-cats" role="tablist">'+cats.map(c=>'<button class="site-picker-chip'+(c===cat?' active':'')+'" data-action="studio-cat" data-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>').join('')+'</div>';
+    html += '<div class="studio-cats" role="group" aria-label="Document category">'+cats.map(c=>'<button class="site-picker-chip'+(c===cat?' active':'')+'" data-action="studio-cat" data-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>').join('')+'</div>';
     html += '<div class="studio-grid">'+bps.map(b=>'<button class="studio-card" data-action="studio-new" data-bp="'+b.id+'"><span class="qa-icon">'+(CATEGORY_ICON[b.category]||ICONS.passport)+'</span><h4>'+escapeHtml(b.name)+'</h4><p>'+escapeHtml(b.description)+'</p><span class="badge sage" style="align-self:flex-start;">'+escapeHtml(b.category)+'</span></button>').join('')+'</div>';
   } else if(tab==='shared'){
     html += '<p class="site-card-sub" style="margin:4px 0 10px;">Site rules, induction packs and templates the sites you work on have shared with their contractors. Read-only.</p>'
