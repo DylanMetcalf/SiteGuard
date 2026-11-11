@@ -58,6 +58,18 @@ describe('bulk invitations', () => {
 
 import { csvCell } from '../src/lib/csv.js';
 
+describe('invitation cap', () => {
+  it('an organisation cannot send more than 300 invitations a day (no mail relay)', async () => {
+    const org = (await pool.query(`select id from organisations where name = 'Bulk Mining'`)).rows[0].id;
+    const owner = (await pool.query(`select user_id from memberships where org_id = $1 and role = 'owner' limit 1`, [org])).rows[0].user_id;
+    await pool.query(`insert into user_invites (org_id, email, role, token_hash, invited_by, expires_at) select $1, 'fill' || g || '@example.com', 'member', 'h' || g, $2, now() + interval '1 day' from generate_series(1, 300) g`, [org, owner]);
+    const r = await mine.post('/api/org/invites', { email: 'onetoomany@example.com', role: 'member' });
+    assert.equal(r.status, 429, JSON.stringify(r.body));
+    const b = await mine.post('/api/org/invites/bulk', { rows: [{ email: 'bulktoomany@example.com', role: 'member' }] });
+    assert.equal(b.status, 200); assert.equal(b.body.results[0].ok, false);
+  });
+});
+
 describe('audit export', () => {
   it('neutralises formulas and doubles quotes', () => {
     assert.equal(csvCell('=HYPERLINK("x")'), '"\'=HYPERLINK(""x"")"');

@@ -5,7 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { Agent, PDF, pool, setup, signup, teardown } from './helpers.js';
 import { findOrphans, removeOrphans } from '../src/lib/filehygiene.js';
 import { storage } from '../src/lib/storage.js';
-import { SlidingWindow } from '../src/lib/window.js';
+import { RollingCounter } from '../src/lib/window.js';
 import { THRESHOLDS, checkAlerts, noteSignal, resetAlerts } from '../src/lib/alerts.js';
 
 let app: FastifyInstance;
@@ -60,13 +60,14 @@ describe('orphan file hygiene', () => {
   });
 });
 
-describe('sliding window', () => {
-  it('counts inside the window only and bounds memory', () => {
-    const w = new SlidingWindow(1000, 10);
-    assert.equal(w.hit('a', 0), 1); assert.equal(w.hit('a', 500), 2); assert.equal(w.hit('a', 1200), 2);
-    assert.equal(w.count('a', 5000), 0);
-    for (let i = 0; i < 100; i++) w.hit('k' + i, 10_000 + i);
-    assert.ok((w as unknown as { hits: Map<string, number[]> }).hits.size <= 11, 'distinct keys cannot grow without bound');
+describe('rolling counter', () => {
+  it('counts inside the window only, in constant time and fixed memory', () => {
+    const w = new RollingCounter(60_000, 60);
+    assert.equal(w.hit('a', 0), 1); assert.equal(w.hit('a', 30_000), 2); assert.equal(w.hit('a', 61_000), 2);
+    assert.equal(w.count('a', 200_000), 0);
+    for (let i = 0; i < 100_000; i++) w.hit('flood', 1_000_000 + Math.floor(i / 2)); // time only moves forward
+    assert.ok((w as unknown as { buckets: Map<string, unknown[]> }).buckets.get('flood')!.length <= 61, 'at most one bucket per slot, however many events');
+    assert.equal(w.count('flood', 1_050_000), 100_000);
   });
 });
 

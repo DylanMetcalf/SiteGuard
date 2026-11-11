@@ -8,7 +8,7 @@
 import { config } from '../config.js';
 import type { Db } from '../db/pool.js';
 import { queueEmail } from './email.js';
-import { SlidingWindow } from './window.js';
+import { RollingCounter } from './window.js';
 
 export type Signal = 'server_error' | 'slow_request' | 'login_failed' | 'rate_limited';
 
@@ -24,7 +24,7 @@ const WHAT: Record<Signal, { title: string; check: string }> = {
   rate_limited: { title: 'Many requests are being turned away', check: 'Look for "security: rate_limited" lines. It can be an attack or a busy site behind one router.' },
 };
 
-const windows = new SlidingWindow(WINDOW_MS);
+const windows = new RollingCounter(WINDOW_MS);
 const lastSent = new Map<Signal, number>();
 
 /** Records one occurrence of a signal. Cheap enough to call on every request. */
@@ -41,7 +41,6 @@ export async function checkAlerts(db: Db, now = Date.now()): Promise<Signal[]> {
     const n = windows.count(s, now);
     if (n < THRESHOLDS[s]) continue;
     if (now - (lastSent.get(s) ?? 0) < COOLDOWN_MS) continue;
-    lastSent.set(s, now);
     fired.push(s);
     for (const email of to) {
       await queueEmail(db, {
@@ -51,6 +50,8 @@ export async function checkAlerts(db: Db, now = Date.now()): Promise<Signal[]> {
         dedupeKey: `alert:${s}:${Math.floor(now / COOLDOWN_MS)}:${email}`,
       });
     }
+    // Only after the emails are queued: if queuing fails the signal stays eligible for the next check.
+    lastSent.set(s, now);
   }
   return fired;
 }

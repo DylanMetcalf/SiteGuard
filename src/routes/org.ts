@@ -98,7 +98,7 @@ export default async function orgRoutes(app: FastifyInstance) {
   });
 
   /** Several invitations from a pasted list or spreadsheet. Each row succeeds or fails on its own; the answer says which. */
-  app.post('/api/org/invites/bulk', rl(5), async (req) => {
+  app.post('/api/org/invites/bulk', rl(2), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireAdmin(ctx);
     requireWritable(ctx);
@@ -114,8 +114,8 @@ export default async function orgRoutes(app: FastifyInstance) {
       seen.add(row.email);
       try { await createInvite(ctx, row.email, row.role); results.push({ email: row.email, ok: true }); }
       catch (err) {
-        if (err instanceof HttpError) results.push({ email: row.email, ok: false, message: err.message });
-        else throw err;
+        // Any failure is reported against its own row, so a retry never re-sends rows that already went out.
+        results.push({ email: row.email, ok: false, message: err instanceof HttpError ? err.message : 'Could not be invited. Try this one again later.' });
       }
     }
     return { results, sent: results.filter((r) => r.ok).length };
@@ -305,12 +305,18 @@ export async function auditFor(
   );
 }
 
+const DAILY_INVITE_CAP = 300;
+
 /** Creates one invitation for the caller's organisation (role checks, seat limit, email). Shared by the single and bulk routes. */
 async function createInvite(ctx: OrgCtx, email: string, role: Role) {
   if (!rolesFor(ctx.org.kind).includes(role)) throw badRequest('That role is not available for this kind of organisation.');
   if (role === 'owner' && ctx.role !== 'owner') throw forbidden('Only owners can invite another owner.');
   return withTx(async (db) => {
     await db.query('select id from organisations where id = $1 for update', [ctx.org.id]);
+    // Stops the invitation feature being used as a mail relay: a day's invitations are capped per organisation.
+    if (((await one<{ n: number }>(db, `select count(*)::int as n from user_invites where org_id = $1 and created_at > now() - interval '1 day'`, [ctx.org.id]))?.n ?? 0) >= DAILY_INVITE_CAP) {
+      throw new HttpError(429, 'invite_cap', `You have sent ${DAILY_INVITE_CAP} invitations in the last day. Try again tomorrow, or contact support if you need more.`);
+    }
     if (await one(db, `select 1 from memberships m join users u on u.id = m.user_id where m.org_id = $1 and u.email = $2`, [ctx.org.id, email])) {
       throw conflict('That person is already a member.');
     }

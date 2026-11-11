@@ -291,8 +291,8 @@ Newest first.
 **REASON** Round two found: shared-address lock-out (SEC-017, fixed), 2 critical and several serious accessibility problems (fixed: unlabelled button, tab group without tabs, low-contrast green, missing page landmarks, a tab row that scrolled the phone sideways). Known and left: dimmed walkthrough summary (intentional), heading order on a few screens.
 **DATE** 2026-11-11
 
-**DECISION** Per-email sign-in limit (10 a minute, any address), early-warning alert emails to the platform owners, daily orphan-file report (delete only when `ORPHAN_CLEANUP=delete`), bulk invitations (up to 100, per-row results), and a CSV audit export that neutralises spreadsheet formulas.
-**REASON** The backlog from the bot rounds. Deleting files is irreversible, so it is opt-in and re-checks references first; alerts carry counts only so they can never leak personal information.
+**DECISION** Early-warning alert emails to the platform owners, daily orphan-file report (delete only when `ORPHAN_CLEANUP=delete`), bulk invitations (up to 100 a time, 300 a day per organisation, per-row results), and a CSV audit export that neutralises spreadsheet formulas.
+**REASON** The backlog from the bot rounds. A per-email sign-in limit was built and then dropped after review: the existing 10-failure lockout already stops guessing one account from many addresses, and a second limiter would let an attacker keep a named person out. Deleting files is irreversible, so it is opt-in and re-checks references first; alerts carry counts only so they can never leak personal information.
 **DATE** 2026-11-11
 
 **DECISION** Not built now: WhatsApp reminders (needs a WhatsApp Business provider account, message templates and recipients' consent; email reminders already exist) and offline pages (the app keeps no records on the device by design, for POPIA; see the parking lot).

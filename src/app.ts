@@ -76,6 +76,9 @@ const allowed = (list: string[], p: string) => list.some((x) => p === x || p.sta
 /** During set-up only creating a site and its departments/areas; not requests, requirements or contractors. */
 const setupAllowed = (p: string, method: string) => allowed(ONBOARDING_ALLOWED, p) || (p === '/api/workplaces' && method === 'POST') || /^\/api\/workplaces\/[0-9a-f-]{36}\/areas(\/[0-9a-f-]{36})?$/.test(p);
 
+/** Routes that are slow by nature (uploads with a virus scan, AI, document generation, bundles, exports, the live stream). */
+const EXPECTED_SLOW = /^\/(healthz|api\/(events|assistant|studio|ai|bundle|org\/export|org-docs|documents\/[^/]+\/file|files))/;
+
 const CSRF_EXEMPT = new Set(['/api/billing/webhook', '/api/billing/paystack/webhook']);
 /** The Exchange portal has its own short sessions and CSRF header (routes/exchangePortal.ts). */
 const isPortal = (p: string) => p.startsWith('/api/x/');
@@ -183,7 +186,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   // Counts for the early-warning alerts (lib/alerts.ts): numbers only.
   app.addHook('onResponse', async (req, reply) => {
     if (reply.statusCode >= 500) noteSignal('server_error');
-    else if (reply.elapsedTime > SLOW_REQUEST_MS && !req.url.startsWith('/api/events') && !req.url.startsWith('/healthz')) noteSignal('slow_request');
+    else if (reply.elapsedTime > SLOW_REQUEST_MS && !EXPECTED_SLOW.test(req.url)) noteSignal('slow_request');
   });
 
   app.setErrorHandler((err, req, reply) => {
