@@ -189,7 +189,18 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     if (err instanceof ZodError) {
       return reply.status(400).send({ error: 'invalid', message: humanIssue(err.issues[0]), issues: err.issues });
     }
-    const e = err as { statusCode?: number; code?: string; message: string };
+    const e = err as { statusCode?: number; code?: string; message: string; constraint?: string };
+    // Database errors a visitor can cause: two requests racing for the same address, or text Postgres cannot store.
+    // These are the caller's problem (4xx), never a server error.
+    if (e.code === '23505') {
+      return reply.status(409).send({
+        error: 'conflict',
+        message: e.constraint === 'users_email_key' ? 'An account with that email already exists — sign in instead.' : 'That already exists. Refresh and try again.',
+      });
+    }
+    if (e.code === '22021' || e.code === '22P05') {
+      return reply.status(400).send({ error: 'invalid', message: 'That text contains characters that cannot be stored. Remove them and try again.' });
+    }
     if (e.statusCode === 429) {
       securityEvent(req, 'rate_limited', { path: redactUrl(req.url.split('?')[0]) });
       return reply.status(429).send({ error: 'rate_limited', message: 'Too many attempts — wait a minute and try again.' });

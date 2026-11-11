@@ -282,3 +282,7 @@ Newest first.
 **DECISION** Contractors use COMVERA free; mines pay per seat after a 14-day trial.
 **REASON** Contractor adoption is what makes the product useful to the paying mine. (Pricing to be validated in the pilot.)
 **DATE** 2026-09-23
+
+**DECISION** A repeatable bot swarm (`npm run test:bots`, `scripts/bots.mts`) exercises a running server with 19 concurrent actors: 4 mines, 6 contractors, 4 attackers, the platform owner and 4 real browsers. It refuses to run against anything but localhost.
+**REASON** Unit tests cannot show races, rate limits, cross-tenant probing or load. Its first run found two real bugs (duplicate sign-up race and NUL characters returning 500), both fixed. Run it before each release against a throwaway database with `TRUST_PROXY=true`.
+**DATE** 2026-11-11
