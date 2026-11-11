@@ -443,7 +443,7 @@ a.menu-row{text-decoration:none;}
 .chat-card .btn svg{width:14px; height:14px; vertical-align:-2px;}
 .chat-sources{margin-top:10px; display:flex; flex-direction:column; gap:3px; font-size:12.5px;}
 .chat-sources a{color:var(--blue); overflow-wrap:anywhere;}
-.chat-empty{color:var(--grey); font-size:14px; display:flex; flex-direction:column; gap:8px; padding:8px 0;}
+.chat-empty{color:var(--grey); font-size:14px; display:flex; flex-direction:column; gap:8px; padding:8px 0 96px;} /* room so the example buttons never sit under the message box */
 .chat-chip{min-height:44px; text-align:left; background:var(--paper); border:1px solid var(--grey-line); color:var(--ink); border-radius:14px; padding:11px 14px; font-size:14px; cursor:pointer; transition:border-color .12s ease, background .12s ease;}
 .chat-chip:hover{border-color:var(--sage); background:var(--sage-bg);}
 .chat-form{display:flex; gap:8px; align-items:flex-end; padding-top:12px; border-top:1px solid var(--grey-line);}
@@ -462,7 +462,7 @@ a.menu-row{text-decoration:none;}
 .studio-card{display:flex; flex-direction:column; gap:6px; text-align:left; padding:16px; border:1px solid var(--grey-line); border-radius:var(--radius); background:var(--paper-raised); box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;}
 .studio-card:hover{transform:translateY(-2px); box-shadow:var(--shadow); border-color:var(--sage-soft);}
 .studio-card .qa-icon{margin-bottom:4px;}
-.studio-card h4{font-size:15px; font-weight:650;}
+.studio-card h2,.studio-card h3,.studio-card h4{font-size:15px; font-weight:650;}
 .studio-card p{font-size:12.5px; color:var(--grey);}
 .studio-cats{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px;}
 .doc-preview{border:1px solid var(--grey-line); border-radius:var(--radius-sm); background:#fff; color:#111; padding:18px; margin-top:12px; font-size:12.5px; max-height:340px; overflow:auto;}

@@ -182,6 +182,11 @@ log('3. Sessions and tokens');
   check('sessions', 'changing the password works and ends the other session', pc.status === 200 && (await b.get('/api/org-docs')).status === 401, `${pc.status} ${pc.text.slice(0, 80)}`);
   const wrongCur = await a.post('/api/me/password', { current: 'nope nope nope nope', next: 'yet another passphrase 1' });
   check('sessions', 'changing the password needs the current password', wrongCur.status >= 400 && wrongCur.status < 500, String(wrongCur.status));
+  // one email tried from many addresses: the per-email limit stops it even though no single address is busy
+  const target = new Bot('S6'); await target.signup('Spray Co ' + tag, 'host');
+  const spray: number[] = [];
+  for (let i = 0; i < 16; i++) spray.push((await new Bot('spray').req('POST', '/api/auth/login', { email: target.email, password: 'wrong guess ' + i }, { 'x-forwarded-for': `10.33.1.${i + 1}` })).status);
+  check('sessions', 'guessing one account from 16 different addresses is stopped by the per-email limit', spray.slice(10).every((c) => c === 429 || c === 423) && spray.every((c) => c < 500), JSON.stringify(spray));
   // single-use tokens: reset + verify
   const v = new Bot('S4'); await v.signup('Token Co ' + tag, 'host');
   await db.query(`update users set email_verified_at = null where id = $1`, [v.userId]);

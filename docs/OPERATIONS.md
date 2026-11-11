@@ -60,3 +60,14 @@ Use Render's *Duplicate* (or a second service from the same repository) with its
 it at a branch you deploy to first. Use Stripe test keys there and no real customer data. Test the
 change on staging, then merge to `main` for production. Migrations only add things, so staging and
 production can run the same code.
+
+## Restore drill you can run any time (no hosting account needed)
+`DATABASE_URL=<database> LOCAL_STORAGE_DIR=<uploads folder> npx tsx scripts/restore-drill.mts` dumps the database, archives the uploads, restores both into a **scratch** database and folder, compares every table's row count, and re-checks the SHA-256 of every stored file against the database record. It prints PASS or FAIL with reasons and never writes to the source. Verified on 2026-11-11 against a seeded local copy (76 tables, 3 files: PASS), and verified to FAIL when files are missing.
+
+For a hosted database, restore the provider's backup into a **new** database, then run `DATABASE_URL=<live> RESTORED_DATABASE_URL=<restored> npx tsx scripts/restore-drill.mts` (add `DRILL_ALLOW_PROD_SOURCE=1` if the live name contains "prod"; reading is safe).
+
+## Alerts
+The app emails the addresses in `PLATFORM_ADMIN_EMAILS` when, over five minutes, it sees 10+ server errors, 30+ slow requests (over 3 s), 100+ failed sign-ins or 200+ turned-away requests; at most once an hour per signal; counts only, no personal details (`src/lib/alerts.ts`). These are per instance and need email delivery working. They do not replace an outside uptime check (`.github/workflows` has one); add the host's own alert for CPU, memory and database connections.
+
+## Stored-file clean-up
+Each day the app counts files nothing points at (older than 7 days, not a logo). By default it only logs the count. To delete them, set `ORPHAN_CLEANUP=delete` after you have a backup you trust; the row is re-checked before each delete.

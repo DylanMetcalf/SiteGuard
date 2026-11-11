@@ -43,7 +43,7 @@ export function page(title: string, body: string, foot = 'Shared from COMVERA. T
 .wrap{max-width:760px;margin:0 auto;padding:20px 16px 40px}.brand{font-weight:700;font-size:16px;margin-bottom:16px}
 .brand img{width:26px;height:26px;vertical-align:-7px;margin-right:8px;border-radius:7px}.brand{letter-spacing:.12em}
 .card{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 2px rgba(14,26,43,.05)}
-h1{font-size:20px;margin:0 0 4px}.sub{color:var(--grey);font-size:12.5px}.big{font:700 36px/1 system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:-.02em}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:18px 0 4px}.sub{color:var(--grey);font-size:12.5px}.big{font:700 36px/1 system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:-.02em}
 table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey)}.pill{font-size:11px;font-weight:600;white-space:nowrap}
 .stamp{display:inline-block;border:2px solid var(--green);color:var(--green);padding:4px 12px;font-size:11px;letter-spacing:.08em;border-radius:999px;font-weight:700}

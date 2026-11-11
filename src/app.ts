@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
+import { noteSignal, SLOW_REQUEST_MS } from './lib/alerts.js';
 import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,6 +75,9 @@ const ONBOARDING_ALLOWED = ['/api/bootstrap', '/api/onboarding', '/api/auth', '/
 const allowed = (list: string[], p: string) => list.some((x) => p === x || p.startsWith(x + '/'));
 /** During set-up only creating a site and its departments/areas; not requests, requirements or contractors. */
 const setupAllowed = (p: string, method: string) => allowed(ONBOARDING_ALLOWED, p) || (p === '/api/workplaces' && method === 'POST') || /^\/api\/workplaces\/[0-9a-f-]{36}\/areas(\/[0-9a-f-]{36})?$/.test(p);
+
+/** Routes that are slow by nature (uploads with a virus scan, AI, document generation, bundles, exports, the live stream). */
+const EXPECTED_SLOW = /^\/(healthz|api\/(events|assistant|studio|ai|bundle|org\/export|org-docs|documents\/[^/]+\/file|files))/;
 
 const CSRF_EXEMPT = new Set(['/api/billing/webhook', '/api/billing/paystack/webhook']);
 /** The Exchange portal has its own short sessions and CSRF header (routes/exchangePortal.ts). */
@@ -177,6 +181,12 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
       const type = req.headers['content-type'] ?? '';
       if (!type.startsWith('application/json')) throw new HttpError(415, 'unsupported_media_type', 'Expected JSON.');
     }
+  });
+
+  // Counts for the early-warning alerts (lib/alerts.ts): numbers only.
+  app.addHook('onResponse', async (req, reply) => {
+    if (reply.statusCode >= 500) noteSignal('server_error');
+    else if (reply.elapsedTime > SLOW_REQUEST_MS && !EXPECTED_SLOW.test(req.url)) noteSignal('slow_request');
   });
 
   app.setErrorHandler((err, req, reply) => {
