@@ -24,7 +24,10 @@
     "test:bots:ux": "tsx scripts/bots-ux.mts",
     "test:bots:shared-address": "tsx scripts/bots-nat.mts",
     "seed": "tsx scripts/seed-test-data.mts",
-    "restore-drill": "tsx scripts/restore-drill.mts"
+    "restore-drill": "tsx scripts/restore-drill.mts",
+    "test:journey": "tsx scripts/contractor-journey.mts",
+    "test:landing": "tsx scripts/landing-audit.mts",
+    "test:today": "tsx scripts/today-check.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

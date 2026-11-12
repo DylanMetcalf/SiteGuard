@@ -76,7 +76,9 @@ export function computeTasks(){
     }
   });
   const order = {high:0, medium:1, low:2};
-  return tasks.sort((a,b)=>order[a.priority]-order[b.priority]);
+  // Within a priority, things that are running out of time come before things that are simply not sent yet.
+  const urgency = (t)=>/expir|overdue|correction|renews/i.test(t.title) ? 0 : /^Review/i.test(t.title) ? 1 : 2;
+  return tasks.sort((a,b)=>order[a.priority]-order[b.priority] || urgency(a)-urgency(b));
 }
 
 function renderTasksSheet(filter){

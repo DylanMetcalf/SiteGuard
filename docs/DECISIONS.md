@@ -306,3 +306,7 @@ Newest first.
 **DECISION** Not built yet: a per-contractor fee above an included number for mines, and a self-serve "paid pilot" button. Pilots are sold by hand: a 3-month, 50%-off code for Site Starter made in the manager portal (Promo codes), a written money-back promise, and agreement to give feedback and a case study.
 **REASON** Metering contractors through Stripe/Paystack is money logic that needs real pilot data first; a manual pilot is faster and teaches us what mines will pay for.
 **DATE** 2026-11-12
+
+**DECISION** The contractor-first journey is tested end to end by `npm run test:journey` (15 tests, 44 checks: first impression, real sign-up and guided set-up, Today, joining a second mine, upload and submit, safety-file PDF with the client invitation line, Document Studio, Oscar, several mines in one place, worker certificates, mine approval, the gate page, phone, keyboard, speed/offline/dark mode).
+**REASON** Its first run found: urgent worker-certificate expiry hidden under generic "Submit" tasks on Today (fixed: urgent items first), no way to see waiting work per mine (fixed: per-mine chips), no "Join a site" button on the Sites tab for a contractor already on one mine (fixed), the safety contact asked for a name and email the person had just typed (fixed: pre-filled), and Oscar answering "what do I still need to submit?" with a generic list in no-key mode (fixed: answers from the person's own sites).
+**DATE** 2026-11-12

@@ -125,3 +125,26 @@ describe('support', () => {
     assert.equal((await new Agent(app).post('/api/client-errors', { message: 'TypeError: x is undefined', url: '/' })).status, 200);
   });
 });
+
+describe('assistant knows the caller\'s own outstanding work (no AI key)', () => {
+  it('lists what a contractor still has to submit, by site, not a generic list', async () => {
+    const w = await host.post('/api/workplaces', { name: 'Outstanding Pit', packIds: [], requirements: [{ category: 'Company Documents', name: 'Letter of Good Standing (COID)', source: 'legal', required: true }] });
+    assert.equal(w.status, 200, JSON.stringify(w.body));
+    const code = (await host.state()).state.workplaces[w.body.id].code;
+    assert.equal((await contractor.post('/api/sites/join', { code })).status, 200);
+    const r = await ask(contractor, 'What do I still need to submit?');
+    assert.equal(r.status, 200);
+    assert.match(r.body.reply, /Outstanding Pit/);
+    assert.match(r.body.reply, /Letter of Good Standing \(COID\): still to submit/);
+    assert.doesNotMatch(r.body.reply, /typical contractor safety file/);
+    assert.ok(r.body.cards.some((c: any) => c.type === 'open_site'), 'offers to open the site');
+  });
+
+  it('tells a host what is outstanding from contractors, and nothing from another organisation', async () => {
+    const mine = await ask(host, 'What is outstanding?');
+    assert.match(mine.body.reply, /Outstanding Pit/);
+    assert.match(mine.body.reply, /not sent yet/);
+    const other = await ask(otherHost, 'What is outstanding?');
+    assert.doesNotMatch(other.body.reply, /Outstanding Pit|Letter of Good Standing/);
+  });
+});

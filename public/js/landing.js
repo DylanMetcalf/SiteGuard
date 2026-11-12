@@ -74,18 +74,22 @@ export function renderPublic(name, features, ctx){
   }
 }
 
-function featureGrid(){
+function featureGrid(short){
   const feat = (icon, title, text) => '<div class="lp-feat"><div class="lp-feat-ic">'+icon+'</div><h3>'+title+'</h3><p>'+text+'</p></div>';
-  return '<div class="lp-grid">'
-    + feat(I.file, 'Safety File Builder', 'Pick a site or client, see every document it needs, reuse what you have, create the rest, and compile one professional PDF.')
-    + feat(I.pen, 'Document Studio', 'Risk assessments, method statements, policies and appointment letters, branded as yours, in PDF and Word, for you to check and sign.')
-    + feat(I.check, 'Requirements that make sense', 'Starter lists for mines and construction, each marked as a legal, site or best-practice requirement, and required or optional.')
-    + feat(I.audit, 'Review and approval', 'Sites review section by section, ask for changes, and mark Site Ready with a verification code.')
-    + feat(I.gate, 'Gate clearance', 'Each worker is cleared only with a valid medical and induction, on a file that is approved.')
-    + feat(I.bell, 'Nothing expires quietly', 'Reminders at the days you choose, and a compliance agent that tells the right person what needs attention.')
-    + feat(I.share, 'Share securely', 'Expiring links for auditors and clients, and individual documents or a merged PDF for the site.')
-    + feat(I.shield, 'Built for POPIA', 'Every company sees only its own data. ID numbers are never stored in full. Every action is logged.')
-    + '</div>';
+  const all = {
+    builder: feat(I.file, 'Safety File Builder', 'Pick a site or client, see every document it needs, reuse what you have, create the rest, and compile one professional PDF.'),
+    studio: feat(I.pen, 'Document Studio', 'Risk assessments, method statements, policies and appointment letters, branded as yours, in PDF and Word, for you to check and sign.'),
+    oscar: feat(I.sparkle, 'Oscar, your assistant', 'Ask what a job needs, what you still have to submit, or what is about to expire. Oscar answers from your own records and drafts documents for you to check.'),
+    expire: feat(I.bell, 'Nothing expires quietly', 'Reminders at the days you choose, and a compliance agent that tells the right person what needs attention.'),
+    reqs: feat(I.check, 'Requirements that make sense', 'Starter lists for mines and construction, each marked as a legal, site or best-practice requirement, and required or optional.'),
+    review: feat(I.audit, 'Review and approval', 'Sites review section by section, ask for changes, and mark Site Ready with a verification code.'),
+    gate: feat(I.gate, 'Gate clearance', 'Each worker is cleared only with a valid medical and induction, on a file that is approved.'),
+    share: feat(I.share, 'Share securely', 'Expiring links for auditors and clients, and individual documents or a merged PDF for the site.'),
+    popia: feat(I.shield, 'Built for POPIA', 'Every company sees only its own data. ID numbers are never stored in full. Every action is logged.'),
+  };
+  const keys = short ? ['builder', 'studio', 'oscar', 'expire'] : ['builder', 'studio', 'oscar', 'reqs', 'review', 'gate', 'expire', 'share', 'popia'];
+  return '<div class="lp-grid">' + keys.map((k) => all[k]).join('') + '</div>'
+    + (short ? '<p class="lp-more">' + go('features', 'See everything COMVERA does', 'btn secondary small') + '</p>' : '');
 }
 
 function featuresPage(){
@@ -225,7 +229,7 @@ export function renderLanding(features){
       +'<li><b>1</b><div><h3>Choose the site or client</h3><p>Type a site\'s code, or start a file for a client who isn\'t on COMVERA.</p></div></li>'
       +'<li><b>2</b><div><h3>Fill the gaps</h3><p>Reuse your company documents, upload certificates, and let COMVERA draft the rest for you to check.</p></div></li>'
       +'<li><b>3</b><div><h3>Check, build, send</h3><p>See exactly what is outstanding, preview the file, then download it, share a link or submit it.</p></div></li></ol></section>'
-    +'<section class="lp-note"><h2>Who pays?</h2><p><strong>Contractors</strong> subscribe for their own company and every safety file they build. <strong>Sites and mines</strong> subscribe to manage contractor compliance, and can sponsor their contractors\' files for their own sites. A sponsorship covers that site only.</p><div class="lp-cta">'+go('pricing','View pricing','btn secondary small')+'</div></section>'
-    +'<section class="lp-feats"><h2>Everything a safety file needs</h2>'+featureGrid()+'</section>'
+    +'<section class="lp-note"><h2>Who pays?</h2><p><strong>Contractors</strong> try everything free for 14 days, then buy one safety file once, or subscribe for every mine they work for. <strong>Mines and sites</strong> subscribe to manage contractor compliance, and can cover their contractors\' files for their own site.</p><div class="lp-cta">'+go('pricing','View pricing','btn secondary small')+'</div></section>'
+    +'<section class="lp-feats"><h2>Everything a contractor safety file needs</h2>'+featureGrid(true)+'</section>'
     + closing('Start with your next safety file.', 'Set-up takes about ten minutes. Every account starts with a 14-day trial of the full product.'));
 }
