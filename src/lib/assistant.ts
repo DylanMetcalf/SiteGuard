@@ -523,6 +523,28 @@ export async function runAssistantOffline(ctx: OrgCtx, history: ChatMessage[]): 
     return reply(`Here's what needs attention, most urgent first:\n${lines.join('\n')}${findings.length > 8 ? `\n\n…and ${findings.length - 8} more under More → Compliance agent.` : ''}`);
   }
 
+  // "What do I still need to submit / do?": the person's OWN outstanding items, by site, not a generic list.
+  const wantsToDo = /\b(still need|need to (submit|send|upload|provide|finish|do)|what do i (still )?(need|owe|have to)|what('s| is| are) (missing|outstanding|left|due)|to submit|not (yet )?(submitted|sent)|awaiting my)\b/i.test(text);
+  if (wantsToDo && !profiles.length) {
+    const live = (await mySites(ctx)).filter((x) => x.status === 'in_progress' || x.status === 'site_ready' || x.status === 'invited');
+    if (!live.length) return reply(canCreateSites(ctx) ? "You don't have any sites yet. Describe a site or job and I'll list what the safety file needs." : 'No active sites yet. You will see them here once a site owner invites you.');
+    const isHostSide = ctx.org.kind === 'host';
+    const label: Record<string, string> = { missing: isHostSide ? 'not sent yet' : 'still to submit', correction_required: 'needs a correction', expired: 'has expired', expiring: 'expires soon', awaiting_review: isHostSide ? 'waiting for your review' : 'waiting for the site to review' };
+    const wanted = isHostSide ? ['awaiting_review', 'expired', 'correction_required', 'expiring', 'missing'] : ['correction_required', 'expired', 'expiring', 'missing'];
+    const groups: string[] = [];
+    let total = 0;
+    for (const site of live.slice(0, 8)) {
+      const d = await siteDetail(ctx, site.id);
+      const todo = d.requirements.filter((r) => wanted.includes(r.status)).sort((a, b) => wanted.indexOf(a.status) - wanted.indexOf(b.status));
+      if (!todo.length) continue;
+      total += todo.length;
+      groups.push(`**${site.name}** (${site.company})\n` + todo.slice(0, 10).map((r) => `- ${r.name}: ${label[r.status]}${r.expiryDate && (r.status === 'expiring' || r.status === 'expired') ? ` (${r.expiryDate})` : ''}`).join('\n') + (todo.length > 10 ? `\n- …and ${todo.length - 10} more` : ''));
+      if (cards.length < 3) cards.push({ type: 'open_site', siteId: site.id, name: site.name });
+    }
+    if (!total) return reply(isHostSide ? 'Nothing is waiting on you or outstanding from contractors right now.' : 'You are up to date: nothing is missing, expired or about to expire on any of your sites.');
+    return reply(`${isHostSide ? 'Here is what is outstanding' : `You still have ${total} thing${total === 1 ? '' : 's'} to deal with`}, most urgent first:\n\n${groups.join('\n\n')}`);
+  }
+
   const wantsStatus = /\b(status|ready|readiness|behind|outstanding|overview|my sites|progress|missing|expir\w*|what'?s (left|due))\b/i.test(text);
   if (wantsStatus && !profiles.length) {
     const sites = await mySites(ctx);

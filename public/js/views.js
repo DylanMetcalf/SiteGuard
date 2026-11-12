@@ -123,6 +123,8 @@ function todayWidget(){
   const row = (t, i, filter) => '<button class="today-row" data-action="task-goto" data-filter="'+filter+'" data-i="'+i+'"><span class="today-dot" style="background:'+dot[t.priority]+';" aria-hidden="true"></span><span class="today-text"><b>'+t.title+'</b><span>'+t.sub+'</span></span></button>';
   const more = (list, shown, filter, label) => list.length>shown ? '<button class="linkish today-more" data-action="open-tasks" data-filter="'+filter+'">'+label+' ('+(list.length-shown)+' more)</button>' : '';
   let html = '<div class="card today-card"><div class="flexbetween" style="align-items:baseline;"><div class="site-card-title">Today</div><div class="site-card-sub">'+todayLabel()+'</div></div>';
+  const perSite = isContractor() ? Object.entries(tasks.reduce((m,t)=>{ if(t.siteId && S.state.sites[t.siteId]) m[t.siteId]=(m[t.siteId]||0)+1; return m; },{})) : [];
+  if(perSite.length>1) html += '<div class="today-sites" aria-label="Waiting at each site">'+perSite.map(([id,n])=>'<button class="site-picker-chip" data-action="open-site" data-site="'+id+'">'+S.state.sites[id].name.split('—')[0].trim()+' · '+n+'</button>').join('')+'</div>';
   if(!tasks.length) html += '<div class="today-clear">'+ICONS.check+'<div><b>All clear today</b><span>Nothing needs you right now. We will tell you when something does.</span></div></div>';
   else {
     html += '<div class="today-group">Do today</div>';
@@ -393,7 +395,7 @@ function renderSitesList(){
   const projectsHtml = isContractor() ? projectsSection(projectMatch) + projectList.filter(projectMatch).map(portfolioRow).join('') : '';
   const nWp = Object.keys(S.state.workplaces||{}).length;
   let html = '<div class="view-head"><div class="flexbetween"><h1>'+(isContractor()?'Safety files':'Sites')+'</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')
-    +(isContractor() ? buildButton('small') : '')+'</div>'
+    +(isContractor() ? '<div class="head-actions">'+(isOrgAdmin() && !readOnly() ? '<button class="btn secondary small" data-action="join-site">Join a site</button>' : '')+buildButton('small')+'</div>' : '')+'</div>'
     +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : 'One safety file per site or client, built from your company documents · '+sites.length+' on COMVERA sites · '+projectList.length+' for your own clients')+'</p></div>';
   if(isHost() && nWp){
     html += ((nWp + sites.length) > 3 || searching('sites') ? searchBox('sites', 'Search sites, locations or contractors') : '')

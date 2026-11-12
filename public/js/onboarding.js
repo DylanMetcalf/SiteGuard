@@ -60,7 +60,9 @@ export function renderOnboarding(inApp){
 
 const fld = (id, label, value, extra = '') => '<label class="field-label" for="' + id + '">' + label + '</label><input type="text" id="' + id + '" value="' + escapeHtml(value || '') + '" ' + extra + '>';
 function stepBody(id, d){
-  const a = d.answers || {}, c = a.contact || {};
+  const a = d.answers || {}, saved = a.contact || {}, me = (S.boot && S.boot.me) || {};
+  // The safety contact starts as the person who signed up, so they only have to correct it, not type it again.
+  const c = { name: saved.name || me.name || '', role: saved.role || '', phone: saved.phone || me.phone || '', email: saved.email || me.email || '' };
   if(id === 'organisation') return fld('obName', d.org.kind === 'host' ? 'Organisation name' : 'Company name', d.org.name, 'maxlength="200" autocomplete="organization"')
     + fld('obReg', 'Company registration number (optional)', d.org.regNumber, 'maxlength="60" placeholder="e.g. 2015/123456/07"')
     + fld('obAddr', 'Physical address (optional)', d.org.address, 'maxlength="400"')
