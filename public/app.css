@@ -718,8 +718,8 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .lp-nav{display:flex; align-items:center; gap:14px;}
 .lp-nav .linkish{font-weight:600; font-size:14px;}
 .lp-eyebrow{font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--sage-strong); margin:0 0 10px;}
-.lp-hero{display:grid; gap:28px; padding:20px 0 36px; align-items:center;}
-.lp-hero h1{font-family:var(--font-head); font-size:clamp(30px, 7.5vw, 52px); line-height:1.08; letter-spacing:-.02em; margin:0 0 16px; text-wrap:balance;}
+.lp-hero{position:relative; overflow-x:clip; display:grid; gap:28px; padding:16px 0 32px; align-items:center;}
+.lp-hero h1{font-family:var(--font-head); font-size:clamp(30px, 6.4vw, 46px); line-height:1.08; letter-spacing:-.02em; margin:0 0 16px; text-wrap:balance;}
 .lp-lead{font-size:17px; line-height:1.6; color:var(--ink-soft); max-width:56ch; margin:0 0 22px;}
 .lp-cta{display:flex; flex-wrap:wrap; gap:10px; align-items:center;}
 .lp-cta .btn{min-height:48px; padding:0 20px; font-size:15px;}
@@ -727,6 +727,18 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .lp-proof li{display:flex; align-items:center; gap:6px;}
 .lp-proof svg, .lp-side li svg{color:var(--sage-strong); flex:none;}
 /* product picture, drawn with HTML so it stays sharp and themes with the app */
+.lp-mark{text-decoration:underline; text-decoration-color:var(--sage); text-decoration-thickness:.1em; text-underline-offset:.12em; text-decoration-skip-ink:none;}
+.lp-hlinks{display:flex; flex-wrap:wrap; gap:6px 18px; align-items:center; font-weight:600; font-size:14.5px; margin:0;}
+.lp-hlinks a,.lp-hlinks .linkish{color:var(--brand,var(--ink)); text-decoration:underline; text-underline-offset:3px;}
+.lp-paths{display:grid; gap:12px; margin:0 0 14px;}
+.lp-path{background:var(--paper-raised); border:1px solid var(--grey-line); border-radius:16px; padding:14px 16px; box-shadow:var(--shadow-sm); display:grid; gap:2px; align-content:start;}
+.lp-path-who{font-weight:700; font-size:16px; margin:0;}
+.lp-path-what{font-size:14px; color:var(--ink-soft); margin:0 0 10px;}
+.lp-path .btn{min-height:48px; width:100%;}
+.lp-hsteps{list-style:none; counter-reset:none; display:grid; gap:8px; padding:0; margin:16px 0 0;}
+.lp-hsteps li{display:flex; gap:10px; align-items:center; font-size:14px; color:var(--ink);}
+.lp-hsteps b{flex:none; width:26px; height:26px; border-radius:50%; background:var(--sage-strong); color:#fff; display:grid; place-items:center; font-size:13px;}
+@media(min-width:640px){ .lp-paths{grid-template-columns:1fr 1fr;} .lp-hsteps{grid-template-columns:repeat(3,1fr); gap:12px;} .lp-hsteps li{align-items:flex-start;} }
 .lp-mock{position:relative; padding:8px 0 30px;}
 .lp-mcard{background:var(--paper-raised); border:1px solid var(--grey-line); border-radius:18px; box-shadow:var(--shadow-lg); padding:18px; max-width:420px; margin:0 auto;}
 .lp-mhead{display:flex; justify-content:space-between; gap:12px; align-items:center; padding-bottom:12px; border-bottom:1px solid var(--grey-line); margin-bottom:6px;}
@@ -797,7 +809,7 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .lp-foot{display:flex; flex-wrap:wrap; gap:6px 16px; justify-content:space-between; font-size:12px; color:var(--grey); padding:14px 0;}
 @media (min-width:560px){ .lp-grid{grid-template-columns:1fr 1fr;} }
 @media (min-width:900px){
-  .lp-hero{grid-template-columns:1.05fr .95fr; gap:48px; padding:48px 0 64px;}
+  .lp-hero{grid-template-columns:1.25fr .75fr; gap:40px; padding:40px 0 56px;}
   .lp-sides{grid-template-columns:1fr 1fr;}
   .lp-how ol{grid-template-columns:repeat(3, 1fr); gap:24px;}
   .lp-grid{grid-template-columns:repeat(4, 1fr);}
@@ -952,3 +964,30 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .sp-band{position:absolute; left:0; right:0; top:0; height:7px;} .sp-foot{position:absolute; left:0; right:0; bottom:0; height:5px;}
 .sp-h{font:700 9px var(--font-body); margin:4px 0 6px;} .sp-line{height:4px; background:#E4E7EA; border-radius:2px; margin-bottom:4px;} .sp-line.short{width:60%;}
 .sp-table{display:grid; gap:2px; margin-top:8px;} .sp-table div{height:8px; background:#EEF0F2;}
+
+/* Landing hero: a little life. Everything below is decoration and stops when the visitor prefers reduced motion. */
+.lp-glow{position:absolute; inset:-12% -10% -8% -10%; z-index:0; border-radius:50%; pointer-events:none; filter:blur(28px);
+  background:radial-gradient(60% 55% at 70% 30%, color-mix(in srgb, var(--sage) 30%, transparent), transparent 70%), radial-gradient(50% 50% at 20% 85%, color-mix(in srgb, var(--blue) 16%, transparent), transparent 70%);
+  animation:lp-drift 14s ease-in-out infinite alternate;}
+.lp-mock .lp-mcard{position:relative; z-index:1;}
+.lp-mgate{z-index:2;}
+.lp-mrow{animation:lp-rise .6s ease both; animation-delay:calc(var(--i,0) * .12s + .1s);}
+.lp-gauge-arc{animation:lp-fill 1.6s cubic-bezier(.2,.7,.2,1) .3s both;}
+.lp-cycle{display:grid; justify-items:end;}
+.lp-cycle .lp-mbadge{grid-area:1/1; opacity:0; animation:lp-show 9s linear infinite;}
+.lp-cycle .lp-mbadge:nth-child(2){animation-delay:3s;} .lp-cycle .lp-mbadge:nth-child(3){animation-delay:6s;}
+.lp-mgate{animation:lp-bob 4.5s ease-in-out infinite;}
+.lp-mgate-q{animation:lp-pulse 2.4s ease-in-out infinite;}
+.lp-hsteps li b{animation:lp-step 9s linear infinite;}
+.lp-hsteps li:nth-child(2) b{animation-delay:3s;} .lp-hsteps li:nth-child(3) b{animation-delay:6s;}
+@keyframes lp-rise{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
+@keyframes lp-fill{from{stroke-dasharray:0 97.4;} to{stroke-dasharray:87.7 97.4;}}
+@keyframes lp-show{0%{opacity:0;} 4%,30%{opacity:1;} 34%,100%{opacity:0;}}
+@keyframes lp-bob{0%,100%{transform:translateY(0);} 50%{transform:translateY(-5px);}}
+@keyframes lp-pulse{0%,100%{opacity:1;} 50%{opacity:.45;}}
+@keyframes lp-step{0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--sage) 70%, transparent); transform:scale(1);} 6%{transform:scale(1.18);} 14%,100%{box-shadow:0 0 0 10px transparent; transform:scale(1);}}
+@keyframes lp-drift{from{transform:translate(-1.5%,0) scale(1);} to{transform:translate(1.5%,-1.5%) scale(1.04);}}
+@media (prefers-reduced-motion: reduce){
+  .lp-glow,.lp-mrow,.lp-gauge-arc,.lp-mgate,.lp-mgate-q,.lp-hsteps li b{animation:none !important;}
+  .lp-cycle .lp-mbadge{animation:none !important; opacity:0;} .lp-cycle .lp-mbadge:last-child{opacity:1;}
+}

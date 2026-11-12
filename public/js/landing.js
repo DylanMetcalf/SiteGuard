@@ -16,14 +16,16 @@ const I = {
 };
 
 function mock(){
-  const row = (name, badge, cls) => '<div class="lp-mrow"><span>'+name+'</span><span class="lp-mbadge '+cls+'">'+badge+'</span></div>';
-  return '<div class="lp-mock" aria-hidden="true">'
+  const row = (name, badge, cls, i) => '<div class="lp-mrow" style="--i:'+i+'"><span>'+name+'</span><span class="lp-mbadge '+cls+'">'+badge+'</span></div>';
+  // The last document moves through the whole process while you watch: Missing, then In review, then Approved.
+  const cycle = '<div class="lp-mrow" style="--i:4"><span>Fall protection plan</span><span class="lp-cycle"><span class="lp-mbadge bad">Missing</span><span class="lp-mbadge rev">In review</span><span class="lp-mbadge ok">Approved</span></span></div>';
+  return '<div class="lp-mock" aria-hidden="true"><div class="lp-glow"></div>'
     +'<div class="lp-mcard"><div class="lp-mhead"><div><div class="lp-meyebrow">Safety file</div><div class="lp-mtitle">Plant 2 Expansion</div><div class="lp-msub">Volt Electrical · 18 of 20 in</div></div>'
-    +'<div class="lp-gauge"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="4"/><circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="87.7 97.4" stroke-linecap="round" transform="rotate(-90 18 18)"/></svg><b>90%</b></div></div>'
-    + row('Letter of Good Standing', 'Approved', 'ok')
-    + row('Risk assessment — MCC upgrade', 'In review', 'rev')
-    + row('Medical — S. Nkosi', 'Expires in 12 days', 'warn')
-    + row('Fall protection plan', 'Missing', 'bad')
+    +'<div class="lp-gauge"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="4"/><circle class="lp-gauge-arc" cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="87.7 97.4" stroke-linecap="round" transform="rotate(-90 18 18)"/></svg><b>90%</b></div></div>'
+    + row('Letter of Good Standing', 'Approved', 'ok', 1)
+    + row('Risk assessment — MCC upgrade', 'In review', 'rev', 2)
+    + row('Medical — S. Nkosi', 'Expires in 12 days', 'warn', 3)
+    + cycle
     +'</div>'
     +'<div class="lp-mgate"><div class="lp-mgate-q">'+I.gate+'</div><div><div class="lp-mgate-s">CLEARED</div><div class="lp-msub">Sipho Nkosi · Electrician</div></div></div>'
     +'</div>';
@@ -198,13 +200,20 @@ export function renderLanding(features){
   const demo = features && features.demo;
   return page('landing', ''
     +'<section class="lp-hero"><div class="lp-hero-text">'
-    +'<p class="lp-eyebrow">Contractor safety files · South African mines and sites</p>'
-    +'<h1>Stop chasing safety documents.</h1>'
-    +'<p class="lp-lead">Certificates buried in email threads. Three versions of the “final” risk assessment. A medical that expired last week and nobody noticed until the gate. COMVERA puts every contractor safety file in one place, so everyone can see what\'s required, what\'s missing, what\'s expiring and whose move it is.</p>'
-    +'<div class="lp-cta">'+trial('Start free trial')+'<a class="btn secondary" href="/walkthrough">See how it works in 6 minutes</a>'
-    +(demo?'<button class="btn secondary" data-action="start-demo" data-tour="1">Explore the demo</button>':'')+'</div>'
-    +'<p class="lp-sub-links">'+go('how','How it works')+' · '+go('pricing','View pricing')+' · '+go('contact','Contact us')+'</p>'
-    +'<ul class="lp-proof"><li>'+tick+'14-day trial of everything, no card</li><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li></ul>'
+    +'<p class="lp-eyebrow">Contractor safety files · South African mines</p>'
+    +'<h1>Contractor safety files, finally in <span class="lp-mark">one place</span>.</h1>'
+    +'<p class="lp-lead"><strong>COMVERA is an online portal for mine safety paperwork.</strong> Mines list what they need. Contractors upload it once. Everyone sees what is approved, missing or expiring.</p>'
+    +'<div class="lp-paths">'
+      +'<div class="lp-path"><p class="lp-path-who">I run a mine or site</p><p class="lp-path-what">Ask for documents and see who is cleared.</p>'+trial('Start as a mine','host')+'</div>'
+      +'<div class="lp-path"><p class="lp-path-who">I am a contractor</p><p class="lp-path-what">Upload once, reuse on every site.</p>'+trial('Start as a contractor','contractor')+'</div>'
+    +'</div>'
+    +'<p class="lp-sub-links lp-hlinks"><a href="/walkthrough">Watch the 6-minute walkthrough (no sign-up)</a>'+(demo?'<button class="linkish" data-action="start-demo" data-tour="1">Explore the demo</button>':'')+'</p>'
+    +'<ol class="lp-hsteps" aria-label="How it works">'
+      +'<li><b>1</b><span>The mine says what it needs</span></li>'
+      +'<li><b>2</b><span>The contractor uploads it once</span></li>'
+      +'<li><b>3</b><span>The mine approves, and cleared workers get in</span></li>'
+    +'</ol>'
+    +'<ul class="lp-proof"><li>'+tick+'14-day free trial, no card</li><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li></ul>'
     +'</div>'+mock()+'</section>'
     + painSection()
     +'<section class="lp-sides"><div class="lp-side"><p class="lp-eyebrow">For contractors</p><h2>Build a professional safety file in minutes.</h2>'
