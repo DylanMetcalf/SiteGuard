@@ -6,6 +6,10 @@
  * approves, and marks the site ready; the contractor shares the safety file
  * with an outsider, then revokes it.
  *
+ * STATUS (2026-11-12): STALE. It was written before guided set-up became mandatory for new organisations (migration 026), so it
+ * stops at the first screen after sign-up. It is not run in CI. The same two-company loop is now covered by `npm run test:journey`
+ * (sign-up, join, upload, review, approve, gate) and by the bot swarms. Update it (finish set-up after sign-up) before relying on it.
+ *
  * Run against a server started with default settings (no SMTP, so emails land
  * in the outbox table this test reads):
  *   npm run dev                          # in one terminal

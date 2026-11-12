@@ -67,7 +67,7 @@ export function renderPublic(name, features, ctx){
     case 'builder': return page(name, builderPage());
     case 'contractors': return page(name, contractorsPage());
     case 'sites': return page(name, sitesPage());
-    case 'pricing': return page(name, pricingPage(ctx && ctx.pricing));
+    case 'pricing': return page(name, pricingPage(ctx && ctx.pricing, ctx && ctx.audience));
     case 'how': return page(name, howPage());
     case 'contact': return page(name, contactPage(f.contact || {}, ctx || {}));
     default: return renderLanding(f);
@@ -139,20 +139,35 @@ function howPage(){
 }
 
 const rands = (c)=> 'R'+Math.round(c/100).toLocaleString('en-ZA');
-function pricingPage(pricing){
-  const head = intro('Pricing', 'Simple plans for contractors and for sites.', 'Every account starts with 14 days of the full product. No card needed. When the trial ends nothing is deleted.');
+function pricingPage(pricing, audience){
+  const head = intro('Pricing', 'Pick the plan that fits how you work.', 'Every account starts with 14 days of the full product. No card needed. When the trial ends nothing is deleted.');
   if(!pricing) return head + '<section class="lp-feats"><div class="empty"><p>Loading prices…</p></div></section>';
   if(pricing.error) return head + '<section class="lp-feats"><div class="empty"><p>Prices couldn\'t load. Please try again, or contact us.</p></div></section>';
-  const card = (p) => '<div class="lp-price"><h3>'+p.name+'</h3><div class="lp-amount">'+(p.priceCents===null ? 'Contact us' : rands(p.priceCents)+'<span> / '+p.per+'</span>')+'</div>'
-    + '<p class="lp-p">'+p.blurb+'</p>'+list(p.highlights)
-    + (p.priceCents===null ? go('contact','Talk to us','btn secondary block') : trial('Start free trial', p.kind))+'</div>';
-  const group = (kind, title, sub) => { const ps = pricing.plans.filter(p=>p.kind===kind); return ps.length ? '<section class="lp-feats"><h2>'+title+'</h2><p class="lp-p">'+sub+'</p><div class="lp-prices">'+ps.map(card).join('')+'</div></section>' : ''; };
+  const who = ['contractor', 'consultant', 'host'].includes(audience) ? audience : 'contractor';
+  // Exactly three choices per audience, so nobody has to compare a table.
+  const SETS = {
+    contractor: { ids: ['contractor_once', 'contractor_starter', 'contractor_pro'], title: 'For contractors', sub: 'Your own company account. Build and keep safety files for every client. A mine that invites you can cover your file for its site.', pick: 'contractor_starter', kind: 'contractor' },
+    consultant: { ids: ['consultant_solo', 'consultant_practice', 'consultant_firm'], title: 'For safety consultants', sub: 'One subscription for the client companies you look after. Each client keeps its own documents, workers and sites.', pick: 'consultant_practice', kind: 'consultant' },
+    host: { ids: ['host_starter', 'host_pro', 'host_enterprise'], title: 'For mines and sites', sub: 'See which contractors are approved and cleared. Cover your contractors\' files for your own site.', pick: 'host_starter', kind: 'host' },
+  };
+  const set = SETS[who];
+  const byId = Object.fromEntries(pricing.plans.map(p=>[p.planId, p]));
+  const card = (p) => {
+    const perClient = p.clientLimit && p.priceCents ? '<p class="lp-perclient">About '+rands(Math.round(p.priceCents / p.clientLimit))+' per client a month</p>' : '';
+    return '<div class="lp-price'+(p.planId===set.pick?' lp-pick':'')+'">'+(p.planId===set.pick?'<span class="lp-flag">Most popular</span>':'')+'<h3>'+p.name+'</h3><div class="lp-amount">'+(p.priceCents===null ? 'Contact us' : rands(p.priceCents)+'<span> '+(p.per==='month' ? '/ month' : p.per==='safety file' ? 'once, for one file' : '/ '+p.per)+'</span>')+'</div>'+perClient
+      + '<p class="lp-p">'+p.blurb+'</p>'+list(p.highlights)
+      + (p.priceCents===null ? go('contact','Talk to us','btn secondary block') : trial(p.planId==='contractor_once' ? 'Build my one file' : 'Start free trial', set.kind))+'</div>';
+  };
+  const tabs = [['contractor', 'Contractors'], ['consultant', 'Safety consultants'], ['host', 'Mines and sites']];
+  const toggle = '<div class="lp-toggle" role="tablist" aria-label="Who is this for?">'+tabs.map(([k, l])=>'<button type="button" role="tab" aria-selected="'+(k===who)+'" class="'+(k===who?'on':'')+'" data-action="pricing-audience" data-who="'+k+'">'+l+'</button>').join('')+'</div>';
+  const cards = set.ids.map(id=>byId[id]).filter(Boolean);
   return head
-    + group('contractor', 'Contractors', 'Your own company account: build and manage safety files for every client.')
-    + group('host', 'Sites and mines', 'Manage contractor compliance, and sponsor your contractors\' files for your own sites.')
+    + '<section class="lp-feats">'+toggle+'<h2>'+set.title+'</h2><p class="lp-p">'+set.sub+'</p><div class="lp-prices lp-prices-3">'+cards.map(card).join('')+'</div>'
+    + (who==='contractor' ? '<p class="lp-p lp-aside">Working for up to 20 mines? <strong>Contractor Business</strong> covers that. '+go('contact','Ask us','linkish')+'.</p>' : '')
+    + '</section>'
     + '<section class="lp-note"><h2>Good to know</h2>'+list([
-        'A site\'s sponsorship covers your file for that site only. Files for other clients need your own contractor plan.',
-        'Safety files are often bought or compiled one job at a time. A subscription covers every file you build while it runs.',
+        'A mine\'s sponsorship covers your file for that site only. Files for other clients need your own plan.',
+        'Safety files are often bought or compiled one job at a time. The once-off file is for exactly that; a subscription covers every file you build while it runs.',
         'Plans are billed monthly. You can change or cancel your plan at any time; your data stays readable.',
         'Prices are shown in South African rand. The price for your plan is confirmed at checkout.'])+'</section>'
     + closing('Start with the full product.', 'Fourteen days, every feature, no card.');

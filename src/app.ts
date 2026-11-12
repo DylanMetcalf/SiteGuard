@@ -16,6 +16,7 @@ import { securityEvent } from './lib/securityLog.js';
 import { safeEqual } from './lib/security.js';
 import authRoutes from './routes/auth.js';
 import orgRoutes from './routes/org.js';
+import consultantRoutes from './routes/consultant.js';
 import bootstrapRoutes from './routes/bootstrap.js';
 import siteRoutes from './routes/sites.js';
 import documentRoutes from './routes/documents.js';
@@ -237,6 +238,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
 
   await app.register(authRoutes);
   await app.register(orgRoutes);
+  await app.register(consultantRoutes);
   await app.register(bootstrapRoutes);
   await app.register(siteRoutes);
   await app.register(documentRoutes);

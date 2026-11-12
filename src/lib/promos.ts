@@ -8,7 +8,7 @@
 import type { Db } from '../db/pool.js';
 import { one } from '../db/pool.js';
 import { badRequest, conflict, notFound } from './errors.js';
-import { PLANS } from './plans.js';
+import { PLANS, planAllowedFor } from './plans.js';
 import type { OrgCtx } from './authz.js';
 
 export interface PromoRow {
@@ -39,7 +39,7 @@ export async function redeemPromo(db: Db, ctx: OrgCtx, code: string) {
   if (p.expires_at && new Date(p.expires_at).getTime() <= Date.now()) throw invalid();
   if (p.org_id && p.org_id !== ctx.org.id) throw invalid();
   const plan = PLANS[p.plan];
-  if (!plan || plan.kind !== ctx.org.kind || (p.org_kind && p.org_kind !== ctx.org.kind)) {
+  if (!plan || !planAllowedFor(plan, ctx.org) || (p.org_kind && p.org_kind !== ctx.org.kind)) {
     throw badRequest(`That code is for ${plan?.kind === 'host' ? 'mines and sites' : 'contractor companies'}.`);
   }
   if (await one(db, 'select 1 from promo_redemptions where promo_id = $1 and org_id = $2', [p.id, ctx.org.id])) {

@@ -66,13 +66,13 @@ export async function queueResetEmail(db: Db, user: { id: string; name: string; 
   });
 }
 
-export async function createOrganisation(db: Db, orgName: string, kind: OrgKind, extra: Partial<{ is_demo: boolean; demo_group: string }> = {}) {
-  const { plan, status, trialEndsAt } = defaultPlanFor(kind);
+export async function createOrganisation(db: Db, orgName: string, kind: OrgKind, extra: Partial<{ is_demo: boolean; demo_group: string; consultant: boolean }> = {}) {
+  const { plan, status, trialEndsAt } = defaultPlanFor(kind, !!extra.consultant);
   return (await one<{ id: string }>(
     db,
-    `insert into organisations (name, kind, plan, subscription_status, trial_ends_at, seat_limit, is_demo, demo_group)
-     values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`,
-    [orgName, kind, plan.id, status, trialEndsAt, plan.defaultSeats, extra.is_demo ?? false, extra.demo_group ?? null],
+    `insert into organisations (name, kind, plan, subscription_status, trial_ends_at, seat_limit, is_demo, demo_group, is_consultant)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
+    [orgName, kind, plan.id, status, trialEndsAt, plan.defaultSeats, extra.is_demo ?? false, extra.demo_group ?? null, !!extra.consultant],
   ))!;
 }
 
@@ -146,6 +146,8 @@ export default async function authRoutes(app: FastifyInstance) {
         password,
         orgName: z.string().trim().max(200).optional(),
         orgKind: z.enum(['host', 'contractor']).optional(),
+        /** A safety consultant: a contractor-type organisation that looks after client companies. */
+        consultant: z.boolean().optional(),
         inviteToken: z.string().max(100).optional(),
         siteInviteToken: z.string().max(100).optional(),
         /** A promo code from the platform owner (e.g. lifetime access); redeemed for the new organisation. */
@@ -200,7 +202,7 @@ export default async function authRoutes(app: FastifyInstance) {
           kind = 'contractor';
           verified = !!si.email && si.email.toLowerCase() === body.email;
         }
-        orgId = (await createOrganisation(db, body.orgName, kind)).id;
+        orgId = (await createOrganisation(db, body.orgName, kind, { consultant: kind === 'contractor' && !siteInvitationId && !!body.consultant })).id;
       }
 
       const user = (await one<{ id: string }>(

@@ -75,6 +75,9 @@ const schema = z.object({
   STRIPE_PRICE_CONTRACTOR_PRO: z.string().optional(),
   STRIPE_PRICE_CONTRACTOR_STARTER: z.string().optional(),
   STRIPE_PRICE_CONTRACTOR_BUSINESS: z.string().optional(),
+  STRIPE_PRICE_CONSULTANT_SOLO: z.string().optional(),
+  STRIPE_PRICE_CONSULTANT_PRACTICE: z.string().optional(),
+  STRIPE_PRICE_CONSULTANT_FIRM: z.string().optional(),
   /**
    * Paystack (South Africa's card and EFT payments; Stripe does not onboard South African
    * businesses directly). A test key (sk_test_…) runs everything in Paystack's test mode.

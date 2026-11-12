@@ -1,3 +1,4 @@
+import { applyConsultantCover } from './consultants.js';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Db } from '../db/pool.js';
 import { hasActiveSponsorship } from './sponsorship.js';
@@ -86,6 +87,7 @@ export async function resolveSession(token: string | undefined, _req: FastifyReq
       org = m.org;
       role = m.role;
       if (org.kind === 'contractor') org.sponsored = await hasActiveSponsorship(pool, org.id);
+      if (org.billing_parent_id) await applyConsultantCover(pool, org); // a consultant's client company, covered live (lib/consultants.ts)
     }
   }
 

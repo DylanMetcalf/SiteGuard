@@ -8,7 +8,7 @@
  * per contractor exactly as before.
  */
 import { recheckSiteReady } from '../lib/siteready.js';
-import { track } from '../lib/events.js';
+import { track, trackFirst } from '../lib/events.js';
 import type { FastifyInstance } from 'fastify';
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
@@ -139,6 +139,8 @@ export default async function workplaceRoutes(app: FastifyInstance) {
       const items = body.requirements.concat(itemsFromPacks(body.packIds, [...body.requirements.map((r) => r.name), ...body.excludeItems]));
       const w = await createWorkplace(db, ctx, { name: body.name, location: body.location, emergency: body.emergency, requirements: items });
       await audit(db, ctx, 'Created site', `${body.name} — open to contractors with a site code, ${items.length} requirements`);
+      await trackFirst(db, ctx.org.id, 'site_created');
+      if (items.length) await trackFirst(db, ctx.org.id, 'document_requested');
       await publishChange(db, [ctx.org.id]);
       return w;
     });

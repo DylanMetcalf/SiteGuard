@@ -9,7 +9,9 @@ export type ProductEvent =
   | 'signup' | 'trial_started' | 'first_safety_file' | 'safety_file_export' | 'document_upload'
   | 'ai_generation' | 'invitation_sent' | 'site_joined' | 'subscription_started' | 'promo_redeemed'
   | 'exchange_request_sent' | 'exchange_share_sent' | 'exchange_submitted' | 'exchange_completed' | 'exchange_claimed'
-  | 'onboarding_completed' | 'org_document_upload' | 'oscar_opened';
+  | 'onboarding_completed' | 'org_document_upload' | 'oscar_opened'
+  // Activation milestones (reported by scripts/activation-report.mts)
+  | 'client_company_added' | 'site_created' | 'document_requested' | 'review_completed' | 'approval_completed' | 'subscription_cancelled';
 
 export async function track(db: Db, orgId: string | null, event: ProductEvent): Promise<void> {
   try {

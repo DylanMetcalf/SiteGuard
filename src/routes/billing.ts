@@ -12,7 +12,7 @@ import { one, pool, withTx } from '../db/pool.js';
 import { config, features } from '../config.js';
 import { badRequest, conflict, unavailable } from '../lib/errors.js';
 import { requireAdmin, requireOrg, type OrgCtx } from '../lib/authz.js';
-import { PLANS, TRIAL_DAYS, grantActive, hasOwnAccess, planOf, plansFor, standing } from '../lib/plans.js';
+import { PLANS, TRIAL_DAYS, grantActive, hasOwnAccess, planAllowedFor, planOf, plansFor, standing } from '../lib/plans.js';
 import { redeemPromo } from '../lib/promos.js';
 import { pricingTable } from '../lib/pricing.js';
 import { rl } from './auth.js';
@@ -91,6 +91,7 @@ async function syncSubscription(sub: Stripe.Subscription) {
       ],
     );
     if (!deleted && status === 'active') await trackFirst(db, org.id, 'subscription_started');
+    if (deleted) await trackFirst(db, org.id, 'subscription_cancelled');
     await publishChange(db, [org.id]);
   });
 }
@@ -128,7 +129,7 @@ export default async function billingRoutes(app: FastifyInstance) {
       grant: grantActive(ctx.org) ? { plan: PLANS[ctx.org.grant_plan!].name, until: ctx.org.grant_until, source: ctx.org.grant_source } : null,
       coupon: (ctx.org.settings as Record<string, unknown>)?.checkoutCouponCode ?? null,
       hasCustomer: !!ctx.org.stripe_customer_id,
-      plans: plansFor(ctx.org.kind).map((p) => ({
+      plans: plansFor(ctx.org.kind, !!ctx.org.is_consultant).map((p) => ({
         id: p.id, name: p.name, blurb: p.blurb, siteLimit: p.siteLimit, connectedSiteLimit: p.connectedSiteLimit, maxSeats: p.maxSeats, ai: p.ai, paid: p.paid,
         once: !!p.once, priceCents: prices.get(p.id)?.priceCents ?? null, per: prices.get(p.id)?.per ?? 'month',
         purchasable: !p.paid || (paystack ? (prices.get(p.id)?.priceCents ?? 0) >= 100 : features.paymentProvider === 'stripe' && !!p.stripePrice),
@@ -140,9 +141,10 @@ export default async function billingRoutes(app: FastifyInstance) {
     const ctx = requireOrg(req.ctx);
     requireAdmin(ctx);
     getStripe(); // explains clearly when online payment isn't switched on
+    if (ctx.org.billing_parent_id) throw badRequest('This company is covered by its consultant\'s plan, so it does not need a plan of its own.');
     const b = z.object({ plan: z.string(), seats: z.coerce.number().int().min(1).max(500) }).parse(req.body);
     const plan = PLANS[b.plan];
-    if (!plan || plan.kind !== ctx.org.kind || !plan.paid || !plan.stripePrice) throw badRequest('That plan is not available.');
+    if (!plan || !planAllowedFor(plan, ctx.org) || !plan.paid || !plan.stripePrice) throw badRequest('That plan is not available.');
     if (ctx.org.stripe_subscription_id) throw conflict('You already have a subscription — change plan or seats instead.');
     if (b.seats > plan.maxSeats) throw badRequest(`${plan.name} allows up to ${plan.maxSeats} seats.`);
     const used = await seatsUsed(pool, ctx.org.id);
@@ -169,7 +171,7 @@ export default async function billingRoutes(app: FastifyInstance) {
     const b = z.object({ plan: z.string().optional(), seats: z.coerce.number().int().min(1).max(500).optional() }).parse(req.body);
     if (!ctx.org.stripe_subscription_id) throw conflict('There is no active subscription to change. Choose a plan first.');
     const plan = b.plan ? PLANS[b.plan] : planOf(ctx.org);
-    if (!plan || plan.kind !== ctx.org.kind || !plan.paid || !plan.stripePrice) throw badRequest('That plan is not available.');
+    if (!plan || !planAllowedFor(plan, ctx.org) || !plan.paid || !plan.stripePrice) throw badRequest('That plan is not available.');
     const seats = b.seats ?? ctx.org.seat_limit;
     if (seats > plan.maxSeats) throw badRequest(`${plan.name} allows up to ${plan.maxSeats} seats.`);
     const used = await seatsUsed(pool, ctx.org.id);

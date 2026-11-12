@@ -33,6 +33,12 @@ export const DEFAULT_PRICING: Record<string, Omit<PlanPrice, 'planId'>> = {
     highlights: ['Up to 20 connected sites', 'Everything in Contractor Pro', 'Up to 500 people'] },
   contractor_once: { priceCents: 129900, currency: 'ZAR', per: 'safety file', blurb: null, visible: true,
     highlights: ['One safety file for one site or project', 'Paid once, no subscription', 'Workspace open for 60 days to finish it', 'Stays readable afterwards'] },
+  consultant_solo: { priceCents: 129900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
+    highlights: ['Up to 5 client companies', 'Each client has its own files, workers and documents', 'AI drafting and expiry detection', 'One portfolio view'] },
+  consultant_practice: { priceCents: 249900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
+    highlights: ['Up to 15 client companies', 'Everything in Consultant Solo', 'Up to 25 people on your team', 'Lower price per client'] },
+  consultant_firm: { priceCents: 499900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
+    highlights: ['Up to 40 client companies', 'Everything in Consultant Practice', 'Up to 100 people on your team', 'Lowest price per client'] },
   host_starter: { priceCents: 249900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
     highlights: ['One site', 'Sponsored access for your contractors', 'Gate clearance, audits and validity rules', 'Permits, incidents and audit trail', 'AI drafting, expiry detection and share links'] },
   host_pro: { priceCents: 599900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
@@ -42,7 +48,7 @@ export const DEFAULT_PRICING: Record<string, Omit<PlanPrice, 'planId'>> = {
 };
 
 /** Plans in pricing-page order with their display prices (admin edits applied). */
-export async function pricingTable(db: Db): Promise<(PlanPrice & { name: string; kind: string; defaultBlurb: string })[]> {
+export async function pricingTable(db: Db): Promise<(PlanPrice & { name: string; kind: string; defaultBlurb: string; clientLimit: number | null })[]> {
   const rows = await many<{ plan_id: string; price_cents: number | null; currency: string; per: string; blurb: string | null; highlights: string[]; visible: boolean }>(
     db, 'select plan_id, price_cents, currency, per, blurb, highlights, visible from plan_settings',
   );
@@ -52,7 +58,7 @@ export async function pricingTable(db: Db): Promise<(PlanPrice & { name: string;
     const r = byId.get(planId);
     const plan = PLANS[planId];
     return {
-      planId, name: plan.name, kind: plan.kind, defaultBlurb: plan.blurb,
+      planId, name: plan.name, kind: plan.kind, defaultBlurb: plan.blurb, clientLimit: plan.clientLimit ?? null,
       priceCents: r ? r.price_cents : d.priceCents,
       currency: r?.currency ?? d.currency,
       per: r?.per ?? d.per,

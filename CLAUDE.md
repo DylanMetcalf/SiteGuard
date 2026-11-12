@@ -90,3 +90,5 @@ haven't built.
 - Keep changes small, preserve existing behaviour, update docs (README/ARCHITECTURE/LAUNCH_GUIDE) and
   the decisions log when behaviour or operations change. The owner is non-technical: explain outcomes
   in plain language.
+- Consultants (`routes/consultant.ts`, `lib/consultants.ts`, migration 029): `is_consultant` is set only at sign-up; plans for consultants are chosen through `planAllowedFor`, never `plan.kind` alone. A client company is its own organisation (`billing_parent_id`); cover is computed live in `applyConsultantCover` (sessions) and is never written to the database. The registration number is locked and unique; slots free only through the archive rules. Every consultant route is 404 for anyone else and touches only the caller's own clients.
+- Activation milestones go through `track()` / `trackFirst()` (organisation and event name only); `npm run activation` reports the funnel and time to value.

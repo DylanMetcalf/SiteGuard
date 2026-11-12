@@ -1,6 +1,6 @@
 import { recheckSiteReady } from '../lib/siteready.js';
 import { can } from '../lib/entitlements.js';
-import { track } from '../lib/events.js';
+import { track, trackFirst } from '../lib/events.js';
 import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -298,6 +298,8 @@ export default async function documentRoutes(app: FastifyInstance) {
       if (version && version !== doc.version) throw conflict(`The contractor submitted a newer version (${doc.version}) while you were reading ${version}. Open it again and check the new version before approving.`);
       await db.query(`update documents set status = 'complete', updated_at = now() where id = $1`, [doc.id]);
       await audit(db, ctx, 'Approved document', `${s.name} (${doc.version})`, s.siteId);
+      await trackFirst(db, ctx.org.id, 'review_completed');
+      await trackFirst(db, ctx.org.id, 'approval_completed');
       if (s.contractorOrgId) await notifyOrg(db, s.contractorOrgId, null, { kind: 'approved', title: `Approved: ${s.name}`, body: `${s.siteName} · approved by ${ctx.user.name}, ${ctx.org.name}`, link: { kind: 'req', id: s.requirementId!, siteId: s.siteId! } });
       await publishChange(db, s.parties);
       return { ok: true };
@@ -320,6 +322,7 @@ export default async function documentRoutes(app: FastifyInstance) {
         [doc.id, ctx.user.id, ctx.user.name, actorRole(ctx), text],
       );
       await audit(db, ctx, 'Requested correction', `${s.name} — "${clip(text)}"`, s.siteId);
+      await trackFirst(db, ctx.org.id, 'review_completed');
       if (s.siteId) await recheckSiteReady(db, s.siteId, `${s.name} sent back`);
       if (s.contractorOrgId) {
         // A document written in COMVERA opens straight in the review workspace, where the notes and highlights are.
