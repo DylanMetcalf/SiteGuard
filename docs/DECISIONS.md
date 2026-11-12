@@ -298,3 +298,11 @@ Newest first.
 **DECISION** Not built now: WhatsApp reminders (needs a WhatsApp Business provider account, message templates and recipients' consent; email reminders already exist) and offline pages (the app keeps no records on the device by design, for POPIA; see the parking lot).
 **REASON** Both need a customer decision or an external account first.
 **DATE** 2026-11-11
+
+**DECISION** Contractor-first positioning (2026-11-12): the public homepage leads with "Build your safety file once. Send it to any mine." and a single main button for contractors; mines and sites are a clearly visible second door. Plans changed with it: **Site Starter** (R2,499 a month, one site) now includes AI drafting, expiry detection and external share links; **Site Professional** (R5,999 a month) is now up to 3 sites with priority support and costs less than three Starters; Enterprise unchanged. Contractor plans and the R1,299 once-off file are unchanged.
+**REASON** Contractors can buy on a card today and every contractor file sent to a mine is a lead for the mine plan; mines take months to approve. The AI-only difference between the two site plans was hard to defend at 2.4 times the price. Prices still live in `plan_settings` (the admin can change what is shown); a trial gives the full product, which is now up to 3 sites for a mine.
+**DATE** 2026-11-12
+
+**DECISION** Not built yet: a per-contractor fee above an included number for mines, and a self-serve "paid pilot" button. Pilots are sold by hand: a 3-month, 50%-off code for Site Starter made in the manager portal (Promo codes), a written money-back promise, and agreement to give feedback and a case study.
+**REASON** Metering contractors through Stripe/Paystack is money logic that needs real pilot data first; a manual pilot is faster and teaches us what mines will pay for.
+**DATE** 2026-11-12

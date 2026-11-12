@@ -34,9 +34,9 @@ export const DEFAULT_PRICING: Record<string, Omit<PlanPrice, 'planId'>> = {
   contractor_once: { priceCents: 129900, currency: 'ZAR', per: 'safety file', blurb: null, visible: true,
     highlights: ['One safety file for one site or project', 'Paid once, no subscription', 'Workspace open for 60 days to finish it', 'Stays readable afterwards'] },
   host_starter: { priceCents: 249900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
-    highlights: ['One site', 'Sponsored access for your contractors', 'Gate clearance, audits and validity rules', 'Permits, incidents and audit trail'] },
+    highlights: ['One site', 'Sponsored access for your contractors', 'Gate clearance, audits and validity rules', 'Permits, incidents and audit trail', 'AI drafting, expiry detection and share links'] },
   host_pro: { priceCents: 599900, currency: 'ZAR', per: 'month', blurb: null, visible: true,
-    highlights: ['One site', 'Sponsored access for your contractors', 'AI drafting and expiry detection', 'External share links'] },
+    highlights: ['Up to 3 sites', 'Everything in Site Starter', 'Priority support', 'Costs less than three separate sites'] },
   host_enterprise: { priceCents: null, currency: 'ZAR', per: 'month', blurb: null, visible: true,
     highlights: ['Every site in your group', 'Onboarding for your contractors', 'Agreed terms and invoicing', 'Priority support'] },
 };

@@ -11,7 +11,7 @@ after(teardown);
 
 describe('entitlements', () => {
   it('names the cheapest plan that includes a feature', () => {
-    assert.equal(planWith('host', 'SHARE_LINKS')?.id, 'host_pro');
+    assert.equal(planWith('host', 'SHARE_LINKS')?.id, 'host_starter', 'share links and AI drafting are part of the entry site plan');
     assert.equal(planWith('contractor', 'AI_GENERATION')?.id, 'contractor_starter');
     assert.equal(planWith('contractor', 'SHARE_LINKS')?.id, 'contractor_pro');
     assert.equal(planWith('contractor', 'CONTRACTOR_PROJECTS')?.id, 'contractor_starter');
@@ -24,5 +24,17 @@ describe('entitlements', () => {
     const s = await agent.state();
     assert.equal(s.org.entitlements.SHARE_LINKS, true);
     assert.equal(s.org.entitlements.SAFETY_FILE_BUILDER, true);
+  });
+});
+
+describe('site plans after the contractor-first restructure', () => {
+  it('Site Starter includes AI drafting and share links; Site Professional covers three sites', async () => {
+    const { PLANS } = await import('../src/lib/plans.js');
+    const { PLAN_FEATURES } = await import('../src/lib/entitlements.js');
+    assert.ok(PLAN_FEATURES.host_starter.includes('AI_GENERATION') && PLAN_FEATURES.host_starter.includes('SHARE_LINKS'));
+    assert.equal(PLANS.host_starter.siteLimit, 1);
+    assert.equal(PLANS.host_pro.siteLimit, 3);
+    assert.ok(PLANS.host_pro.maxSeats >= PLANS.host_starter.maxSeats);
+    assert.equal(PLANS.host_starter.ai, true);
   });
 });

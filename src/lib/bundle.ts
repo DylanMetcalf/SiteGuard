@@ -24,6 +24,7 @@ import { storage } from './storage.js';
 import { pdfFromDefinition, tint } from './studio/render-pdf.js';
 import { pdfSafe } from './studio/model.js';
 import { DEFAULT_BRAND } from './studio/generate.js';
+import { config } from '../config.js';
 
 const INK = '#1B2433';
 const MUTED = '#5E6A7A';
@@ -71,6 +72,8 @@ interface BundleSpec {
   brand: string;
   logo: string | null;
   coverRows: [string, string][];
+  /** One short line printed on the cover, e.g. an invitation for the client to receive files like this online. */
+  coverNote?: string;
   items: BundleItem[];
   contentsNote: string;
   /** pdfmake nodes printed after the contents, e.g. registers. */
@@ -236,6 +239,15 @@ export interface FileSelection {
   preview?: boolean;
 }
 
+/**
+ * For a file a contractor prepared for a client who is NOT on COMVERA: one plain line pointing that client to how sites
+ * collect and approve files like this online. No claim about price, and nothing for files already on COMVERA.
+ */
+export function projectCoverNote(isClientProject: boolean, appUrl = config.APP_URL): string | undefined {
+  if (!isClientProject) return undefined;
+  return `Sites and mines: collect, review and approve contractor safety files online with COMVERA. ${appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}/for-sites`;
+}
+
 export async function buildSafetyFile(_db: Db, siteId: string, generatedBy: string, selection: FileSelection = {}): Promise<{ pdf: Buffer; filename: string; revision: number; created: boolean; partial: boolean }> {
   return withTx(async (db) => {
     await db.query('select pg_advisory_xact_lock(hashtext($1))', ['safety-file:' + siteId]);
@@ -273,6 +285,7 @@ async function compileSafetyFile(db: Db, siteId: string, generatedBy: string, se
     author: site.contractor_name,
     brand,
     logo,
+    coverNote: projectCoverNote(!!site.project),
     coverRows: [
       ['Contractor', site.contractor_name],
       ...(site.project
@@ -432,6 +445,7 @@ async function renderBundle(_db: Db, spec: BundleSpec): Promise<Buffer> {
         table: { widths: ['32%', '*'], body: spec.coverRows.map(([k, v]) => [{ text: t(k), bold: true, fillColor: tint(brand, 0.92) }, t(v)]) },
         layout: { hLineWidth: () => 0.5, vLineWidth: () => 0, hLineColor: () => '#D5DBE3', paddingTop: () => 6, paddingBottom: () => 6, paddingLeft: () => 8 },
       },
+      ...(spec.coverNote ? [{ text: t(spec.coverNote), fontSize: 9, color: brand, bold: true, margin: [0, 16, 0, 0] }] : []),
       { text: 'Compiled from the digital record in COMVERA. The platform record is the source of truth; printed copies are uncontrolled.', fontSize: 8, color: MUTED, italics: true, margin: [0, 18, 0, 0], pageBreak: 'after' },
       ...contents(pages, regPage),
     ], true);
