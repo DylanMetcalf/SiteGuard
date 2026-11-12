@@ -4,6 +4,7 @@
  * unchanged. Everything here is filtered server-side by tenant and role; the
  * client never receives data it isn't allowed to see.
  */
+import { clientLimitFor } from '../lib/consultants.js';
 import { libraryTypeFor } from '../lib/readiness.js';
 import { mustSetUpMfa } from '../lib/mfa.js';
 import { mustOnboard } from '../lib/onboarding.js';
@@ -433,7 +434,9 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         kindLabel: c.org.kind === 'host' ? 'Mining House / Principal Employer' : 'Contractor company',
         reg: c.org.reg_number, coid: c.org.coid_number, vat: c.org.vat_number, address: c.org.address, trade: c.org.trade,
         role: c.role, roleLabel: roleLabel(c.org.kind, c.role), uiRole: uiRole(c),
-        plan: plan.id, planName: plan.name, subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
+        plan: plan.id, planName: plan.name, isConsultant: !!c.org.is_consultant, clientLimit: c.org.is_consultant ? clientLimitFor(c.org) : null,
+        managedBy: c.org.billing_parent_id && c.org.billing_parent_name ? { id: c.org.billing_parent_id, name: c.org.billing_parent_name } : null,
+        subscriptionStatus: c.org.subscription_status, trialEndsAt: d(c.org.trial_ends_at),
         currentPeriodEnd: d(c.org.current_period_end), standing: standing(c.org), requireMfa: (c.org.settings as Record<string, unknown> | null)?.requireMfa === true, seatLimit: c.org.seat_limit, isDemo: c.org.is_demo, validityRules: rulesOf(c.org.settings), cleanDemo: c.org.is_demo && (c.org.settings as Record<string, unknown> | null)?.cleanDemo === true,
         siteLimit: plan.siteLimit,
         // Own access = subscription, trial in date or a promo/enterprise grant. Without it a

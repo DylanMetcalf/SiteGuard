@@ -1,6 +1,6 @@
 import { recheckSiteReady } from '../lib/siteready.js';
 import type { FastifyInstance } from 'fastify';
-import { track } from '../lib/events.js';
+import { track, trackFirst } from '../lib/events.js';
 import { z } from 'zod';
 import { many, one, pool, withTx, type Db } from '../db/pool.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
@@ -170,6 +170,7 @@ export default async function siteRoutes(app: FastifyInstance) {
         );
       }
       await audit(db, ctx, 'Created site', body.name, site.id);
+      await trackFirst(db, ctx.org.id, 'site_created');
       await inviteContractor(db, ctx, site, contractor);
       await publishChange(db, [ctx.org.id, ...(contractor.linked_org_id ? [contractor.linked_org_id] : [])]);
       return { id: site.id, contractorName: contractor.name };

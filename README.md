@@ -247,6 +247,8 @@ Without `SMTP_URL`, emails (confirmation links, invites) are printed to the serv
 | `npm run test:e2e` | Two-browser Playwright flow against a running server (see the file header) |
 | `npm run test:bots:security`, `test:bots:shared-address`, `test:bots:ux` | Other bot scenarios (see `docs/DECISIONS.md`) |
 | `npm run test:journey` | 15 contractor-first browser tests (sign-up, Today, join, upload, safety file PDF, Studio, Oscar, gate, phone, keyboard, speed/offline/dark); `test:landing` scores the homepage; `test:today` checks the Today card |
+| `npm run test:consultant` | Pricing toggle (three plans per audience) and the consultant journey: sign-up, add, open and leave a client |
+| `npm run activation` | Read-only funnel and time-to-value report from the milestone events |
 | `npm run test:bots` | 19 concurrent bots (mines, contractors, attackers, platform owner, 4 real browsers) against a local server with `TRUST_PROXY=true` and a throwaway database; writes `bots-report.json` (see the header of `scripts/bots.mts`) |
 | `npm run typecheck` | TypeScript |
 | `npm run build && npm start` | Production build and server |

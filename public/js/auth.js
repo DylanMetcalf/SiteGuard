@@ -160,6 +160,7 @@ export function renderAuth(){
       +'<div class="role-cards" role="radiogroup">'
         +roleCard('host', 'We run a site or mine', 'Create your sites, set what every contractor\'s safety file must contain, share a site code and vet what comes in.')
         +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, or build safety files for any client yourself.')
+        +roleCard('consultant', 'We\'re a safety consultant', 'Look after the safety files of several client companies from one portfolio, each kept separate.')
       +'</div>'
       +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name" placeholder="e.g. Thandi Nkosi">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email">'
@@ -237,6 +238,7 @@ export function showPublic(page, push){
   go(page);
   window.scrollTo(0, 0);
 }
+on('pricing-audience', (el)=>{ S.publicCtx.audience = el.dataset.who; render(); });
 on('public-go', (el, e)=>{ if(e && (e.metaKey || e.ctrlKey || e.shiftKey)) return; if(e && e.preventDefault) e.preventDefault(); showPublic(el.dataset.page); });
 on('contact-send', async (el)=>{
   const body = { name: val('ctName'), email: val('ctEmail'), phone: val('ctPhone'), company: val('ctCompany'), topic: val('ctTopic'), message: (document.getElementById('ctMessage')||{}).value || '', website: val('ctWebsite') };
@@ -282,7 +284,8 @@ on('signup', async (el)=>{
   if(body.password.length < 10) return need('Choose a password of at least 10 characters.', 'suPassword');
   if(mode === 'new'){
     body.orgName = val('suOrgName'); body.orgKind = S.authContext.kind;
-    if(!body.orgKind){ S.authContext.error = 'Choose whether you run a site or are a contractor.'; keepTyped(render); const c = document.querySelector('.role-card'); if(c) c.focus(); return; }
+    if(body.orgKind === 'consultant'){ body.orgKind = 'contractor'; body.consultant = true; }
+    if(!body.orgKind){ S.authContext.error = 'Choose whether you run a site, are a contractor or are a safety consultant.'; keepTyped(render); const c = document.querySelector('.role-card'); if(c) c.focus(); return; }
     if(!body.orgName) return need('Enter your company or organisation name.', 'suOrgName');
     const promo = val('suPromo'); if(promo) body.promoCode = promo;
   }

@@ -44,6 +44,14 @@ export interface OrgRow {
   grant_source: string | null;
   /** Contractors only, computed per request: a site currently sponsors this company. */
   sponsored?: boolean;
+  /** A safety consultant: looks after client companies (lib/consultants.ts). */
+  is_consultant?: boolean;
+  /** Set on a consultant's client company: the consultant organisation whose plan covers it. */
+  billing_parent_id?: string | null;
+  registration_key?: string | null;
+  client_archived_at?: Date | null;
+  /** Computed per request on a client company: the consultant's name, for the "back to portfolio" link. */
+  billing_parent_name?: string | null;
 }
 
 export interface UserRow {

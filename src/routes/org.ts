@@ -1,4 +1,5 @@
 import { csvCell } from '../lib/csv.js';
+import { dropClientAccess } from '../lib/consultants.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { track } from '../lib/events.js';
@@ -18,7 +19,7 @@ import { buildState } from './bootstrap.js';
 export async function seatsUsed(db: Db, orgId: string): Promise<number> {
   const r = await one<{ n: number }>(
     db,
-    `select (select count(*) from memberships where org_id = $1)
+    `select (select count(*) from memberships where org_id = $1 and not via_consultant)
           + (select count(*) from user_invites where org_id = $1 and accepted_at is null and revoked_at is null and expires_at > now()) as n`,
     [orgId],
   );
@@ -29,9 +30,9 @@ async function ownerCount(db: Db, orgId: string): Promise<number> {
   return Number((await one<{ n: number }>(db, `select count(*) as n from memberships where org_id = $1 and role = 'owner'`, [orgId]))?.n ?? 0);
 }
 
-export function requireVerified(ctx: OrgCtx) {
+export function requireVerified(ctx: OrgCtx, action = 'inviting people') {
   if (!ctx.user.email_verified_at && !ctx.user.is_demo) {
-    throw forbidden('Confirm your email address before inviting people — check your inbox, or resend the confirmation from your profile.');
+    throw forbidden(`Confirm your email address before ${action} — check your inbox, or resend the confirmation from your profile.`);
   }
 }
 
@@ -160,6 +161,7 @@ export default async function orgRoutes(app: FastifyInstance) {
         throw conflict('An organisation needs at least one owner.');
       }
       await db.query('update memberships set role = $3 where org_id = $1 and user_id = $2', [ctx.org.id, userId, role]);
+      if (ctx.org.is_consultant && role !== 'owner' && role !== 'admin') await dropClientAccess(db, ctx.org.id, userId); // no longer an admin: no longer opens clients
       await audit(db, ctx, 'Changed role', `${m.name}: ${roleLabel(ctx.org.kind, m.role)} → ${roleLabel(ctx.org.kind, role)}`);
       await publishChange(db, [ctx.org.id]);
     });
@@ -185,6 +187,7 @@ export default async function orgRoutes(app: FastifyInstance) {
         throw conflict('An organisation needs at least one owner. Make someone else an owner first.');
       }
       await db.query('delete from memberships where org_id = $1 and user_id = $2', [ctx.org.id, userId]);
+      if (ctx.org.is_consultant) await dropClientAccess(db, ctx.org.id, userId); // and from the clients they opened
       // Their sessions in this org lose access immediately.
       await db.query('update sessions set org_id = null where user_id = $1 and org_id = $2', [userId, ctx.org.id]);
       await audit(db, ctx, self ? 'Left organisation' : 'Removed member', m.name);

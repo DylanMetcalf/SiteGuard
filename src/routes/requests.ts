@@ -1,3 +1,4 @@
+import { trackFirst } from '../lib/events.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { many, one, withTx, type Db } from '../db/pool.js';
@@ -31,6 +32,7 @@ async function sendRequest(db: Db, ctx: OrgCtx, site: { id: string; name: string
     [site.id, body.type, body.title, body.message, body.dueDate ?? null, ctx.user.id, ctx.user.name, actorRole(ctx), body.linkedReqId ?? null],
   ))!;
   await audit(db, ctx, 'Sent request', `${body.title} → ${site.contractor_name}`, site.id);
+  await trackFirst(db, ctx.org.id, 'document_requested');
   if (site.linked_org_id) {
     await queueToOrg(db, site.linked_org_id, null, (to) => ({
       to: to.email,

@@ -1,6 +1,7 @@
 // Main screens. Rendering is ported from the original MVP; data now comes
 // from the server and every button is a data-action handled in app.js.
 
+import { renderClients, clientsWidget, managedBanner } from './consultant.js';
 import { api } from './api.js';
 import {
   S, ICONS, SOURCE_LABEL, STATUS_LABEL, CERT_KINDS, LIBRARY_TYPES,
@@ -43,7 +44,7 @@ export function topbar(){
 
 function banners(){
   const o = org(), f = S.boot.features;
-  let html = '';
+  let html = managedBanner();
   if(o.isDemo) html += '<div class="banner warn"><span>'+(o.cleanDemo ? 'Your practice space — kept for 30 days. Switch between the mine and the contractor with the menu above.' : 'Demo with sample data. Switch people with the menu above.')+'</span><button class="btn small secondary" data-action="leave-demo">Create a real account</button></div>';
   if(!S.boot.me.verified) html += '<div class="banner info"><span>Confirm your email address — we sent a link to '+S.boot.me.email+'.</span><button class="btn small secondary" data-action="resend-verification">Resend</button></div>';
   if(f.billing && !o.isDemo && !o.grant){
@@ -91,7 +92,7 @@ function greeting(){
 }
 
 export const DASHBOARD_WIDGETS = {
-  contractor: [['today','Today'],['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
+  contractor: [['today','Today'],['clients','Client companies'],['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
   host: [['today','Today'],['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
 };
 const DEFAULT_WIDGETS = {
@@ -110,7 +111,7 @@ export function dashboardLayout(){
     if(!order.includes('today')) full.unshift(full.splice(full.indexOf('today'),1)[0]);
     return { order: full, hidden: (prefs.hidden||[]).filter(id=>all.includes(id)) };
   }
-  const defaults = DEFAULT_WIDGETS[role()] || all;
+  const defaults = org().isConsultant ? ['today','clients','invitations'] : (DEFAULT_WIDGETS[role()] || all);
   return { order: defaults.concat(all.filter(id=>!defaults.includes(id))), hidden: all.filter(id=>!defaults.includes(id)) };
 }
 
@@ -219,11 +220,12 @@ function renderDashboard(){
   const head = '<div class="dash-hero"><div class="flexbetween" style="align-items:flex-start;"><div><p class="hero-eyebrow">'+org().name+'</p><h1>'+greeting()+'</h1>'
     +'<p class="greeting">'+(urgent ? urgent+' urgent item'+(urgent===1?'':'s')+' need'+(urgent===1?'s':'')+' you today.' : findings.length ? findings.length+' item'+(findings.length===1?'':'s')+' to look at — nothing urgent.' : 'Everything is in order across your sites.')+'</p></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn secondary small" data-action="start-tour">Walkthrough</button><button class="btn secondary small" data-action="customise-dashboard">Customise</button></div></div>'
-    +(isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button>'+(isOrgAdmin() ? '<button class="btn secondary" data-action="exchange-share">'+ICONS.link+' Share securely</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="studio">Document Studio</button><button class="btn secondary" data-action="nav" data-nav="oscar">'+ICONS.sparkle+' Oscar</button></div>'
+    +(org().isConsultant && !readOnly() ? '<div class="hero-actions"><button class="btn primary" data-action="goto-more" data-view="clients">'+ICONS.plus+' Client companies</button><button class="btn secondary" data-action="nav" data-nav="studio">Document Studio</button><button class="btn secondary" data-action="nav" data-nav="oscar">Oscar</button></div>'
+      : isContractor() && !readOnly() ? '<div class="hero-actions">'+buildButton()+'<button class="btn secondary" data-action="upload-document">'+ICONS.upload+' Upload document</button>'+(isOrgAdmin() ? '<button class="btn secondary" data-action="exchange-share">'+ICONS.link+' Share securely</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="studio">Document Studio</button><button class="btn secondary" data-action="nav" data-nav="oscar">'+ICONS.sparkle+' Oscar</button></div>'
       : isHost() ? '<div class="hero-actions">'+(isOrgAdmin() && !readOnly() ? '<button class="btn primary" data-action="new-site">'+ICONS.plus+' Add site</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="passport">Contractors</button><button class="btn secondary" data-action="nav" data-nav="studio">Document Studio</button><button class="btn secondary" data-action="nav" data-nav="oscar">'+ICONS.sparkle+' Oscar</button></div>' : '')
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
-  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='today' ? todayWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
+  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='today' ? todayWidget() : id==='clients' ? clientsWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
   let start = gettingStarted();
   const welcome = welcomeCard();
   if(welcome) return head + welcome;
@@ -241,7 +243,9 @@ function welcomeCard(){
   if(dismissed) return '';
   const opt = (action, icon, title, sub, extra) => '<button class="qa-item welcome-opt" data-action="'+action+'"'+(extra||'')+'><div class="qa-icon">'+icon+'</div><div style="flex:1;"><div class="qa-title">'+title+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
   return '<div class="welcome"><h2>Welcome to COMVERA</h2><p class="greeting">What would you like to do first?</p>'
-    + (isContractor()
+    + (org().isConsultant
+      ? opt('goto-more', ICONS.sites, 'Add my first client company', 'Each client keeps its own documents, workers and sites', ' data-view="clients"')
+      : isContractor()
       ? opt('sfb-start', ICONS.passport, 'Build my first safety file', 'For a site on COMVERA or for any client')
         + opt('join-site', ICONS.link, 'Join a site', 'You have a code from a mine or site')
       : opt('new-site', ICONS.sites, 'Set up my first site', 'Choose what every contractor\'s safety file must contain'))
@@ -855,6 +859,7 @@ function renderMore(){
   if(isContractor() && !readOnly()) html += '<button class="menu-row" data-action="sfb-start"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">Create a safety file</div><div class="qa-sub">For a site on COMVERA or any client</div></div>'+ICONS.chevron+'</button>';
   html += '<button class="menu-row" data-action="nav" data-nav="studio"><div class="qa-icon">'+ICONS.passport+'</div><div style="flex:1;"><div class="qa-title">Document Studio</div><div class="qa-sub">Upload your documents, and create branded ones as PDF and Word</div></div>'+ICONS.chevron+'</button>';
   if(isContractor() && isOrgAdmin() && !readOnly()) html += '<button class="menu-row" data-action="new-project"><div class="qa-icon">'+ICONS.plus+'</div><div style="flex:1;"><div class="qa-title">New project</div><div class="qa-sub">A safety file for a client who isn\'t on COMVERA</div></div>'+ICONS.chevron+'</button>';
+  if(org().isConsultant) html += item('clients', ICONS.sites, 'Client companies', 'The companies you look after, and what needs attention at each');
   if(isContractor() && isOrgAdmin()) html += '<button class="menu-row" data-action="join-site"><div class="qa-icon">'+ICONS.link+'</div><div style="flex:1;"><div class="qa-title">Join a site with a code</div><div class="qa-sub">Type the code the site gave you</div></div>'+ICONS.chevron+'</button>';
   html += item('exchanges', ICONS.link, 'Exchanges', isHost() ? 'Request documents from contractors — no account needed' : 'Share documents securely, and answer requests');
   const nf = (S.boot.agent||{findings:[]}).findings.length;
@@ -894,6 +899,7 @@ const MORE_VIEWS = {
   studio: renderStudio,
   platform: renderPlatform,
   exchanges: renderExchanges,
+  clients: renderClients,
 };
 
 /* ---- Safety Centre (cross-site incidents & permits) ---- */

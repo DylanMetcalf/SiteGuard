@@ -23,6 +23,10 @@ export interface Plan {
   /** Stripe Price id (per-seat, recurring). */
   stripePrice?: string;
   blurb: string;
+  /** Consultant plans only: a contractor-type organisation that looks after client companies. */
+  consultant?: boolean;
+  /** Consultant plans only: how many client companies the plan covers at once. */
+  clientLimit?: number;
 }
 
 export const PLANS: Record<string, Plan> = {
@@ -116,6 +120,51 @@ export const PLANS: Record<string, Plan> = {
     once: true,
     blurb: 'One safety file for one site or project, paid once with no subscription. The workspace stays open for a set period to finish and download it; it stays readable after that.',
   },
+  consultant_solo: {
+    id: 'consultant_solo',
+    name: 'Consultant Solo',
+    kind: 'contractor',
+    consultant: true,
+    clientLimit: 5,
+    siteLimit: null,
+    connectedSiteLimit: 1,
+    defaultSeats: 3,
+    maxSeats: 10,
+    ai: true,
+    paid: true,
+    stripePrice: config.STRIPE_PRICE_CONSULTANT_SOLO,
+    blurb: 'Up to 5 client companies, each with its own safety files, workers and documents, in one portfolio. One subscription, no separate plans for your clients.',
+  },
+  consultant_practice: {
+    id: 'consultant_practice',
+    name: 'Consultant Practice',
+    kind: 'contractor',
+    consultant: true,
+    clientLimit: 15,
+    siteLimit: null,
+    connectedSiteLimit: 1,
+    defaultSeats: 3,
+    maxSeats: 25,
+    ai: true,
+    paid: true,
+    stripePrice: config.STRIPE_PRICE_CONSULTANT_PRACTICE,
+    blurb: 'Up to 15 client companies, each with its own safety files, workers and documents, in one portfolio. One subscription, no separate plans for your clients.',
+  },
+  consultant_firm: {
+    id: 'consultant_firm',
+    name: 'Consultant Firm',
+    kind: 'contractor',
+    consultant: true,
+    clientLimit: 40,
+    siteLimit: null,
+    connectedSiteLimit: 1,
+    defaultSeats: 3,
+    maxSeats: 100,
+    ai: true,
+    paid: true,
+    stripePrice: config.STRIPE_PRICE_CONSULTANT_FIRM,
+    blurb: 'Up to 40 client companies, each with its own safety files, workers and documents, in one portfolio. One subscription, no separate plans for your clients.',
+  },
   host_enterprise: {
     id: 'host_enterprise',
     name: 'Enterprise',
@@ -133,9 +182,11 @@ export const PLANS: Record<string, Plan> = {
 export const TRIAL_DAYS = 14;
 
 /** Everyone starts with the full product for 14 days, no card needed. */
-export function defaultPlanFor(kind: OrgKind): { plan: Plan; status: 'trialing'; trialEndsAt: Date } {
+export function defaultPlanFor(kind: OrgKind, consultant = false): { plan: Plan; status: 'trialing'; trialEndsAt: Date } {
   const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 86400_000);
-  return { plan: kind === 'host' ? PLANS.host_pro : PLANS.contractor_pro, status: 'trialing', trialEndsAt };
+  // A consultant's trial lets them try the middle plan: 15 client companies.
+  const plan = kind === 'host' ? PLANS.host_pro : consultant ? PLANS.consultant_practice : PLANS.contractor_pro;
+  return { plan, status: 'trialing', trialEndsAt };
 }
 
 export interface OrgBilling {
@@ -202,6 +253,11 @@ export function standing(org: OrgBilling): 'ok' | 'grace' | 'lapsed' {
 }
 
 /** Plans an organisation of the given kind may move to. */
-export function plansFor(kind: OrgKind): Plan[] {
-  return Object.values(PLANS).filter((p) => p.kind === kind && p.id !== 'host_enterprise');
+export function plansFor(kind: OrgKind, consultant = false): Plan[] {
+  return Object.values(PLANS).filter((p) => p.kind === kind && !!p.consultant === consultant && p.id !== 'host_enterprise');
+}
+
+/** Whether a plan may be bought or given to this organisation: right kind, and consultant plans only for consultants. */
+export function planAllowedFor(plan: Plan | undefined, org: { kind?: string; is_consultant?: boolean }): boolean {
+  return !!plan && plan.kind === org.kind && !!plan.consultant === !!org.is_consultant;
 }

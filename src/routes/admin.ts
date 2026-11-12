@@ -11,7 +11,7 @@ import { isPlatformAdmin, isProd } from '../config.js';
 import { logPlatformAction } from '../lib/platformLog.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { isUuid, requireUser } from '../lib/authz.js';
-import { PLANS } from '../lib/plans.js';
+import { PLANS, planAllowedFor } from '../lib/plans.js';
 import { CODE_RE } from '../lib/promos.js';
 import { DEFAULT_PRICING, pricingTable } from '../lib/pricing.js';
 import { publishChange } from '../lib/realtime.js';
@@ -149,9 +149,9 @@ export default async function adminRoutes(app: FastifyInstance) {
       note: z.string().trim().max(100).default(''),
     }).parse(req.body);
     await withTx(async (db) => {
-      const org = await one<{ kind: string; name: string }>(db, 'select kind, name from organisations where id = $1 and not is_demo and managed_by_org is null for update', [id]);
+      const org = await one<{ kind: string; name: string; is_consultant: boolean }>(db, 'select kind, name, is_consultant from organisations where id = $1 and not is_demo and managed_by_org is null for update', [id]);
       if (!org) throw notFound();
-      if (b.plan && (!PLANS[b.plan] || PLANS[b.plan].kind !== org.kind || b.plan === 'contractor_free')) throw conflict('That plan is not for this kind of organisation.');
+      if (b.plan && (!planAllowedFor(PLANS[b.plan], org) || b.plan === 'contractor_free')) throw conflict('That plan is not for this kind of organisation.');
       const until = b.until ? `${b.until}T23:59:59+02:00` : null;
       await db.query('update organisations set grant_plan = $2, grant_until = $3, grant_source = $4 where id = $1', [id, b.plan, b.plan ? until : null, b.plan ? `admin${b.note ? ': ' + b.note : ''}` : null]);
       await auditPlatform(db, id, ctx.user.name, b.plan ? 'Plan given by COMVERA' : 'Plan from COMVERA removed', b.plan ? `${PLANS[b.plan].name}${b.until ? ' until ' + b.until : ', no end date'}` : '');

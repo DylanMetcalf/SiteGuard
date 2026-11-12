@@ -98,7 +98,7 @@ let n = 0;
 export const uniqueEmail = (prefix: string) => `${prefix}.${Date.now()}.${n++}@example.com`;
 export const PASSWORD = 'correct horse battery staple';
 
-export async function signup(app: FastifyInstance, opts: { orgName: string; orgKind: 'host' | 'contractor'; name?: string; email?: string; siteInviteToken?: string; inviteToken?: string; keepOnboarding?: boolean }) {
+export async function signup(app: FastifyInstance, opts: { orgName: string; orgKind: 'host' | 'contractor'; name?: string; email?: string; siteInviteToken?: string; inviteToken?: string; keepOnboarding?: boolean; consultant?: boolean }) {
   const a = new Agent(app);
   const email = opts.email ?? uniqueEmail(opts.orgKind);
   const { keepOnboarding: _k, ...body } = opts;

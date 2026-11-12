@@ -15,7 +15,7 @@ import { many, one, pool, withTx, type Db } from '../db/pool.js';
 import { config, features } from '../config.js';
 import { badRequest, conflict, notFound, unavailable } from '../lib/errors.js';
 import { requireAdmin, requireOrg } from '../lib/authz.js';
-import { PLANS, grantActive, type Plan } from '../lib/plans.js';
+import { PLANS, grantActive, planAllowedFor, type Plan } from '../lib/plans.js';
 import { pricingTable } from '../lib/pricing.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
@@ -207,6 +207,7 @@ async function handleEvent(event: string, data: Record<string, unknown>) {
           await db.query(`update organisations set grant_plan = $2, grant_until = $3, grant_source = 'Paid period after cancelling' where id = $1`, [org.id, org.plan, paidUntil]);
         }
         await billingAudit(db, org.id, 'Subscription cancelled', paidUntil ? `Paid access continues until ${new Date(paidUntil).toISOString().slice(0, 10)}; data stays readable after that.` : 'Data stays readable.');
+        await trackFirst(db, org.id, 'subscription_cancelled');
         await publishChange(db, [org.id]);
       });
       return;
@@ -221,9 +222,10 @@ export default async function paystackRoutes(app: FastifyInstance) {
     const ctx = requireOrg(req.ctx);
     requireAdmin(ctx);
     requirePaystack();
+    if (ctx.org.billing_parent_id) throw badRequest('This company is covered by its consultant\'s plan, so it does not need a plan of its own.');
     const { plan: planId } = z.object({ plan: z.string().max(60) }).parse(req.body);
     const plan = PLANS[planId];
-    if (!plan || plan.kind !== ctx.org.kind || !plan.paid || plan.id === 'host_enterprise') throw badRequest('That plan is not available.');
+    if (!plan || !planAllowedFor(plan, ctx.org) || !plan.paid || plan.id === 'host_enterprise') throw badRequest('That plan is not available.');
     const price = (await pricingTable(pool)).find((p) => p.planId === plan.id);
     if (!price || price.priceCents === null || price.priceCents < 100 || price.currency !== 'ZAR') throw badRequest('That plan has no online price yet. Contact us to arrange it.');
     if (plan.once) {

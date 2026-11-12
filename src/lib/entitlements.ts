@@ -41,6 +41,9 @@ export const PLAN_FEATURES: Record<string, Feature[]> = {
   contractor_pro: [...CORE, 'MULTI_SITE', 'AI_GENERATION', 'SHARE_LINKS'],
   contractor_business: [...CORE, 'MULTI_SITE', 'AI_GENERATION', 'SHARE_LINKS'],
   contractor_once: [...CORE, 'AI_GENERATION'],
+  consultant_solo: [...CORE, 'MULTI_SITE', 'AI_GENERATION', 'SHARE_LINKS'],
+  consultant_practice: [...CORE, 'MULTI_SITE', 'AI_GENERATION', 'SHARE_LINKS'],
+  consultant_firm: [...CORE, 'MULTI_SITE', 'AI_GENERATION', 'SHARE_LINKS'],
 };
 
 /** Plain-language names for upgrade messages and the billing page. */
