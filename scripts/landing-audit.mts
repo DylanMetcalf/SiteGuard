@@ -33,7 +33,7 @@ if (process.env.COPY) {
     const t = (s: string) => (h.querySelector(s) as HTMLElement | null)?.innerText.trim() || '';
     const vh = innerHeight;
     const inView = (el: Element) => { const r = el.getBoundingClientRect(); return r.top < vh && r.bottom > 0; };
-    const ctas = [...h.querySelectorAll('a.btn, button.btn')].filter(inView).map((e) => (e as HTMLElement).innerText.trim());
+    const ctas = [...h.querySelectorAll('a.btn, button.btn')].filter(inView).map((e) => (e as HTMLElement).innerText.trim() + ((e as HTMLElement).dataset.kind ? ' [' + (e as HTMLElement).dataset.kind + ']' : ''));
     const anim = [...h.querySelectorAll('*')].filter((e) => { const a = getComputedStyle(e).animationName; return a && a !== 'none'; }).length;
     return { h1: t('h1'), lead: t('.lp-lead'), all: (h as HTMLElement).innerText, ctas, anim, hasVisual: !!h.querySelector('.lp-mock, .lp-visual, svg'), steps: h.querySelectorAll('.lp-hsteps li, .lp-steps li').length };
   });
@@ -50,7 +50,7 @@ if (process.env.COPY) {
     ['Lead paragraph is short (45 words or fewer)', wordsLead <= 45, `${wordsLead} words`],
     ['Lead reads at school grade 9 or below', grade(hero.lead) <= 9, `grade ${grade(hero.lead)}`],
     ['No jargon in the hero', jargon.length === 0, jargon.join(', ')],
-    ['Two clear paths above the fold, one per audience', hero.ctas.some((c) => /mine|site/i.test(c)) && hero.ctas.some((c) => /contractor/i.test(c)), hero.ctas.join(' | ')],
+    ['Two clear paths above the fold, one per audience', hero.ctas.some((c) => /\[host\]/.test(c)) && hero.ctas.some((c) => /\[contractor\]/.test(c)), hero.ctas.join(' | ')],
     ['No more than 4 buttons above the fold', hero.ctas.length <= 4, `${hero.ctas.length}: ${hero.ctas.join(' | ')}`],
     ['A visual shows the product working (illustration or live mock)', hero.hasVisual, ''],
     ['Some life: at least 3 gently animated elements', hero.anim >= 3, `${hero.anim} animated`],
@@ -76,8 +76,9 @@ for (const [w, h] of [[390, 844], [1280, 800]] as const) {
 // 2. both audiences have an above-the-fold path
 for (const [w, h] of [[390, 844], [1280, 800]] as const) {
   const { ctx, p } = await open(w, h);
-  const ok = await p.evaluate(() => { const vh = innerHeight; const vis = (re: RegExp) => [...document.querySelectorAll('.lp-hero a, .lp-hero button')].some((e) => re.test((e as HTMLElement).innerText) && e.getBoundingClientRect().top < vh && e.getBoundingClientRect().bottom > 0); return { mine: vis(/mine|site/i), contractor: vis(/contractor/i) }; });
-  check('2 paths', `${w}px: a mine path and a contractor path are both on screen`, ok.mine && ok.contractor, JSON.stringify(ok));
+  const ok = await p.evaluate(() => { const vh = innerHeight; const vis = (kind: string) => [...document.querySelectorAll('.lp-hero [data-kind="' + kind + '"]')].some((e) => e.getBoundingClientRect().top < vh && e.getBoundingClientRect().bottom > 0); return { mine: vis('host'), contractor: vis('contractor') }; });
+  // the contractor button must always be on screen; the mine door is secondary, so only required where there is room (desktop)
+  check('2 paths', `${w}px: the main contractor button${w >= 1000 ? ' and the mine door are' : ' is'} on screen`, ok.contractor && (w < 1000 || ok.mine), JSON.stringify(ok));
   await ctx.close();
 }
 // 3. the "how it works" strip is in the hero and readable

@@ -739,7 +739,7 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .lp-hsteps li{display:flex; gap:10px; align-items:center; font-size:14px; color:var(--ink);}
 .lp-hsteps b{flex:none; width:26px; height:26px; border-radius:50%; background:var(--sage-strong); color:#fff; display:grid; place-items:center; font-size:13px;}
 @media(min-width:640px){ .lp-paths{grid-template-columns:1fr 1fr;} .lp-hsteps{grid-template-columns:repeat(3,1fr); gap:12px;} .lp-hsteps li{align-items:flex-start;} }
-.lp-mock{position:relative; padding:8px 0 30px;}
+.lp-mock{position:relative; padding:8px 0 74px;}
 .lp-mcard{background:var(--paper-raised); border:1px solid var(--grey-line); border-radius:18px; box-shadow:var(--shadow-lg); padding:18px; max-width:420px; margin:0 auto;}
 .lp-mhead{display:flex; justify-content:space-between; gap:12px; align-items:center; padding-bottom:12px; border-bottom:1px solid var(--grey-line); margin-bottom:6px;}
 .lp-meyebrow{font-size:10.5px; font-weight:700; letter-spacing:.08em; color:var(--grey); text-transform:uppercase;}
@@ -1010,3 +1010,9 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .today-foot .btn{white-space:normal; height:auto; min-height:40px; max-width:100%; text-align:center; line-height:1.3; padding-top:8px; padding-bottom:8px;}
 .lp-hlinks a,.lp-hlinks .linkish{display:inline-flex; align-items:center; min-height:32px;}
 .today-more{display:inline-flex; align-items:center; min-height:40px; padding:6px 2px;}
+
+/* Contractor-first hero: one main button, mines as a clear second door */
+.lp-cta-main{margin:0 0 10px;} .lp-cta-main .btn.primary{min-height:54px; padding:0 26px; font-size:16.5px;}
+.lp-minebar{display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; justify-content:space-between; margin:18px 0 0; padding:12px 14px; border:1px dashed var(--grey-line); border-radius:14px; background:var(--paper-raised);}
+.lp-minebar div{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 220px;} .lp-minebar b{font-size:15px;} .lp-minebar span{font-size:13.5px; color:var(--ink-soft);}
+.lp-minebar .btn{min-height:44px; flex:none;}

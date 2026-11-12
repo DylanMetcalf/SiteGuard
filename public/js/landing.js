@@ -6,6 +6,7 @@ const tick = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-h
 const ic = (d) => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">'+d+'</svg>';
 const I = {
   file: ic('<path d="M7 3h7l5 5v13H7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M10 13h6M10 17h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+  sparkle: ic('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'),
   pen: ic('<path d="M4 20l4-1 11-11-3-3L5 16z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 6l3 3" stroke="currentColor" stroke-width="1.8"/>'),
   gate: ic('<rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2" stroke="currentColor" stroke-width="1.8"/>'),
   bell: ic('<path d="M6 16V11a6 6 0 1112 0v5l2 2H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20a2 2 0 004 0" stroke="currentColor" stroke-width="1.8"/>'),
@@ -20,14 +21,14 @@ function mock(){
   // The last document moves through the whole process while you watch: Missing, then In review, then Approved.
   const cycle = '<div class="lp-mrow" style="--i:4"><span>Fall protection plan</span><span class="lp-cycle"><span class="lp-mbadge bad">Missing</span><span class="lp-mbadge rev">In review</span><span class="lp-mbadge ok">Approved</span></span></div>';
   return '<div class="lp-mock" aria-hidden="true"><div class="lp-glow"></div>'
-    +'<div class="lp-mcard"><div class="lp-mhead"><div><div class="lp-meyebrow">Safety file</div><div class="lp-mtitle">Plant 2 Expansion</div><div class="lp-msub">Volt Electrical · 18 of 20 in</div></div>'
+    +'<div class="lp-mcard"><div class="lp-mhead"><div><div class="lp-meyebrow">Safety file</div><div class="lp-mtitle">Plant 2 Expansion</div><div class="lp-msub">Volt Electrical · for Example Mining</div></div>'
     +'<div class="lp-gauge"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="4"/><circle class="lp-gauge-arc" cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="87.7 97.4" stroke-linecap="round" transform="rotate(-90 18 18)"/></svg><b>90%</b></div></div>'
     + row('Letter of Good Standing', 'Approved', 'ok', 1)
     + row('Risk assessment — MCC upgrade', 'In review', 'rev', 2)
     + row('Medical — S. Nkosi', 'Expires in 12 days', 'warn', 3)
     + cycle
     +'</div>'
-    +'<div class="lp-mgate"><div class="lp-mgate-q">'+I.gate+'</div><div><div class="lp-mgate-s">CLEARED</div><div class="lp-msub">Sipho Nkosi · Electrician</div></div></div>'
+    +'<div class="lp-mgate"><div class="lp-mgate-q">'+I.sparkle+'</div><div><div class="lp-mgate-s">OSCAR</div><div class="lp-msub">I drafted your fall protection plan. Check it, then send.</div></div></div>'
     +'</div>';
 }
 
@@ -200,20 +201,18 @@ export function renderLanding(features){
   const demo = features && features.demo;
   return page('landing', ''
     +'<section class="lp-hero"><div class="lp-hero-text">'
-    +'<p class="lp-eyebrow">Contractor safety files · South African mines</p>'
-    +'<h1>Contractor safety files, finally in <span class="lp-mark">one place</span>.</h1>'
-    +'<p class="lp-lead"><strong>COMVERA is an online portal for mine safety paperwork.</strong> Mines list what they need. Contractors upload it once. Everyone sees what is approved, missing or expiring.</p>'
-    +'<div class="lp-paths">'
-      +'<div class="lp-path"><p class="lp-path-who">I run a mine or site</p><p class="lp-path-what">Ask for documents and see who is cleared.</p>'+trial('Start as a mine','host')+'</div>'
-      +'<div class="lp-path"><p class="lp-path-who">I am a contractor</p><p class="lp-path-what">Upload once, reuse on every site.</p>'+trial('Start as a contractor','contractor')+'</div>'
-    +'</div>'
-    +'<p class="lp-sub-links lp-hlinks"><a href="/walkthrough">Watch the 6-minute walkthrough (no sign-up)</a>'+(demo?'<button class="linkish" data-action="start-demo" data-tour="1">Explore the demo</button>':'')+'</p>'
+    +'<p class="lp-eyebrow">For contractors on South African mines</p>'
+    +'<h1>Build your safety file <span class="lp-mark">once</span>. Send it to any mine.</h1>'
+    +'<p class="lp-lead"><strong>COMVERA is an online portal for contractor safety files.</strong> Upload your documents once. Oscar drafts what is missing. See what is approved, missing or expiring.</p>'
+    +'<div class="lp-cta lp-cta-main">'+trial('Build my safety file','contractor')+'<a class="btn secondary" href="/walkthrough">Watch the 6-minute walkthrough</a></div>'
+    +'<p class="lp-sub-links lp-hlinks"><span>No card needed for the 14-day trial.</span>'+(demo?'<button class="linkish" data-action="start-demo" data-tour="1">Explore the demo</button>':'')+'</p>'
     +'<ol class="lp-hsteps" aria-label="How it works">'
-      +'<li><b>1</b><span>The mine says what it needs</span></li>'
-      +'<li><b>2</b><span>The contractor uploads it once</span></li>'
-      +'<li><b>3</b><span>The mine approves, and cleared workers get in</span></li>'
+      +'<li><b>1</b><span>Upload your company documents once</span></li>'
+      +'<li><b>2</b><span>Oscar drafts what is missing</span></li>'
+      +'<li><b>3</b><span>Send one complete file to any mine</span></li>'
     +'</ol>'
-    +'<ul class="lp-proof"><li>'+tick+'14-day free trial, no card</li><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li></ul>'
+    +'<div class="lp-minebar"><div><b>Run a mine or site?</b><span>See which contractors are approved and cleared before they reach the gate.</span></div>'+trial('Start as a mine','host')+'</div>'
+    +'<ul class="lp-proof"><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li><li>'+tick+'Reuse documents on every site</li></ul>'
     +'</div>'+mock()+'</section>'
     + painSection()
     +'<section class="lp-sides"><div class="lp-side"><p class="lp-eyebrow">For contractors</p><h2>Build a professional safety file in minutes.</h2>'

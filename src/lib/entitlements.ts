@@ -32,7 +32,7 @@ export const SPONSORED: Feature[] = ['SAFETY_FILE_BUILDER', 'DOCUMENT_STUDIO', '
 const CORE: Feature[] = ['SAFETY_FILE_BUILDER', 'DOCUMENT_STUDIO', 'TOOLBOX_TALKS', 'AUDIT_TRAIL', 'EXPORTS', 'CONTRACTOR_PROJECTS'];
 
 export const PLAN_FEATURES: Record<string, Feature[]> = {
-  host_starter: [...CORE, 'MULTI_SITE', 'ADVANCED_COMPLIANCE'],
+  host_starter: [...CORE, 'MULTI_SITE', 'ADVANCED_COMPLIANCE', 'AI_GENERATION', 'SHARE_LINKS'],
   host_pro: [...CORE, 'MULTI_SITE', 'ADVANCED_COMPLIANCE', 'AI_GENERATION', 'SHARE_LINKS'],
   host_enterprise: [...CORE, 'MULTI_SITE', 'ADVANCED_COMPLIANCE', 'AI_GENERATION', 'SHARE_LINKS'],
   // No subscription: only what a sponsoring site's files need. Own projects need a plan.
