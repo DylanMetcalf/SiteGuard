@@ -23,7 +23,7 @@ const issues: Issue[] = []; const layout: string[] = []; const consoleErrs = new
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
 
 async function audit(p: any, who: string, screen: string, size: string) {
-  await p.waitForTimeout(who === 'public' ? 1500 : 350); // public pages fade in; measure colours once settled
+  await p.waitForTimeout(who === 'public' || /landing/.test(screen) ? 1600 : 350); // public pages fade in; measure colours once settled
   const over = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   if (over > 1) {
     const wide = await p.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(e).position !== 'fixed').slice(0, 3).map((e) => e.outerHTML.slice(0, 90).replace(/\s+/g, ' ') + ' | ' + e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : '') + ' right=' + Math.round(e.getBoundingClientRect().right)));

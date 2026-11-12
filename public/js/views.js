@@ -91,24 +91,47 @@ function greeting(){
 }
 
 export const DASHBOARD_WIDGETS = {
-  contractor: [['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
-  host: [['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
+  contractor: [['today','Today'],['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['invitations','Invitations'],['focus','Site you\'re working on'],['allSites','All your sites'],['workforce','Worker certificates'],['company','Company profile']],
+  host: [['today','Today'],['agent','Compliance agent'],['assistant','Ask COMVERA'],['studio','Document Studio'],['safety','Safety alert'],['organisation','Organisation overview'],['attention','Needs attention'],['portfolio','Site portfolio'],['invitations','Pending invitations'],['workforce','Worker certificates']],
 };
 const DEFAULT_WIDGETS = {
-  contractor: ['agent','assistant','studio','invitations','focus','allSites','workforce','company'],
-  admin: ['safety','agent','assistant','studio','organisation','portfolio','invitations','workforce'],
-  reviewer: ['safety','agent','assistant','attention','portfolio','workforce'],
-  viewer: ['safety','agent','assistant','attention','portfolio'],
+  contractor: ['today', 'agent','assistant','studio','invitations','focus','allSites','workforce','company'],
+  admin: ['today', 'safety','agent','assistant','studio','organisation','portfolio','invitations','workforce'],
+  reviewer: ['today', 'safety','agent','assistant','attention','portfolio','workforce'],
+  viewer: ['today', 'safety','agent','assistant','attention','portfolio'],
 };
 export function dashboardLayout(){
   const all = DASHBOARD_WIDGETS[isContractor()?'contractor':'host'].map(w=>w[0]);
   const prefs = S.state.dashboardPrefs || {};
   if(prefs.order && prefs.order.length){
     const order = prefs.order.filter(id=>all.includes(id));
-    return { order: order.concat(all.filter(id=>!order.includes(id))), hidden: (prefs.hidden||[]).filter(id=>all.includes(id)) };
+    const full = order.concat(all.filter(id=>!order.includes(id)));
+    // "Today" is new for people with a saved layout: put it first (they can still hide or move it).
+    if(!order.includes('today')) full.unshift(full.splice(full.indexOf('today'),1)[0]);
+    return { order: full, hidden: (prefs.hidden||[]).filter(id=>all.includes(id)) };
   }
   const defaults = DEFAULT_WIDGETS[role()] || all;
   return { order: defaults.concat(all.filter(id=>!defaults.includes(id))), hidden: all.filter(id=>!defaults.includes(id)) };
+}
+
+/* ---- Today: the daily, weekly and monthly jobs on one card ---- */
+const todayLabel = () => new Date().toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long' });
+function todayWidget(){
+  const tasks = computeTasks();
+  const high = tasks.filter(t=>t.priority==='high'), medium = tasks.filter(t=>t.priority==='medium'), low = tasks.filter(t=>t.priority==='low');
+  const dot = {high:'var(--red)', medium:'var(--amber)', low:'var(--green)'};
+  const row = (t, i, filter) => '<button class="today-row" data-action="task-goto" data-filter="'+filter+'" data-i="'+i+'"><span class="today-dot" style="background:'+dot[t.priority]+';" aria-hidden="true"></span><span class="today-text"><b>'+t.title+'</b><span>'+t.sub+'</span></span></button>';
+  const more = (list, shown, filter, label) => list.length>shown ? '<button class="linkish today-more" data-action="open-tasks" data-filter="'+filter+'">'+label+' ('+(list.length-shown)+' more)</button>' : '';
+  let html = '<div class="card today-card"><div class="flexbetween" style="align-items:baseline;"><div class="site-card-title">Today</div><div class="site-card-sub">'+todayLabel()+'</div></div>';
+  if(!tasks.length) html += '<div class="today-clear">'+ICONS.check+'<div><b>All clear today</b><span>Nothing needs you right now. We will tell you when something does.</span></div></div>';
+  else {
+    html += '<div class="today-group">Do today</div>';
+    html += high.length ? high.slice(0,4).map((t,i)=>row(t,i,'high')).join('') + more(high,4,'high','See all urgent') : '<div class="site-card-sub" style="padding:6px 0;">Nothing urgent. Nice.</div>';
+    if(medium.length){ html += '<div class="today-group">This week</div>' + medium.slice(0,3).map((t,i)=>row(t,i,'medium')).join('') + more(medium,3,'medium','See everything coming up'); }
+    if(low.length){ html += '<div class="today-group">This month</div>' + low.slice(0,2).map((t,i)=>row(t,i,'low')).join('') + more(low,2,'low','See what to plan for'); }
+  }
+  if(isHost() && canReview()) html += '<div class="today-foot"><a class="btn secondary small" href="/api/audit?format=csv&from='+new Date().toISOString().slice(0,8)+'01" download>Download this month\'s activity report (CSV)</a></div>';
+  return html+'</div>';
 }
 
 /* ---- Compliance agent ---- */
@@ -186,8 +209,10 @@ function renderDashboard(){
   const sitesAll = Object.values(S.state.sites);
   const active = sitesAll.filter(s=>s.status==='in_progress'||s.status==='site_ready').length;
   const ready = sitesAll.filter(s=>s.status==='site_ready').length;
-  const findings = ((S.boot.agent||{}).findings||[]);
-  const urgent = findings.filter(f=>f.severity==='high').length;
+  // The header counts the same to-do list as the Today card, so the two can never disagree.
+  const todo = computeTasks().filter(t=>t.priority!=='low');
+  const findings = todo;
+  const urgent = todo.filter(t=>t.priority==='high').length;
   const stat = (n, label) => '<div class="hero-stat"><b>'+n+'</b><span>'+label+'</span></div>';
   const head = '<div class="dash-hero"><div class="flexbetween" style="align-items:flex-start;"><div><p class="hero-eyebrow">'+org().name+'</p><h1>'+greeting()+'</h1>'
     +'<p class="greeting">'+(urgent ? urgent+' urgent item'+(urgent===1?'':'s')+' need'+(urgent===1?'s':'')+' you today.' : findings.length ? findings.length+' item'+(findings.length===1?'':'s')+' to look at — nothing urgent.' : 'Everything is in order across your sites.')+'</p></div>'
@@ -196,11 +221,13 @@ function renderDashboard(){
       : isHost() ? '<div class="hero-actions">'+(isOrgAdmin() && !readOnly() ? '<button class="btn primary" data-action="new-site">'+ICONS.plus+' Add site</button>' : '')+'<button class="btn secondary" data-action="nav" data-nav="passport">Contractors</button><button class="btn secondary" data-action="nav" data-nav="studio">Document Studio</button><button class="btn secondary" data-action="nav" data-nav="oscar">'+ICONS.sparkle+' Oscar</button></div>' : '')
     +'<div class="hero-stats">'+stat(active, isContractor()?'Active sites':'Active sites')+stat(ready,'Site Ready')+stat(findings.length,'To action')+'</div></div>';
   const ctx = isContractor() ? contractorDashboardContext() : null;
-  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
+  const parts = order.filter(id=>!hidden.includes(id)).map(id=> id==='assistant' ? assistantWidget() : id==='today' ? todayWidget() : id==='agent' ? agentWidget() : id==='studio' ? studioWidget() : (isContractor() ? contractorWidget(id, ctx) : hostWidget(id)) ).filter(Boolean);
   let start = gettingStarted();
   const welcome = welcomeCard();
   if(welcome) return head + welcome;
   if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
+  // When there is work waiting, the Today card comes before the set-up checklist.
+  if(order.filter(id=>!hidden.includes(id))[0]==='today' && todo.length) return head + parts[0] + start + parts.slice(1).join('');
   return head + start + parts.join('');
 }
 

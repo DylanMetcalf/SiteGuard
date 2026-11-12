@@ -991,3 +991,22 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
   .lp-glow,.lp-mrow,.lp-gauge-arc,.lp-mgate,.lp-mgate-q,.lp-hsteps li b{animation:none !important;}
   .lp-cycle .lp-mbadge{animation:none !important; opacity:0;} .lp-cycle .lp-mbadge:last-child{opacity:1;}
 }
+
+/* Today card */
+.today-card{padding-bottom:12px;}
+.today-group{font-size:11.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--grey); margin:14px 0 4px;}
+.today-row{display:flex; gap:12px; align-items:flex-start; width:100%; text-align:left; background:transparent; border:none; border-top:1px solid var(--grey-line); padding:11px 2px; cursor:pointer; min-height:44px;}
+.today-row:first-of-type{border-top:none;}
+.today-row:hover{background:var(--paper-deep);}
+.today-dot{flex:none; width:10px; height:10px; border-radius:50%; margin-top:6px;}
+.today-text{display:flex; flex-direction:column; gap:1px; min-width:0;}
+.today-text b{font-size:14.5px; font-weight:650; overflow-wrap:anywhere;}
+.today-text span{font-size:12.5px; color:var(--grey);}
+.today-more{margin:2px 0 4px;}
+.today-clear{display:flex; gap:12px; align-items:center; padding:14px 2px 6px; color:var(--green);}
+.today-clear svg{flex:none; width:26px; height:26px;}
+.today-clear div{display:flex; flex-direction:column; color:var(--ink);} .today-clear span{font-size:13px; color:var(--grey);}
+.today-foot{margin-top:12px; padding-top:12px; border-top:1px solid var(--grey-line);}
+.today-foot .btn{white-space:normal; height:auto; min-height:40px; max-width:100%; text-align:center; line-height:1.3; padding-top:8px; padding-bottom:8px;}
+.lp-hlinks a,.lp-hlinks .linkish{display:inline-flex; align-items:center; min-height:32px;}
+.today-more{display:inline-flex; align-items:center; min-height:40px; padding:6px 2px;}

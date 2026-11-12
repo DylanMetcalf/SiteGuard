@@ -88,3 +88,15 @@ describe('audit export', () => {
     assert.equal((await mine.get('/api/audit')).status, 200, 'the JSON form still works');
   });
 });
+
+import { projectCoverNote } from '../src/lib/bundle.js';
+
+describe('PDF cover invitation for clients not on COMVERA', () => {
+  it('appears only on files prepared for a client who is not on COMVERA, and makes no price claim', () => {
+    const note = projectCoverNote(true, 'https://www.comvera.co.za');
+    assert.match(String(note), /collect, review and approve contractor safety files online/);
+    assert.match(String(note), /www\.comvera\.co\.za\/for-sites$/);
+    assert.ok(!/free|R\d|price/i.test(String(note)), 'no claim about cost');
+    assert.equal(projectCoverNote(false), undefined, 'nothing extra on files already reviewed in COMVERA');
+  });
+});
