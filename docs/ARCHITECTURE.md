@@ -481,6 +481,17 @@ time-limited transaction) and a **workspace** (an organisation someone signed up
 - **Screens**: `public/exchange.html` + `public/js/exchange.js` (portal), `public/js/exchanges.js`
   (More → Exchanges, contractor sheet → Request documents, Documents → Share securely).
 
+### Document requests (replacement, signed copy, general, other)
+
+One workflow on top of Exchange; there is no second request system. An `exchange_items` row now has a `kind` (`document`, `replacement`, `signature`, `other`), a `reason`, an optional `due_date`, and where it applies the `requirement_id` it answers and the document it refers to (`source_kind/source_id/source_version/source_file_id/source_sha256`, taken server-side from the caller's own tenant, never from client file ids).
+
+- **Replacement**: only the site (reviewer/admin) on a requirement of its own site; a reason is required. The recipient uploads through the same secure link; on submit the file is filed on the requirement as the **next version, awaiting review** (`fileToRequirement`). Earlier versions and review history stay. The reviewer's accept or send-back through the request applies the normal review result (`decideRequirement`), and only to the version that was returned. Uploading never approves anything or makes a site ready.
+- **Signed copy**: the document and its version at request time are recorded; the recipient may view or download that one document for that request only (`GET /api/x/items/:id/source`, session required, `kind = 'signature'`). The returned file is a *returned copy*; COMVERA does not verify signatures and the screens and audit say so. A signature never answers a requirement and a later revision never inherits it (the detail marks the item "revised").
+- **General / other**: name and instruction; `other` is never linked to a requirement and never changes readiness.
+- **Duplicates**: an open request for the same recipient, kind and target returns `{ duplicate }` (with the existing request) unless `force` is sent; an advisory lock makes two simultaneous clicks one request. Reminders are limited to one an hour; cancelling is the existing revoke.
+- **Email honesty**: `queueEmail` returns the outbox id, stored on the exchange; the workspace shows `not_configured` (no SMTP, nothing leaves the server), `queued`, `retrying`, `sent` (accepted by the mail server, not read) or `failed`. Subjects name the document, never a person.
+- **Who can use Exchange**: owners, admins and reviewers with a writable organisation. A contractor owner is blocked only when the organisation is lapsed (trial ended, no sponsoring site); the workspace now explains that and offers Plans & billing. Recipients through the portal are never blocked by billing.
+
 ## Manager portal (platform operator)
 
 - **Page and API:** `/manager` (static, `public/manager.html`, `js/manager.js`) over `routes/manager.ts` (`/api/manager/*`).

@@ -4,8 +4,9 @@
 // Everything from the API is escaped here (it isn't part of the escaped bootstrap).
 
 import { api } from './api.js';
+import { deliveryText } from './requests.js';
 import {
-  S, ICONS, escapeHtml as esc, isHost, isOrgAdmin, canReview, readOnly, org,
+  S, ICONS, escapeHtml as esc, isHost, isOrgAdmin, canReview, readOnly, org, restrictionNotice,
   on, render, showToast, openSheet, sheetHead, closeSheet, val, searchBox, matchSearch,
 } from './core.js';
 
@@ -42,6 +43,7 @@ function statusBadge(x){
   if(x.status === 'submitted' && x.counts && x.counts.resubmitted) label = 'Resubmitted';
   return '<span class="badge '+cls+'">'+esc(label)+'</span>'+(x.access === 'expired' && x.status !== 'approved' ? ' <span class="badge expired">Access expired</span>' : '');
 }
+const KIND_NAME = { replacement:'Replacement', signature:'Signed copy', other:'Other document', document:'Request' };
 const ITEM_STATUS = { requested:['Requested','grey'], submitted:['Under review','awaiting_review'], approved:['Approved','complete'], rejected:['Replacement required','correction_required'], shared:['Shared','grey'] };
 const itemBadge = (s) => { const [l, c] = ITEM_STATUS[s] || [s, 'grey']; return '<span class="badge '+c+'">'+esc(l)+'</span>'; };
 
@@ -51,7 +53,7 @@ function row(x, received){
   const progress = x.direction === 'request' && x.counts.items ? ' · '+x.counts.approved+'/'+x.counts.items+' approved' : x.counts.items ? ' · '+x.counts.items+' document'+(x.counts.items===1?'':'s') : '';
   return '<div class="reqrow" data-action="exchange-open" data-id="'+esc(x.id)+'" role="button" tabindex="0" style="cursor:pointer;">'
     +'<div class="reqrow-main"><div class="reqrow-name">'+esc(who)+'</div>'
-    +'<div class="site-card-sub">'+esc(x.ref)+' · '+what+(received ? ' from them' : ' to '+esc(x.recipientEmail))+progress+(x.deadline && x.direction==='request' ? ' · due '+esc(fmtDate(x.deadline)) : '')+'</div>'
+    +'<div class="site-card-sub">'+esc(x.ref)+' · '+(x.firstDoc && x.direction==='request' ? esc(x.firstDoc)+(x.counts.items>1 ? ' +'+(x.counts.items-1) : '')+' · ' : '')+(x.kinds && x.kinds.length===1 && x.kinds[0]!=='document' ? KIND_NAME[x.kinds[0]] : what)+(received ? ' from them' : ' to '+esc(x.recipientEmail))+progress+(x.deadline && x.direction==='request' ? ' · due '+esc(fmtDate(x.deadline)) : '')+'</div>'
     +'<div class="reqrow-meta">'+statusBadge(x)+'<span class="site-card-sub">'+esc(fmtDate(x.createdAt))+'</span></div></div>'
     +'<div class="reqrow-chevron">'+ICONS.chevron+'</div></div>';
 }
@@ -62,9 +64,12 @@ export function renderExchanges(){
   if(S.exchangeId) return renderDetail();
   const tab = S.exchangeTab || 'sent';
   let h = '<div class="view-head"><h1>Exchanges</h1><p>Request or share specific documents with anyone — they don\'t need a COMVERA account. Each exchange is private, time-limited and recorded.</p></div>';
+  if(!canSend()) h += restrictionNotice(readOnly() ? 'lapsed' : 'nonadmin', 'send or review requests and shares')
+    + '<div class="site-card-sub" style="margin:-4px 2px 12px;">You can still answer a request you receive by email — that needs no plan and no account.</div>';
   if(canSend()){
     h += '<div class="hero-actions" style="margin-bottom:14px;">'
-      +'<button class="btn primary" data-action="exchange-request">'+ICONS.plus+' Request documents</button>'
+      +'<button class="btn primary" data-action="request-document">'+ICONS.plus+' Request document</button>'
+      +'<button class="btn secondary" data-action="exchange-request">Request several</button>'
       +(isHost() ? '<button class="btn secondary" data-action="exchange-bulk">'+ICONS.search+' Bulk request</button>' : '')
       +'<button class="btn secondary" data-action="exchange-share">'+ICONS.link+' Share documents</button></div>';
   }
@@ -116,6 +121,7 @@ function renderDetail(){
     + (x.submittedAt ? kv('Last submitted', fmtTime(x.submittedAt)) : '')
     + (x.direction==='share' ? kv('Download', x.allowDownload ? 'Allowed' : 'View only') : '')
     + (x.claimed && mine ? kv('Recipient', 'Has linked this to their COMVERA workspace') : '')
+    + (mine && x.direction==='request' && x.email && deliveryText(x.email) ? '<div class="site-card-sub" style="margin-top:8px;">Email: '+esc(deliveryText(x.email))+(x.remindCount ? ' · '+x.remindCount+' reminder'+(x.remindCount===1?'':'s')+' sent' : '')+'</div>' : '')
     + (x.message ? '<div class="site-card-sub" style="margin-top:8px;">Your message: “'+esc(x.message)+'”</div>' : '')
     + (x.recipientResponse ? '<div class="notice" style="margin:10px 0 0;">Their message: “'+esc(x.recipientResponse)+'”</div>' : '')
     + '</div>';
@@ -124,8 +130,13 @@ function renderDetail(){
   const reviewable = mine && canSend() && x.direction==='request' && items.some(i=>i.status==='submitted');
   h += '<div class="section-title">Documents</div><div class="card">';
   for(const it of items){
-    h += '<div class="reqrow" style="align-items:flex-start;"><div class="reqrow-main"><div class="reqrow-name">'+esc(it.documentType)+'</div>'
+    h += '<div class="reqrow" style="align-items:flex-start;"><div class="reqrow-main"><div class="reqrow-name">'+esc(it.documentType)+(it.kind && it.kind!=='document' ? ' <span class="badge grey">'+esc(it.kindLabel)+'</span>' : '')+'</div>'
       +(it.personName ? '<div class="site-card-sub">For '+esc(it.personName)+'</div>' : '')
+      +(it.reason ? '<div class="site-card-sub">'+(it.kind==='replacement' ? 'Why: ' : '')+esc(it.reason)+(it.dueDate ? ' · due '+esc(fmtDate(it.dueDate)) : '')+'</div>' : it.dueDate ? '<div class="site-card-sub">Due '+esc(fmtDate(it.dueDate))+'</div>' : '')
+      +(it.requirementName ? '<div class="site-card-sub">Answers the requirement “'+esc(it.requirementName)+'”; filed as a new version for your review.</div>' : '')
+      +(it.source ? '<div class="site-card-sub">'+(it.kind==='signature' ? 'Signature requested on ' : 'Replaces ')+esc(it.source.label)+(it.source.version ? ' (version '+esc(it.source.version)+')' : '')+'</div>' : '')
+      +(it.source && it.source.revised ? '<div class="notice" style="margin:6px 0;">This document has been revised since the request (now '+esc(it.source.currentVersion||'newer')+'). A signed copy applies only to the version it was sent with.</div>' : '')
+      +(it.kind==='signature' && it.submissions.length ? '<div class="site-card-sub">A returned copy. COMVERA does not verify signatures.</div>' : '')
       +'<div class="reqrow-meta">'+itemBadge(it.status)+(it.downloadedAt ? '<span class="site-card-sub">Downloaded '+esc(fmtTime(it.downloadedAt))+'</span>' : '')+'</div>';
     if(it.reviewNote) h += '<div class="site-card-sub" style="margin-top:6px;">'+(it.status==='rejected'?'Sent back':'Note')+': '+esc(it.reviewNote)+(it.reviewedByName ? ' — '+esc(it.reviewedByName) : '')+'</div>';
     if(mine && it.submissions.length){

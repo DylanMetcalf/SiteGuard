@@ -10,6 +10,7 @@ import {
 } from './core.js';
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
 import { studioBlueprintFor } from './studio.js';
+import { requirementRequestBlock, hydrateOutstanding, signatureButton } from './requests.js';
 
 const refreshSheet = (html) => { const el = sheetEl(); if(el) el.innerHTML = html; };
 
@@ -168,7 +169,7 @@ on('qa', (el)=>{
 });
 
 /* ============ REQUIREMENT / DOCUMENT ============ */
-export function openReqSheet(reqId){ S.openReq = reqId; openSheet(renderReqSheet(reqId)); S.openReq = reqId; }
+export function openReqSheet(reqId){ S.openReq = reqId; openSheet(renderReqSheet(reqId)); S.openReq = reqId; hydrateOutstanding(reqId); }
 on('open-req', (el)=>openReqSheet(el.dataset.req));
 
 /** The site's own form for this requirement, if the mine has given one. */
@@ -273,6 +274,7 @@ function renderReqSheet(reqId){
   } else {
     body += '<p class="site-card-sub">Viewing only.</p>';
   }
+  if(site && !ro && isHost() && !site.project && !reqId.startsWith('lib:')) body += requirementRequestBlock(reqId, eff);
   if(site && !ro && !reqId.startsWith('lib:')){
     body += '<label class="field-label" for="commentText">Add a comment</label><textarea id="commentText" placeholder="Visible to both '+(isContractor()?site.hostName:contractorOf(site).name)+' and your team"></textarea>'
       +'<button class="btn secondary small" style="margin-top:6px;" data-action="comment-req" data-req="'+reqId+'">Post comment</button>';
@@ -902,7 +904,7 @@ function renderWorkerSheet(workerId, siteId){
   body += w.certificates.length ? w.certificates.map(c=>{
     const st = certStatus(c);
     return '<div class="cert-row"><div><div style="font-weight:600;">'+c.name+'</div><div class="site-card-sub">'+CERT_KINDS[c.kind]+(c.issuer?' · '+c.issuer:'')+(c.expiresOn?' · '+(st==='expired'?'expired ':'valid to ')+timeAgo(c.expiresOn):' · no expiry')+(c.restrictions?' · restrictions: '+c.restrictions:'')+'</div></div>'
-      +'<div style="display:flex;gap:6px;align-items:center;">'+badge(st)+(c.fileUrl?'<a class="btn secondary small" href="'+c.fileUrl+'" target="_blank" rel="noopener">View</a>':'')
+      +'<div style="display:flex;gap:6px;align-items:center;">'+badge(st)+(c.fileUrl?'<a class="btn secondary small" href="'+c.fileUrl+'" target="_blank" rel="noopener">View</a>'+(editable?signatureButton('certificate', c.id, 'Request signature'):''):'')
       +(editable?'<button class="btn danger small" data-action="delete-cert" data-id="'+c.id+'" data-worker="'+w.id+'" aria-label="Remove">'+ICONS.cross+'</button>':'')+'</div></div>';
   }).join('') : '<div class="site-card-sub">No certificates recorded.</div>';
   if(editable){

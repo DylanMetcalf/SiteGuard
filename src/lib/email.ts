@@ -52,14 +52,16 @@ ${
   return { text, html };
 }
 
-export async function queueEmail(db: Db, e: OutgoingEmail): Promise<void> {
+/** Queues one email and returns its outbox id (null when a duplicate was skipped), so callers can report delivery honestly. */
+export async function queueEmail(db: Db, e: OutgoingEmail): Promise<number | null> {
   const { text, html } = renderEmail(e);
-  await db.query(
+  const r = await db.query<{ id: string }>(
     `insert into email_outbox (org_id, to_email, subject, text_body, html_body, dedupe_key)
      values ($1, $2, $3, $4, $5, $6)
-     on conflict (dedupe_key) do nothing`,
+     on conflict (dedupe_key) do nothing returning id`,
     [e.orgId ?? null, e.to, e.subject, text, html, e.dedupeKey ?? null],
   );
+  return r.rows[0] ? Number(r.rows[0].id) : null;
 }
 
 /** Emails a set of organisation members, optionally filtered by role. */

@@ -2,6 +2,7 @@
 // failures, and describe them (type, site, area, dates, who can see them). Also the document sheet with
 // its versions. Everything goes through /api/org-docs; the server decides who may see what.
 import { api, csrf } from './api.js';
+import { signatureButton } from './requests.js';
 import { S, ICONS, escapeHtml, on, openSheet, closeSheet, sheetHead, showToast, render, val } from './core.js';
 
 export const DOC_TYPES = [
@@ -155,6 +156,7 @@ export async function openDocSheet(id){
     + (d.description ? '<p class="site-card-sub" style="margin:10px 0;">' + escapeHtml(d.description) + '</p>' : '')
     + '<div class="row-actions" style="margin:12px 0;"><a class="btn primary small" href="/api/org-docs/' + d.id + '/file" target="_blank" rel="noopener">Open</a><a class="btn secondary small" href="/api/org-docs/' + d.id + '/file?download=1">Download</a>'
     + (mine && !d.archivedAt ? '<label class="btn secondary small" for="verFile" style="cursor:pointer;">' + ICONS.upload + ' New version<input type="file" id="verFile" accept="' + ACCEPT + '" data-action-change="doc-version" data-id="' + d.id + '" style="position:absolute;opacity:0;width:1px;height:1px;"></label>' : '')
+    + (mine && !d.archivedAt && d.filename ? signatureButton('org_document', d.id, 'Request signature') : '')
     + (mine ? '<button class="btn secondary small" data-action="doc-archive" data-id="' + d.id + '" data-on="' + (d.archivedAt ? '0' : '1') + '">' + (d.archivedAt ? 'Restore' : 'Archive') + '</button>' : '') + '</div>'
     + (mine && r.versions.length ? '<div class="section-title">Versions</div><div class="card">' + r.versions.map((v) => '<div class="menu-row" style="cursor:default;"><div style="flex:1;"><div class="qa-title">Version ' + v.version + (v.version === d.version ? ' (current)' : '') + '</div><div class="qa-sub">'
       + escapeHtml(v.filename) + ' · ' + escapeHtml(v.by) + ' · ' + new Date(v.at).toLocaleDateString('en-ZA') + (v.note ? ' · ' + escapeHtml(v.note) : '') + '</div></div><a class="btn secondary small" href="/api/org-docs/' + d.id + '/file?v=' + v.version + '" target="_blank" rel="noopener">Open</a></div>').join('') + '</div>' : '')

@@ -29,6 +29,7 @@
     "test:landing": "tsx scripts/landing-audit.mts",
     "test:today": "tsx scripts/today-check.mts",
     "test:consultant": "tsx scripts/consultant-check.mts",
+    "test:requests": "tsx scripts/docrequests-journey.mts",
     "activation": "tsx scripts/activation-report.mts"
   },
   "dependencies": {
