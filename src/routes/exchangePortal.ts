@@ -331,7 +331,7 @@ export default async function exchangePortalRoutes(app: FastifyInstance) {
    * The document the sender wants signed, for this recipient only: a signature item of this exchange, while access lasts.
    * The sender chose to send it by making the request; every view and download is recorded on both sides.
    */
-  app.get('/api/x/items/:id/source', async (req, reply) => {
+  app.get('/api/x/items/:id/source', rl(60), async (req, reply) => {
     const itemId = (req.params as { id: string }).id;
     const s = await session(req);
     if (s.x.direction !== 'request' || !isUuid(itemId)) throw notFound();
@@ -359,6 +359,7 @@ export default async function exchangePortalRoutes(app: FastifyInstance) {
         db, 'select id, status, requirement_id, kind from exchange_items where id = $1 and exchange_id = $2 for update', [itemId, s.x.id]);
       if (!item || !item.requirement_id || item.kind === 'signature') throw notFound();
       if (item.status !== 'requested' && item.status !== 'rejected') throw conflict('This document is already with the sender.');
+      if (b.expiryDate && !(Number.isFinite(Date.parse(b.expiryDate + 'T00:00:00Z')) && new Date(b.expiryDate + 'T00:00:00Z').toISOString().slice(0, 10) === b.expiryDate)) throw badRequest('That is not a real date. Check the day and month.', 'bad_date');
       if (b.expiryDate && b.expiryDate < new Date().toISOString().slice(0, 10)) throw badRequest('That date has already passed. Check the year.', 'expired_date');
       if (b.expiryDate && b.expiryDate > `${new Date().getFullYear() + 25}-12-31`) throw badRequest('That date is too far ahead. Check the year.', 'bad_date');
       await db.query('update exchange_items set expiry_date = $2 where id = $1', [item.id, b.expiryDate]);

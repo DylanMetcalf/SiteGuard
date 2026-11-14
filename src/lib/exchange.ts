@@ -216,7 +216,7 @@ export async function fileToRequirement(
     [doc.id, version, fileId, text, expiry, `${email} (secure link)`.slice(0, 200)],
   );
   await db.query(
-    `update documents set status = 'awaiting_review', version = $2, current_file_id = $3, pending_file_id = null, note = $4, expiry_date = $5, updated_at = now() where id = $1`,
+    `update documents set status = 'awaiting_review', version = $2, current_file_id = $3, note = $4, expiry_date = $5, updated_at = now() where id = $1`,
     [doc.id, version, fileId, text, expiry],
   );
   await notifyOrg(db, x.sender_org_id, REVIEWERS, {
@@ -229,13 +229,13 @@ export async function fileToRequirement(
 export async function decideRequirement(
   db: Db, x: Pick<ExchangeRow, 'sender_org_id' | 'ref'>, item: { requirement_id: string | null; file_id: string | null }, decision: 'approve' | 'reject', note: string,
   actor: { id: string; name: string; role: string },
-): Promise<void> {
-  if (!item.requirement_id) return;
+): Promise<boolean> {
+  if (!item.requirement_id) return true;
   const doc = await one<{ id: string; current_file_id: string | null }>(db, 'select id, current_file_id from documents where requirement_id = $1 for update', [item.requirement_id]);
-  // If the contractor has since filed something else, this decision must not touch it.
-  if (!doc || !item.file_id || doc.current_file_id !== item.file_id) return;
+  // If something newer has been filed on the requirement, this decision must not touch it: the caller is told.
+  if (!doc || !item.file_id || doc.current_file_id !== item.file_id) return false;
   const req = await one<{ id: string; name: string; site_id: string }>(db, 'select id, name, site_id from requirements where id = $1', [item.requirement_id]);
-  if (!req) return;
+  if (!req) return true;
   if (decision === 'approve') {
     await db.query(`update documents set status = 'complete', updated_at = now() where id = $1`, [doc.id]);
     await db.query(`insert into reviews (document_id, author_id, author_name, author_role, kind, text) values ($1, $2, $3, $4, 'approval', $5)`, [doc.id, actor.id, actor.name, actor.role, note || `Accepted (${refLabel(x.ref)})`]);
@@ -244,6 +244,7 @@ export async function decideRequirement(
     await db.query(`insert into reviews (document_id, author_id, author_name, author_role, kind, text) values ($1, $2, $3, $4, 'correction', $5)`, [doc.id, actor.id, actor.name, actor.role, note]);
     await recheckSiteReady(db, req.site_id, `${req.name} sent back`);
   }
+  return true;
 }
 
 /** Tells the sender's team (owners, admins, reviewers) when something comes back. */

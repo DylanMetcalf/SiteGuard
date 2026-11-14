@@ -350,3 +350,35 @@ describe('other documents', () => {
     assert.equal((await mine.get(`/api/exchanges/outstanding?siteId=${siteId}`)).body.open.some((o: any) => o.documentType === 'Site access letter'), true);
   });
 });
+
+describe('review findings', () => {
+  it('an impossible calendar date is a plain 400, not a server error', async () => {
+    const r = await mine.post('/api/exchanges/request', { contractorId, contactName: 'Sipho', email: 'dates@docreq.example', items: [{ requirementId: coidReqId }] });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const p = new Portal(await link('dates@docreq.example')); await p.signIn('dates@docreq.example');
+    const it = (await p.get('/api/x/exchange')).body.items[0];
+    for (const d of ['2040-02-31', '2040-13-45']) {
+      const x = await p.post(`/api/x/items/${it.id}/expiry`, { expiryDate: d });
+      assert.equal(x.status, 400, d);
+    }
+  });
+
+  it('a decision on an older return is refused when something newer was filed, instead of being recorded as applied', async () => {
+    const mk = async (email: string) => {
+      const r = await mine.post('/api/exchanges/request', { contractorId, contactName: 'S', email, force: true, items: [{ requirementId: reqId }] });
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+      const p = new Portal(await link(email)); await p.signIn(email);
+      const it = (await p.get('/api/x/exchange')).body.items[0];
+      assert.equal((await p.upload(it.id, email + '.pdf', Buffer.concat([PDF, Buffer.from('%' + email + '\n')]))).status, 200);
+      assert.equal((await p.post('/api/x/submit', {})).status, 200);
+      return r.body.id as string;
+    };
+    const older = await mk('older@docreq.example');
+    await mk('newer@docreq.example');
+    const item = (await mine.get(`/api/exchanges/${older}`)).body.items[0];
+    const res = await mine.post(`/api/exchanges/${older}/review`, { decisions: [{ itemId: item.id, decision: 'approve' }] });
+    assert.equal(res.status, 409);
+    assert.match(res.body.message, /newer version/);
+    assert.equal((await mine.get(`/api/exchanges/${older}`)).body.items[0].status, 'submitted', 'nothing was recorded as approved');
+  });
+});

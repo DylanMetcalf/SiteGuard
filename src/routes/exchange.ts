@@ -121,7 +121,7 @@ async function resolveItem(db: Db, ctx: OrgCtx, it: RichItem): Promise<ResolvedI
     if (s.personName && !out.personName) out.personName = s.personName;
     if (s.workerId && !out.workerId) out.workerId = s.workerId;
     // A signature on a requirement-linked document is a record of that document only; it never answers the requirement.
-    if (src.kind === 'requirement') out.requirementId = null;
+    out.requirementId = null;
   } else if (it.source && it.kind === 'replacement') {
     out.source = await resolveSource(db, ctx, it.source);
   }
@@ -726,8 +726,8 @@ export default async function exchangeRoutes(app: FastifyInstance) {
       items: items.map((i) => ({
         id: i.id, documentType: i.document_type, personName: i.person_name, note: i.note, status: i.status,
         reviewNote: i.review_note, reviewedByName: i.reviewed_by_name, reviewedAt: iso(i.reviewed_at), downloadedAt: iso(i.downloaded_at),
-        kind: i.kind, kindLabel: KIND_LABEL[i.kind as ItemKind], reason: i.reason, dueDate: i.due, requirementId: i.requirement_id, requirementName: i.requirement_name, expiryDate: i.expiry,
-        source: i.source_kind ? {
+        kind: i.kind, kindLabel: KIND_LABEL[i.kind as ItemKind], reason: i.reason, dueDate: i.due, requirementId: mine ? i.requirement_id : null, requirementName: mine ? i.requirement_name : null, expiryDate: i.expiry,
+        source: mine && i.source_kind ? {
           kind: i.source_kind, id: i.source_id, label: i.source_label, version: i.source_version,
           // A signed copy answers the version it was sent with. If the document has been revised since, say so.
           revised: i.source_now ? (String(i.source_now).split('|')[1] !== (i.source_file_id ?? '') || (i.source_kind !== 'certificate' && String(i.source_now).split('|')[0] !== i.source_version)) : false,
@@ -763,7 +763,9 @@ export default async function exchangeRoutes(app: FastifyInstance) {
           [item.id, d.decision === 'approve' ? 'approved' : 'rejected', d.note, ctx.user.name],
         );
         const label = `${item.document_type}${item.person_name ? ' — ' + item.person_name : ''}`;
-        if (item.kind !== 'signature') await decideRequirement(db, x, item, d.decision, d.note, { id: ctx.user.id, name: ctx.user.name, role: actorRole(ctx) });
+        if (item.kind !== 'signature' && !(await decideRequirement(db, x, item, d.decision, d.note, { id: ctx.user.id, name: ctx.user.name, role: actorRole(ctx) }))) {
+          throw conflict(`A newer version of “${item.document_type}” has been filed on the requirement since this one was returned. Open the requirement to review the current version.`);
+        }
         const accepted = item.kind === 'signature' ? 'Signed copy accepted' : 'Exchange document approved';
         const returned = item.kind === 'signature' ? 'Signed copy sent back' : 'Exchange document rejected';
         const extra = item.kind === 'signature' && d.decision === 'approve' ? ' (a returned copy: COMVERA does not verify signatures)' : '';
