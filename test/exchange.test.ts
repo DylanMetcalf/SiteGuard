@@ -229,7 +229,7 @@ describe('mine → contractor request (no account needed)', () => {
     assert.ok(done.body.exchange.completedAt);
     assert.equal((await portal.upload(items[0].id)).status, 409);
     const actions = done.body.history.map((h: any) => h.action);
-    for (const a of ['Exchange request created', 'Exchange email sent', 'Exchange opened', 'Verification completed', 'Exchange document uploaded',
+    for (const a of ['Exchange request created', 'Exchange email queued', 'Exchange opened', 'Verification completed', 'Exchange document uploaded',
       'Exchange document replaced', 'Exchange submitted', 'Exchange document rejected', 'Exchange document approved', 'Exchange completed']) {
       assert.ok(actions.includes(a), `audit has ${a}`);
     }

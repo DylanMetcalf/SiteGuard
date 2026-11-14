@@ -7,7 +7,7 @@
 
 import {
   S, ICONS, on, actions, openSheet, closeSheet, sheetHead, computeReadiness, effectiveStatus,
-  isContractor, isOrgAdmin, readOnly, myContractorId, libraryReqId, LIBRARY_TYPES,
+  isContractor, isOrgAdmin, readOnly, myContractorId, libraryReqId, LIBRARY_TYPES, restrictionNotice, org,
 } from './core.js';
 import { openGuide } from './guide.js';
 
@@ -18,6 +18,22 @@ const files = ()=>Object.values(S.state.sites).filter(s=>s.status!=='invited' &&
 export function buildButton(cls){
   if(!isContractor() || readOnly()) return '';
   return '<button class="btn primary '+(cls||'')+'" data-action="sfb-start">'+ICONS.passport+' Create safety file</button>';
+}
+
+/**
+ * The Safety files page's main call to action. It never hides: when you cannot start a file it says why
+ * (read-only, not an admin) and what to do about it.
+ */
+export function createFileBlock(hasFiles){
+  if(!isContractor()) return '';
+  if(readOnly()) return restrictionNotice('lapsed', 'start a new safety file');
+  if(!isOrgAdmin()) return restrictionNotice('nonadmin', 'start a new safety file') ;
+  const ent = (org().entitlements || {});
+  const needsPlan = ent.CONTRACTOR_PROJECTS === false;
+  const actions2 = '<div class="sf-actions"><button class="btn primary" data-action="sfb-start">'+ICONS.plus+' Create safety file</button><button class="btn secondary" data-action="join-site">'+ICONS.link+' Join a site with a code</button></div>';
+  const planNote = needsPlan ? '<div class="site-card-sub" style="margin-top:8px;">A site\'s code works on your current access. Files for clients who aren\'t on COMVERA need your own plan. <button class="linkish" data-action="goto-more" data-view="billing">See plans</button></div>' : '';
+  if(hasFiles) return '<div style="margin-bottom:14px;">'+actions2.replace('sf-actions','sf-actions" style="margin-top:0')+planNote+'</div>';
+  return '<div class="next-card"><h3>Start your first safety file</h3><p>Choose a site on COMVERA (the site gives you a join code and its requirements load straight in) or a client who isn\'t on COMVERA. Your company documents are reused, so nothing is uploaded twice.</p>'+actions2+planNote+'</div>';
 }
 
 on('sfb-start', ()=>{

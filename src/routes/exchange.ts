@@ -12,15 +12,16 @@ import { z } from 'zod';
 import type { Db } from '../db/pool.js';
 import { many, one, pool, withTx } from '../db/pool.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
-import { canAdminOrg, isUuid, loadSite, requireOrg, requireWritable, type OrgCtx } from '../lib/authz.js';
+import { actorRole, canAdminOrg, isUuid, loadSite, requireOrg, requireWritable, type OrgCtx } from '../lib/authz.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { newToken, sha256 } from '../lib/security.js';
 import { queueEmail } from '../lib/email.js';
+import { effectiveStatus } from '../lib/readiness.js';
 import { track } from '../lib/events.js';
 import { LIBRARY_TYPES } from '../lib/readiness.js';
 import {
-  accessState, exchangeAudit, refLabel, refreshRequestStatus, sendExchangeEmail, type ExchangeRow,
+  accessState, decideRequirement, emailState, exchangeAudit, KIND_LABEL, refLabel, refreshRequestStatus, sendExchangeEmail, type ExchangeRow, type ItemKind,
 } from '../lib/exchange.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
@@ -48,6 +49,103 @@ const requestItem = z.object({
   workerId: z.string().uuid().optional(),
   note: z.string().trim().max(500).default(''),
 });
+
+/** The Request document form: one item with its kind, reason and (where it applies) the document it is about. */
+const richItem = z.object({
+  kind: z.enum(['document', 'replacement', 'signature', 'other']).default('document'),
+  documentType: z.string().trim().max(200).default(''),
+  personName: z.string().trim().max(200).default(''),
+  workerId: z.string().uuid().optional(),
+  note: z.string().trim().max(500).default(''),
+  reason: z.string().trim().max(1000).default(''),
+  dueDate: dateString.optional().or(z.literal('').transform(() => undefined)),
+  requirementId: z.string().uuid().optional().or(z.literal('').transform(() => undefined)),
+  source: z.object({ kind: z.enum(['requirement', 'org_document', 'certificate']), id: z.string().uuid() }).optional(),
+});
+type RichItem = z.infer<typeof richItem>;
+
+interface SourceInfo { kind: 'requirement' | 'org_document' | 'certificate'; id: string; label: string; version: string; fileId: string; sha256: string; personName?: string; workerId?: string }
+
+/** The document a request is about, found through the caller's own tenant (never by a client-supplied file id). */
+async function resolveSource(db: Db, ctx: OrgCtx, src: { kind: string; id: string }): Promise<SourceInfo> {
+  const file = async (id: string | null) => {
+    if (!id) throw badRequest('There is no document on file to use yet. Upload it first.', 'no_source_file');
+    const f = await one<{ sha256: string }>(db, 'select sha256 from files where id = $1', [id]);
+    return f?.sha256 ?? '';
+  };
+  if (src.kind === 'requirement') {
+    const r = await one<{ id: string; name: string; site_id: string }>(db, 'select id, name, site_id from requirements where id = $1', [src.id]);
+    if (!r) throw notFound();
+    await loadSite(db, ctx, r.site_id);
+    const d = await one<{ version: string | null; current_file_id: string | null }>(db, 'select version, current_file_id from documents where requirement_id = $1', [r.id]);
+    return { kind: 'requirement', id: r.id, label: r.name, version: d?.version ?? '', fileId: d?.current_file_id ?? '', sha256: await file(d?.current_file_id ?? null) };
+  }
+  if (src.kind === 'org_document') {
+    const d = await one<{ id: string; name: string; version: number; current_file_id: string | null; visibility: string; archived_at: Date | null; subject: string }>(
+      db, 'select id, name, version, current_file_id, visibility, archived_at, subject from org_documents where id = $1 and org_id = $2', [src.id, ctx.org.id]);
+    if (!d || d.archived_at) throw notFound();
+    if (d.visibility === 'restricted' && !canAdminOrg(ctx)) throw forbidden('That document is restricted to owners and admins.');
+    return { kind: 'org_document', id: d.id, label: d.name, version: String(d.version), fileId: d.current_file_id ?? '', sha256: await file(d.current_file_id) };
+  }
+  const c = await one<{ id: string; name: string; file_id: string | null; worker_id: string; full_name: string; issued_on: string | null }>(
+    db,
+    `select wc.id, wc.name, wc.file_id, wc.worker_id, w.full_name, to_char(wc.issued_on, 'YYYY-MM-DD') as issued_on from worker_certificates wc join workers w on w.id = wc.worker_id
+      where wc.id = $1 and (w.org_id = $2 or exists (select 1 from site_workers sw join sites s on s.id = sw.site_id where sw.worker_id = w.id and s.org_id = $2))`,
+    [src.id, ctx.org.id]);
+  if (!c) throw notFound();
+  return { kind: 'certificate', id: c.id, label: c.name, version: c.issued_on ? `issued ${c.issued_on}` : '', fileId: c.file_id ?? '', sha256: await file(c.file_id), personName: c.full_name, workerId: c.worker_id };
+}
+
+interface ResolvedItem extends NewItem { siteId: string | null; contractorId: string | null }
+
+async function resolveItem(db: Db, ctx: OrgCtx, it: RichItem): Promise<ResolvedItem> {
+  await checkWorker(db, ctx, it.workerId);
+  const out: ResolvedItem = {
+    kind: it.kind, documentType: it.documentType, personName: it.personName, workerId: it.workerId ?? null, note: it.note, reason: it.reason,
+    dueDate: it.dueDate ?? null, requirementId: null, source: null, siteId: null, contractorId: null,
+  };
+  if (it.requirementId) {
+    const r = await one<{ id: string; name: string; site_id: string }>(db, 'select id, name, site_id from requirements where id = $1', [it.requirementId]);
+    if (!r) throw notFound();
+    const acc = await loadSite(db, ctx, r.site_id); // 404 outside the caller's tenant
+    if (acc.side !== 'host' && it.kind !== 'signature') throw forbidden('Only the site can ask for a replacement of its requirement.');
+    out.requirementId = r.id; out.siteId = r.site_id; out.contractorId = acc.site.contractor_id;
+    out.documentType ||= r.name;
+  }
+  if (it.kind === 'signature') {
+    const src = it.source ?? (it.requirementId ? { kind: 'requirement' as const, id: it.requirementId } : null);
+    if (!src) throw badRequest('Choose the document that needs signing.');
+    const s = await resolveSource(db, ctx, src);
+    out.source = s;
+    out.documentType ||= s.label;
+    if (s.personName && !out.personName) out.personName = s.personName;
+    if (s.workerId && !out.workerId) out.workerId = s.workerId;
+    // A signature on a requirement-linked document is a record of that document only; it never answers the requirement.
+    if (src.kind === 'requirement') out.requirementId = null;
+  } else if (it.source && it.kind === 'replacement') {
+    out.source = await resolveSource(db, ctx, it.source);
+  }
+  if (!out.documentType) throw badRequest(it.kind === 'other' ? 'Enter the name of the document you need.' : 'Say which document you need.');
+  if (it.kind === 'replacement' && (out.reason ?? '').length < 3) throw badRequest('Say why a replacement is needed (for example: expired, unreadable, incomplete), so they know what to fix.', 'reason_required');
+  if (out.dueDate && out.dueDate < new Date().toISOString().slice(0, 10)) throw badRequest('The due date has already passed.', 'bad_due_date');
+  return out;
+}
+
+/** An open request for the same thing from the same people: reminding is better than asking twice. */
+async function findOpenDuplicate(db: Db, ctx: OrgCtx, email: string, it: ResolvedItem) {
+  await db.query('select pg_advisory_xact_lock(hashtext($1))', [`${ctx.org.id}|${email}|${it.kind}|${it.requirementId ?? it.source?.id ?? it.documentType.toLowerCase()}`]);
+  return one<{ id: string; ref: number; created_at: Date; status: string }>(
+    db,
+    `select x.id, x.ref, x.created_at, i.status from exchange_items i join exchanges x on x.id = i.exchange_id
+      where x.sender_org_id = $1 and lower(x.recipient_email) = lower($2) and x.direction = 'request' and x.revoked_at is null
+        and i.status in ('requested', 'submitted', 'rejected') and i.kind = $3 and lower(i.person_name) = lower($7)
+        and (($4::uuid is not null and i.requirement_id = $4)
+          or ($4::uuid is null and $5::uuid is not null and i.source_id = $5)
+          or ($4::uuid is null and $5::uuid is null and lower(i.document_type) = lower($6)))
+      order by x.created_at desc limit 1`,
+    [ctx.org.id, email, it.kind, it.requirementId, it.source?.id ?? null, it.documentType, it.personName],
+  );
+}
 
 /** Company names that differ only by "(Pty) Ltd", punctuation or case count as the same. */
 export function sameCompany(a: string, b: string): boolean {
@@ -88,7 +186,10 @@ async function upsertContact(db: Db, ctx: OrgCtx, relationshipId: string, c: { n
   ))!.id;
 }
 
-interface NewItem { documentType: string; personName: string; workerId?: string | null; note?: string; fileId?: string | null }
+interface NewItem {
+  documentType: string; personName: string; workerId?: string | null; note?: string; fileId?: string | null;
+  kind?: ItemKind; reason?: string; dueDate?: string | null; requirementId?: string | null; source?: SourceInfo | null;
+}
 
 /** Creates one exchange with a fresh link, emails it and records it. Returns the new row. */
 async function createExchange(
@@ -110,14 +211,19 @@ async function createExchange(
   ))!;
   for (const [i, it] of e.items.entries()) {
     await db.query(
-      `insert into exchange_items (exchange_id, position, document_type, person_name, worker_id, note, status, file_id) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [x.id, i, it.documentType, it.personName, it.workerId ?? null, it.note ?? '', e.direction === 'request' ? 'requested' : 'shared', it.fileId ?? null],
+      `insert into exchange_items (exchange_id, position, document_type, person_name, worker_id, note, status, file_id, kind, reason, due_date, requirement_id,
+                                   source_kind, source_id, source_label, source_version, source_file_id, source_sha256)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+      [x.id, i, it.documentType, it.personName, it.workerId ?? null, it.note ?? '', e.direction === 'request' ? 'requested' : 'shared', it.fileId ?? null,
+        it.kind ?? 'document', it.reason ?? '', it.dueDate ?? null, it.requirementId ?? null,
+        it.source?.kind ?? null, it.source?.id ?? null, it.source?.label ?? '', it.source?.version ?? '', it.source?.fileId || null, it.source?.sha256 ?? ''],
     );
   }
   const what = `${e.items.length} document${e.items.length === 1 ? '' : 's'} — ${e.recipient.email}`;
   await exchangeAudit(db, x, staff(ctx), e.direction === 'request' ? 'Exchange request created' : 'Secure share created', what);
-  await sendExchangeEmail(db, x, ctx.org.name, token);
-  await exchangeAudit(db, x, staff(ctx), 'Exchange email sent', e.recipient.email);
+  const outboxId = await sendExchangeEmail(db, x, ctx.org.name, token);
+  x.email_outbox_id = outboxId;
+  await exchangeAudit(db, x, staff(ctx), 'Exchange email queued', e.recipient.email);
   await track(db, ctx.org.id, e.direction === 'request' ? 'exchange_request_sent' : 'exchange_share_sent');
   return x;
 }
@@ -166,12 +272,15 @@ function summary(x: any) {
     deadline: x.deadline, createdAt: iso(x.created_at), accessExpiresAt: iso(x.access_expires_at), revokedAt: iso(x.revoked_at),
     openedAt: iso(x.opened_at), verifiedAt: iso(x.verified_at), submittedAt: iso(x.submitted_at), completedAt: iso(x.completed_at),
     claimed: !!x.recipient_org_id, createdByName: x.created_by_name, allowDownload: x.allow_download,
+    firstDoc: x.first_doc ?? null, kinds: x.kinds ?? [],
     counts: { items: x.n_items ?? 0, submitted: x.n_submitted ?? 0, approved: x.n_approved ?? 0, rejected: x.n_rejected ?? 0, resubmitted: x.n_resubmitted ?? 0 },
   };
 }
 
 const SUMMARY_SQL = `
   select x.*, to_char(x.deadline, 'YYYY-MM-DD') as deadline, o.name as sender_name, s.name as site_name,
+         (select i.document_type from exchange_items i where i.exchange_id = x.id order by position limit 1) as first_doc,
+         (select array_agg(distinct i.kind) from exchange_items i where i.exchange_id = x.id) as kinds,
          (select count(*)::int from exchange_items i where i.exchange_id = x.id) as n_items,
          (select count(*)::int from exchange_items i where i.exchange_id = x.id and i.status = 'submitted') as n_submitted,
          (select count(*)::int from exchange_items i where i.exchange_id = x.id and i.status = 'approved') as n_approved,
@@ -227,7 +336,10 @@ export default async function exchangeRoutes(app: FastifyInstance) {
     return { contractor: { id: c.id, name: c.name }, contacts };
   });
 
-  /** Request documents from a company (usually a contractor in the directory). */
+  /**
+   * Request a document: a replacement, a signed copy, a general request or something else. One workflow, one secure link.
+   * Returns { duplicate } instead of creating a second open request for the same thing, unless `force` is set.
+   */
   app.post('/api/exchanges/request', rl(30), async (req) => {
     const ctx = requireOrg(req.ctx);
     requireSender(ctx);
@@ -236,25 +348,125 @@ export default async function exchangeRoutes(app: FastifyInstance) {
       contractorId: z.string().optional(),
       ...recipientSchema,
       siteId: z.string().optional(),
-      deadline: dateString.optional(),
+      deadline: dateString.optional().or(z.literal('').transform(() => undefined)),
       message: z.string().trim().max(2000).default(''),
-      items: z.array(requestItem).min(1, 'Add at least one document.').max(50),
+      force: z.boolean().default(false),
+      items: z.array(richItem).min(1, 'Add at least one document.').max(50),
     }).parse(req.body);
     return withTx(async (db) => {
+      const resolved: ResolvedItem[] = [];
+      for (const it of b.items) resolved.push(await resolveItem(db, ctx, it));
+      let siteId = b.siteId ? (await loadSite(db, ctx, b.siteId)).site.id : null;
+      let contractorId = b.contractorId || null;
+      for (const r of resolved) {
+        if (r.siteId) {
+          if (siteId && siteId !== r.siteId) throw badRequest('Those documents belong to different sites. Send them as separate requests.');
+          siteId = r.siteId;
+        }
+        if (r.contractorId) {
+          if (contractorId && contractorId !== r.contractorId) throw badRequest('Those documents belong to different contractors. Send them as separate requests.');
+          contractorId = r.contractorId;
+        }
+      }
       let company = b.company;
-      if (b.contractorId) company = (await contractorFor(db, ctx, b.contractorId)).name;
-      if (!company) throw badRequest('Enter the company name.');
-      const siteId = b.siteId ? (await loadSite(db, ctx, b.siteId)).site.id : null;
-      for (const it of b.items) await checkWorker(db, ctx, it.workerId);
-      const relationshipId = await upsertRelationship(db, ctx, { name: company, contractorId: b.contractorId, kind: ctx.org.kind === 'host' ? 'contractor' : 'other' });
+      if (contractorId) company = (await contractorFor(db, ctx, contractorId)).name;
+      if (!company) company = resolved.find((r) => r.personName)?.personName || b.contactName || 'Recipient';
+      if (!b.force) {
+        for (const r of resolved) {
+          const dup = await findOpenDuplicate(db, ctx, b.email, r);
+          if (dup) return { duplicate: { id: dup.id, ref: refLabel(dup.ref), status: dup.status, createdAt: iso(dup.created_at) } };
+        }
+      }
+      const relationshipId = await upsertRelationship(db, ctx, { name: company, contractorId, kind: contractorId ? 'contractor' : 'other' });
       const contactId = await upsertContact(db, ctx, relationshipId, { name: b.contactName, email: b.email, phone: b.phone, role: b.role });
       const x = await createExchange(db, ctx, {
         direction: 'request', relationshipId, contactId, recipient: { name: b.contactName, email: b.email, company },
-        siteId, message: b.message, deadline: b.deadline ?? null, allowDownload: true, accessExpiresAt: requestExpiry(b.deadline ?? null), items: b.items,
+        siteId, message: b.message, deadline: b.deadline ?? null, allowDownload: true, accessExpiresAt: requestExpiry(b.deadline ?? resolved.find((r) => r.dueDate)?.dueDate ?? null), items: resolved,
       });
       await publishChange(db, [ctx.org.id]);
-      return { id: x.id, ref: refLabel(x.ref) };
+      return { id: x.id, ref: refLabel(x.ref), email: await emailState(db, x) };
     });
+  });
+
+  /**
+   * What the Request document form needs to open pre-filled from a document: the document, site, contractor, the best
+   * contact on file, a suggested kind and reason, and which kinds the caller may actually use here.
+   */
+  app.get('/api/exchanges/prefill', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireSender(ctx);
+    const q = z.object({ requirementId: z.string().uuid().optional(), sourceKind: z.enum(['org_document', 'certificate']).optional(), sourceId: z.string().uuid().optional() }).parse(req.query);
+    if (!q.requirementId && !(q.sourceKind && q.sourceId)) throw badRequest('Say which document.');
+    if (q.requirementId) {
+      const r = await one<{ id: string; name: string; site_id: string }>(pool, 'select id, name, site_id from requirements where id = $1', [q.requirementId]);
+      if (!r) throw notFound();
+      const { site, side } = await loadSite(pool, ctx, r.site_id);
+      const d = await one<{ status: string; version: string | null; expiry_date: string | null; current_file_id: string | null }>(
+        pool, `select status, version, to_char(expiry_date, 'YYYY-MM-DD') as expiry_date, current_file_id from documents where requirement_id = $1`, [r.id]);
+      const st = effectiveStatus(d ? { status: d.status, expiry_date: d.expiry_date } : null);
+      const { contact } = side === 'host' ? await defaultContact(pool, ctx, site.contractor_id) : { contact: null };
+      const reason = st === 'expired' ? `Expired${d?.expiry_date ? ' on ' + d.expiry_date : ''}` : st === 'expiring' ? `Expires${d?.expiry_date ? ' on ' + d.expiry_date : ' soon'}` : '';
+      return {
+        requirementId: r.id, documentType: r.name, siteId: site.id, siteName: site.name, contractor: { id: site.contractor_id, name: site.contractor_name },
+        contact, source: { kind: 'requirement', id: r.id, label: r.name, version: d?.version ?? '', hasFile: !!d?.current_file_id, status: st, expiryDate: d?.expiry_date ?? null },
+        allowed: { replacement: side === 'host', signature: !!d?.current_file_id, document: true, other: true },
+        suggestion: side === 'host' && (st === 'expired' || st === 'expiring') ? 'replacement' : null, suggestedReason: reason,
+      };
+    }
+    const src = await resolveSource(pool, ctx, { kind: q.sourceKind!, id: q.sourceId! });
+    return {
+      requirementId: null, documentType: src.label, siteId: null, siteName: null, contractor: null, contact: null,
+      source: { kind: src.kind, id: src.id, label: src.label, version: src.version, hasFile: !!src.fileId, status: null, expiryDate: null },
+      person: src.personName ? { id: src.workerId, name: src.personName } : null,
+      allowed: { replacement: false, signature: !!src.fileId, document: true, other: true }, suggestion: 'signature', suggestedReason: '',
+    };
+  });
+
+  /** Documents that can be sent for signature: the caller's own files, company uploads and worker certificates, by search. */
+  app.get('/api/exchanges/sources', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    requireSender(ctx);
+    const { q } = z.object({ q: z.string().trim().max(100).default('') }).parse(req.query);
+    const admin = canAdminOrg(ctx);
+    const rows = await many(
+      pool,
+      `select 'org_document' as kind, d.id, d.name, '' as person, '' as site, d.version::text as version
+         from org_documents d where d.org_id = $1 and d.archived_at is null and d.current_file_id is not null and ($2 or d.visibility <> 'restricted')
+       union all
+       select 'certificate', wc.id, wc.name, w.full_name, '', ''
+         from worker_certificates wc join workers w on w.id = wc.worker_id where w.org_id = $1 and wc.file_id is not null
+       union all
+       select 'requirement', r.id, r.name, '', s.name, coalesce(d.version, '')
+         from documents d join requirements r on r.id = d.requirement_id join sites s on s.id = r.site_id join contractors c on c.id = s.contractor_id
+        where d.current_file_id is not null and (s.org_id = $1 or (c.linked_org_id = $1 and s.status not in ('invited', 'declined')))`,
+      [ctx.org.id, admin],
+    );
+    const needle = q.toLowerCase();
+    return {
+      sources: rows.filter((r) => !needle || [r.name, r.person, r.site].some((v) => String(v ?? '').toLowerCase().includes(needle))).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 100)
+        .map((r) => ({ kind: r.kind, id: r.id, name: r.name, person: r.person, site: r.site, version: r.version })),
+    };
+  });
+
+  /** Open requests in one context (a document, contractor, worker, site or source document), for showing "already requested". */
+  app.get('/api/exchanges/outstanding', async (req) => {
+    const ctx = requireOrg(req.ctx);
+    const q = z.object({
+      requirementId: z.string().uuid().optional(), contractorId: z.string().uuid().optional(), workerId: z.string().uuid().optional(),
+      siteId: z.string().uuid().optional(), sourceId: z.string().uuid().optional(),
+    }).parse(req.query);
+    if (!Object.values(q).some(Boolean)) throw badRequest('Say which context.');
+    const rows = await many(
+      pool,
+      `select x.id, x.ref, x.recipient_email, x.recipient_name, x.revoked_at, x.access_expires_at, x.created_at, i.kind, i.document_type, i.person_name, i.status, to_char(coalesce(i.due_date, x.deadline), 'YYYY-MM-DD') as due
+         from exchange_items i join exchanges x on x.id = i.exchange_id
+        where x.sender_org_id = $1 and x.direction = 'request' and x.revoked_at is null and i.status in ('requested', 'submitted', 'rejected')
+          and ($2::uuid is null or i.requirement_id = $2) and ($3::uuid is null or x.relationship_id in (select id from relationships where contractor_id = $3 and org_id = $1))
+          and ($4::uuid is null or i.worker_id = $4) and ($5::uuid is null or x.site_id = $5) and ($6::uuid is null or i.source_id = $6)
+        order by x.created_at desc limit 50`,
+      [ctx.org.id, q.requirementId ?? null, q.contractorId ?? null, q.workerId ?? null, q.siteId ?? null, q.sourceId ?? null],
+    );
+    return { open: rows.map((r) => ({ id: r.id, ref: refLabel(r.ref), kind: r.kind, kindLabel: KIND_LABEL[r.kind as ItemKind], documentType: r.document_type, personName: r.person_name, status: r.status, recipientEmail: r.recipient_email, dueDate: r.due, createdAt: iso(r.created_at), access: accessState(r) })) };
   });
 
   /** Your own documents that can be shared: current files your organisation holds. */
@@ -487,7 +699,18 @@ export default async function exchangeRoutes(app: FastifyInstance) {
     const ctx = requireOrg(req.ctx);
     const { x, mine } = await loadExchange(pool, ctx, (req.params as { id: string }).id);
     const row = (await one(pool, `${SUMMARY_SQL} where x.id = $1`, [x.id]))!;
-    const items = await many(pool, `select i.*, f.filename from exchange_items i left join files f on f.id = i.file_id where i.exchange_id = $1 order by i.position`, [x.id]);
+    const items = await many(
+      pool,
+      `select i.*, to_char(i.due_date, 'YYYY-MM-DD') as due, to_char(i.expiry_date, 'YYYY-MM-DD') as expiry, f.filename,
+              case i.source_kind
+                when 'requirement' then (select d.version || '|' || coalesce(d.current_file_id::text, '') from documents d where d.requirement_id = i.source_id)
+                when 'org_document' then (select d.version::text || '|' || coalesce(d.current_file_id::text, '') from org_documents d where d.id = i.source_id)
+                when 'certificate' then (select '|' || coalesce(c.file_id::text, '') from worker_certificates c where c.id = i.source_id)
+              end as source_now,
+              (select r.name from requirements r where r.id = i.requirement_id) as requirement_name
+         from exchange_items i left join files f on f.id = i.file_id where i.exchange_id = $1 order by i.position`,
+      [x.id],
+    );
     const subs = mine
       ? await many(pool, `select u.item_id, u.version, u.file_id, u.note, u.submitted_at, f.filename, f.size_bytes from exchange_submissions u
                             join files f on f.id = u.file_id join exchange_items i on i.id = u.item_id
@@ -499,10 +722,17 @@ export default async function exchangeRoutes(app: FastifyInstance) {
       : [];
     const contact = mine && x.contact_id ? await one(pool, 'select name, email, phone, role from contacts where id = $1', [x.contact_id]) : null;
     return {
-      exchange: { ...summary(row), message: x.message, recipientResponse: x.recipient_response, mine, contact },
+      exchange: { ...summary(row), message: x.message, recipientResponse: x.recipient_response, mine, contact, email: mine ? await emailState(pool, x) : null, remindedAt: iso(x.reminded_at), remindCount: x.remind_count },
       items: items.map((i) => ({
         id: i.id, documentType: i.document_type, personName: i.person_name, note: i.note, status: i.status,
         reviewNote: i.review_note, reviewedByName: i.reviewed_by_name, reviewedAt: iso(i.reviewed_at), downloadedAt: iso(i.downloaded_at),
+        kind: i.kind, kindLabel: KIND_LABEL[i.kind as ItemKind], reason: i.reason, dueDate: i.due, requirementId: i.requirement_id, requirementName: i.requirement_name, expiryDate: i.expiry,
+        source: i.source_kind ? {
+          kind: i.source_kind, id: i.source_id, label: i.source_label, version: i.source_version,
+          // A signed copy answers the version it was sent with. If the document has been revised since, say so.
+          revised: i.source_now ? (String(i.source_now).split('|')[1] !== (i.source_file_id ?? '') || (i.source_kind !== 'certificate' && String(i.source_now).split('|')[0] !== i.source_version)) : false,
+          currentVersion: i.source_now ? String(i.source_now).split('|')[0] : '',
+        } : null,
         // The sender sees its own file; a claiming recipient only sees shared files, and only while access lasts.
         fileId: mine ? i.file_id : null, filename: mine || i.status === 'shared' ? i.filename : null,
         submissions: subs.filter((s) => s.item_id === i.id).map((s) => ({ version: s.version, fileId: s.file_id, filename: s.filename, size: Number(s.size_bytes), note: s.note, submittedAt: iso(s.submitted_at) })),
@@ -533,7 +763,11 @@ export default async function exchangeRoutes(app: FastifyInstance) {
           [item.id, d.decision === 'approve' ? 'approved' : 'rejected', d.note, ctx.user.name],
         );
         const label = `${item.document_type}${item.person_name ? ' — ' + item.person_name : ''}`;
-        await exchangeAudit(db, x, staff(ctx), d.decision === 'approve' ? 'Exchange document approved' : 'Exchange document rejected', d.note ? `${label}: ${d.note}` : label);
+        if (item.kind !== 'signature') await decideRequirement(db, x, item, d.decision, d.note, { id: ctx.user.id, name: ctx.user.name, role: actorRole(ctx) });
+        const accepted = item.kind === 'signature' ? 'Signed copy accepted' : 'Exchange document approved';
+        const returned = item.kind === 'signature' ? 'Signed copy sent back' : 'Exchange document rejected';
+        const extra = item.kind === 'signature' && d.decision === 'approve' ? ' (a returned copy: COMVERA does not verify signatures)' : '';
+        await exchangeAudit(db, x, staff(ctx), d.decision === 'approve' ? accepted : returned, (d.note ? `${label}: ${d.note}` : label) + extra);
         if (d.decision === 'reject') rejected.push({ name: label, note: d.note });
       }
       const status = await refreshRequestStatus(db, x.id);
@@ -550,7 +784,7 @@ export default async function exchangeRoutes(app: FastifyInstance) {
           reminder: `${ctx.org.name} reviewed what you sent. ${rejected.length === 1 ? 'One document needs' : `${rejected.length} documents need`} replacing:`,
           extra: rejected.map((r) => `↺ ${r.name} — ${r.note}`),
         });
-        await exchangeAudit(db, x, staff(ctx), 'Exchange email sent', `${x.recipient_email} (replacements requested)`);
+        await exchangeAudit(db, x, staff(ctx), 'Exchange email queued', `${x.recipient_email} (replacements requested)`);
       }
       if (status === 'approved' && x.status !== 'approved') {
         await exchangeAudit(db, x, staff(ctx), 'Exchange completed');
@@ -591,6 +825,7 @@ export default async function exchangeRoutes(app: FastifyInstance) {
       const { x } = await loadExchange(db, ctx, (req.params as { id: string }).id, { sentOnly: true, lock: true });
       if (x.revoked_at) throw conflict('This exchange was revoked. Start a new one instead.');
       if (x.direction === 'request' && x.status === 'approved') throw conflict('Everything in this request has been accepted already.');
+      if (x.reminded_at && Date.now() - new Date(x.reminded_at).getTime() < 3_600_000) throw conflict('A reminder went out less than an hour ago. Give them a little time before sending another.');
       const until = x.direction === 'share'
         ? new Date(Date.now() + (days ?? 14) * day)
         : new Date(Math.max(new Date(x.access_expires_at).getTime(), Date.now() + (days ?? 30) * day));
@@ -599,10 +834,11 @@ export default async function exchangeRoutes(app: FastifyInstance) {
         db, `update exchanges set link_token_hash = $2, access_expires_at = $3 where id = $1 returning *, to_char(deadline, 'YYYY-MM-DD') as deadline`,
         [x.id, sha256(token), until],
       ))!;
-      await sendExchangeEmail(db, updated, ctx.org.name, token, { reminder: 'A reminder: this is still open.' });
-      await exchangeAudit(db, x, staff(ctx), 'Exchange email sent', `${x.recipient_email} (reminder)`);
+      const outboxId = await sendExchangeEmail(db, updated, ctx.org.name, token, { reminder: 'A reminder: this is still open.' });
+      await db.query('update exchanges set reminded_at = now(), remind_count = remind_count + 1 where id = $1', [x.id]);
+      await exchangeAudit(db, x, staff(ctx), 'Exchange reminder queued', x.recipient_email);
       await publishChange(db, [ctx.org.id]);
-      return { ok: true, accessExpiresAt: until.toISOString() };
+      return { ok: true, accessExpiresAt: until.toISOString(), email: await emailState(db, { email_outbox_id: outboxId }) };
     });
   });
 

@@ -67,7 +67,11 @@ export async function handleDeepLink(){
   }
   const billing = url.searchParams.get('billing');
   if(billing){
-    S.pendingToast = billing==='success' ? 'Thanks — your subscription is being activated.' : 'Checkout cancelled — nothing was charged.';
+    // A redirect is not proof of payment: the Plans & billing page asks the server and only then says it is done.
+    S.billingReturn = ['success','pending'].includes(billing) ? 'success' : billing==='failed' ? 'failed' : 'cancelled';
+    S.billingReturnLoaded = false;
+    S.nav = 'more'; S.moreView = 'billing';
+    S.pendingToast = S.billingReturn==='success' ? 'Checking your payment with your payment provider…' : S.billingReturn==='failed' ? 'Your payment was not accepted.' : 'Checkout cancelled — nothing was charged.';
     history.replaceState(null, '', '/');
   }
   return false;

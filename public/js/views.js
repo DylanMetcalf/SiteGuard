@@ -4,18 +4,19 @@
 import { renderClients, clientsWidget, managedBanner } from './consultant.js';
 import { api } from './api.js';
 import {
-  S, ICONS, SOURCE_LABEL, STATUS_LABEL, CERT_KINDS, LIBRARY_TYPES,
+  S, ICONS, restrictionNotice, SOURCE_LABEL, STATUS_LABEL, CERT_KINDS, LIBRARY_TYPES,
   org, role, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId, isDemoMode,
   computeReadiness, siteSubmissionStatus, statusLabelForSubmission, gauge, gaugeColor, badge, timeAgo, dateTime, initials,
   openSafetyIssues, orgOpenSafetyIssuesCount, incidentTypeInfo, permitTypeInfo, permitEffectiveStatus, effectiveStatus, certStatus,
-  libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, openSheet, sheetHead, closeSheet, searchBox, matchSearch, searching, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq, actions,
+  libraryReqId, contractorOf, daysUntil, on, act, render, reload, showToast, openSheet, sheetHead, closeSheet, searchBox, matchSearch, afterPendingBack, searching, escapeHtml, unescapeHtml, deepEscape, printHtml, findReq, actions,
 } from './core.js';
 import { computeTasks, sessionLabel } from './sheets.js';
 import { renderStudio } from './studio.js';
 import { renderOscar } from './assistant.js';
 import { docStyleBody } from './docstyle.js';
 import { renderOnboarding } from './onboarding.js';
-import { buildButton } from './safetyfiles.js';
+import { buildButton, createFileBlock } from './safetyfiles.js';
+import { renderBillingPage, paymentConfirmed } from './billingui.js';
 import { renderPlatform, invalidatePlatform } from './platform.js';
 import { renderReview } from './review.js';
 import { guideCard } from './guide.js';
@@ -38,7 +39,7 @@ export function topbar(){
     +(personas && personas.length ? '<select class="persona-select" id="personaSel" aria-label="Demo persona" title="Demo persona — switches to another sample user (their real permissions apply)">'
         // In a clean start both people share one name, so lead with the company ("the mine" / "the contractor").
         + personas.map(p=>'<option value="'+p.userId+'"'+(p.current?' selected':'')+' title="'+p.label+'">'+(org().cleanDemo ? p.label.split(' · ')[1] : p.name+' ('+p.label.split(' · ')[1]+')')+'</option>').join('')+'</select>' : '')
-    +'<button class="identity-avatar" data-action="open-profile" aria-label="Profile">'+initials(myName())+'</button></div>'
+    +'<button class="identity-avatar" data-action="open-account-menu" aria-label="Account menu: '+escapeHtml(unescapeHtml(myName()))+', '+escapeHtml(unescapeHtml(org().name))+'" aria-haspopup="dialog" title="Account menu">'+initials(myName())+'</button></div>'
     +'</div>'+banners()+'</header>';
 }
 
@@ -398,9 +399,9 @@ function renderSitesList(){
   const projectMatch = (s)=>matchSearch('sites', s.name, s.location, s.hostName);
   const projectsHtml = isContractor() ? projectsSection(projectMatch) + projectList.filter(projectMatch).map(portfolioRow).join('') : '';
   const nWp = Object.keys(S.state.workplaces||{}).length;
-  let html = '<div class="view-head"><div class="flexbetween"><h1>'+(isContractor()?'Safety files':'Sites')+'</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')
-    +(isContractor() ? '<div class="head-actions">'+(isOrgAdmin() && !readOnly() ? '<button class="btn secondary small" data-action="join-site">Join a site</button>' : '')+buildButton('small')+'</div>' : '')+'</div>'
-    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : 'One safety file per site or client, built from your company documents · '+sites.length+' on COMVERA sites · '+projectList.length+' for your own clients')+'</p></div>';
+  let html = '<div class="view-head"><div class="flexbetween"><h1>'+(isContractor()?'Safety files':'Sites')+'</h1>'+(isHost() && isOrgAdmin() && !readOnly()?'<button class="btn primary small" data-action="new-site">+ Add site</button>':'')+'</div>'
+    +'<p>'+(isHost() ? nWp+' site'+(nWp===1?'':'s')+(sites.length?' · '+sites.length+' single job'+(sites.length===1?'':'s'):'') : 'A safety file is everything a site or client needs from you, in one place. You keep one for each site or client, and it is built from your company documents.'+(sites.length+projectList.length?' <span class="muted">'+sites.length+' on COMVERA sites · '+projectList.length+' for your own clients</span>':''))+'</p></div>'
+    +(isContractor() ? createFileBlock(sites.length+projectList.length>0) : '');
   if(isHost() && nWp){
     html += ((nWp + sites.length) > 3 || searching('sites') ? searchBox('sites', 'Search sites, locations or contractors') : '')
       + '<div class="section-title">Sites contractors join with a code</div>' + (workplaceCards() || '<div class="list-empty">No site matches.</div>');
@@ -408,8 +409,8 @@ function renderSitesList(){
     html += '<div class="section-title">Single-contractor jobs</div>';
     return html + sites.filter(s=>matchSearch('sites', s.name, s.location, (contractorOf(s)||{}).name)).map(portfolioRow).join('');
   }
-  if(!sites.length && projectList.length) return html + '<div class="section-title">Sites on COMVERA</div><div class="card"><div class="site-card-sub">When a site on COMVERA gives you a code or invites you, its file appears here.</div>'+(isOrgAdmin()&&!readOnly()?'<button class="btn secondary small" style="margin-top:8px;" data-action="join-site">Join a site with a code</button>':'')+'</div>' + projectsHtml;
-  if(!sites.length) return html + (isContractor() ? '<div class="section-title">Sites on COMVERA</div>' : '') + '<div class="empty"><h3>No sites yet</h3><p>'+(isContractor()?'Sites appear here when a site owner invites your company — by email, or with a join code.':'Add a site to start tracking contractor compliance.')+'</p>'+(isContractor()&&isOrgAdmin()&&!readOnly()?'<button class="btn primary" data-action="join-site">Join a site with a code</button>':'')+'</div>' + projectsHtml;
+  if(!sites.length && projectList.length) return html + '<div class="section-title">Sites on COMVERA</div><div class="card"><div class="site-card-sub">When a site on COMVERA gives you a code or invites you, its file appears here.'+(isOrgAdmin()?'':' Ask the site for a code, then ask an owner or admin to enter it.')+'</div></div>' + projectsHtml;
+  if(!sites.length) return html + (isContractor() ? '' : '<div class="empty"><h3>No sites yet</h3><p>Add a site to start tracking contractor compliance.</p>'+(isOrgAdmin()&&!readOnly()?'<button class="btn primary" data-action="new-site">+ Add site</button>':restrictionNotice(readOnly()?'lapsed':'nonadmin','add a site'))+'</div>') + projectsHtml;
   const kind = (s)=>s.status==='site_ready'?'ready':s.status==='invited'?'invited':s.status==='declined'?'declined':'progress';
   const attention = (s)=>{ if(s.status!=='in_progress') return false; const st = siteSubmissionStatus(s.id); return st==='changes_required' || (isHost() ? st==='under_review' || st==='ready_to_approve' : st!=='under_review'); };
   const base = sites.filter(s=>matchSearch('sites', s.name, s.location, s.hostName, (contractorOf(s)||{}).name));
@@ -690,7 +691,7 @@ function renderPassport(){
   let html = '<div class="view-head"><div class="flexbetween"><h1>Your Documents</h1>'
     +'<div style="display:flex;gap:6px;">'+(isOrgAdmin() && !readOnly() && !S.docSelectMode ? '<button class="btn secondary small" data-action="exchange-share">'+ICONS.link+' Share securely</button>' : '')
     +'<button class="btn secondary small" data-action="toggle-select">'+(S.docSelectMode?'Cancel':'Select')+'</button></div></div>'
-    +'<p>'+org().name+'</p></div>';
+    +'<p>Your company documents, and which site or client needs each one.</p></div>';
   if(!S.docSelectMode) html += studioWidget().replace('<div class="section-title">Document Studio</div>','');
   if(S.docSelectMode){
     html += '<div class="card checkpoint" style="display:flex;align-items:center;justify-content:space-between;">'
@@ -783,14 +784,14 @@ function contractorSummary(c){
 
 function renderContractorsList(){
   const tab = S.hostPeopleTab || 'contractors';
-  let html = '<div class="view-head"><h1>'+(tab==='contractors'?'Contractors':'Documents')+'</h1><p>'+org().name+'</p></div>'
+  let html = '<div class="view-head"><h1>'+(tab==='contractors'?'Contractors':'Documents')+'</h1><p>'+(tab==='contractors'?'Every contractor you work with, their files and what still needs your attention.':'Documents your contractors have submitted, and what is waiting for your review.')+'</p></div>'
     +'<div class="subtabs" role="tablist">'
     +[['contractors','Contractors'],['documents','Documents']].map(([t,l])=>'<button role="tab" data-action="host-people-tab" data-tab="'+t+'" class="'+(tab===t?'active':'')+'" aria-selected="'+(tab===t)+'">'+l+'</button>').join('')
     +'</div>';
   if(tab==='documents') return html + renderDocumentCentre();
 
   const list = Object.values(S.state.contractors);
-  if(!list.length) return html+'<div class="empty"><h3>No contractors yet</h3><p>Contractors are added when you create a site and invite them. Tap + and choose <strong>Add a site</strong>.</p></div>';
+  if(!list.length) return html+'<div class="empty"><h3>No contractors yet</h3><p>Contractors appear when you create a site and invite them, or when they join with your site code.</p>'+(isOrgAdmin() && !readOnly() ? '<button class="btn primary" data-action="new-site">+ Add a site</button>' : restrictionNotice(readOnly()?'lapsed':'nonadmin','add a site'))+'</div>';
   const withSum = list.map(c=>({ c, sum: contractorSummary(c) }));
   const trades = [...new Set(list.map(c=>(c.trade||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const f = S.contractorFilter || 'all', trade = S.contractorTrade || '', sort = S.contractorSort || 'attention';
@@ -848,6 +849,40 @@ on('open-contractor', (el)=>{
 on('contractor-site', (el)=>{ closeSheet(); S.nav='sites'; S.activeSiteId = el.dataset.site; S.siteTab='compliance'; render(); window.scrollTo(0,0); });
 
 /* ============ MORE ============ */
+/** One plain line for the More page: plan and standing, never a seat count (seats are explained on the billing page). */
+function billingSummary(){
+  const o = org();
+  if(o.grant) return o.planName+' · given by COMVERA'+(o.grant.until?', until '+timeAgo(o.grant.until):'');
+  if(o.standing==='lapsed') return o.planName+' · read-only, choose a plan';
+  if(isContractor() && !o.ownAccess) return 'No plan of your own · sponsored sites only';
+  if(o.subscriptionStatus==='trialing' && o.trialEndsAt) return o.planName+' · trial, '+Math.max(0, Math.ceil((new Date(o.trialEndsAt)-Date.now())/86400000))+' days left';
+  if(o.subscriptionStatus==='past_due') return o.planName+' · payment failed';
+  return o.planName+' · usage, plans and payment';
+}
+
+/* ---- Account menu (top-right avatar) ---- */
+function renderAccountMenu(){
+  const admin = isOrgAdmin(), me = S.boot.me, o = org();
+  const row = (action, icon, title, sub, tag, attrs) => '<button class="menu-row" data-action="'+action+'"'+(attrs||'')+'><div class="qa-icon">'+icon+'</div><div style="flex:1;min-width:0;"><div class="qa-title">'+title+(tag?'<span class="acct-tag">'+tag+'</span>':'')+'</div><div class="qa-sub">'+sub+'</div></div>'+ICONS.chevron+'</button>';
+  let h = sheetHead('Account', 'Signed in as '+me.email)
+    +'<div class="acct-who"><div class="acct-org">'+o.name+'</div><div class="site-card-sub">'+(isContractor()?'Contractor':'Site owner')+' · your role: '+(o.roleLabel||S.boot.me.roleLabel)+'</div></div>'
+    +'<div class="acct-group">Just for you</div><div class="card" style="padding:4px;">'
+    + row('acct-open-profile', initials(myName()), 'Account settings', 'Your name, title and phone, password, two-step sign-in, sign out on other devices', 'Personal')
+    +'</div><div class="acct-group">'+o.name+' (everyone here)</div><div class="card" style="padding:4px;">';
+  if(admin){
+    h += row('acct-goto', ICONS.gear, 'Organisation settings', 'Company details, document style, notifications, integrations', 'Organisation', ' data-view="settings"');
+    h += row('acct-goto', ICONS.card, 'Plans &amp; billing', billingSummary(), 'Organisation', ' data-view="billing"');
+  }
+  h += row('acct-goto', ICONS.people, 'Team &amp; roles', admin ? 'Invite colleagues and set what they can do' : 'See who is on your team and what each role can do', 'Organisation', ' data-view="team"');
+  h += '</div>';
+  if(!admin) h += '<div class="site-card-sub" style="margin:8px 2px 0;">Organisation settings and billing are managed by this organisation\'s owners and admins.</div>';
+  h += '<button class="btn secondary block" style="margin-top:14px;" data-action="auth-signout">Sign out</button>';
+  return '<div class="acct-menu" aria-label="Account menu">'+h+'</div>';
+}
+on('open-account-menu', ()=>openSheet(renderAccountMenu()));
+on('acct-open-profile', ()=>{ closeSheet(); afterPendingBack(()=>actions['open-profile']()); });
+on('acct-goto', (el)=>{ const view = el.dataset.view; closeSheet(); afterPendingBack(()=>actions['goto-more']({ dataset: { view } })); });
+
 function renderMore(){
   // An open exchange has its own "← Exchanges" back button.
   if(S.moreView) return (S.moreView==='exchanges' && S.exchangeId ? '' : '<div style="margin-bottom:14px;"><button class="btn secondary small" data-action="goto-more" data-view="">← More</button></div>') + (MORE_VIEWS[S.moreView] ? MORE_VIEWS[S.moreView]() : '');
@@ -872,13 +907,13 @@ function renderMore(){
   html += item('links', ICONS.link, 'External share links', 'Expiring links for people outside '+org().name);
   html += item('verify', ICONS.verify, 'Verify a record', 'Check a Site Ready verification');
   html += '</div><div class="section-title">Organisation</div><div class="card">';
-  html += item('team', ICONS.people, 'Team & roles', 'Invite colleagues and set what they can do');
-  if(isOrgAdmin()) html += item('billing', ICONS.card, 'Plan & billing', org().planName+' · '+org().seatLimit+' seats');
+  html += item('team', ICONS.people, 'Team &amp; roles', isOrgAdmin() ? 'Invite colleagues and set what they can do' : 'See who is on your team and what each role can do');
+  if(isOrgAdmin()) html += item('billing', ICONS.card, 'Plans &amp; billing', billingSummary());
   if(isOrgAdmin()) html += '<button class="menu-row" data-action="nav" data-nav="setup"><div class="qa-icon">'+ICONS.check+'</div><div style="flex:1;"><div class="qa-title">Organisation set-up</div><div class="qa-sub">Your set-up answers: details, safety contact, sites, departments and areas, documents</div></div>'+ICONS.chevron+'</button>';
   if(isOrgAdmin()) html += item('settings', ICONS.gear, 'Organisation settings', 'Company details, notifications, integrations');
   if(S.boot.me.platformAdmin) html += item('platform', ICONS.dashboard, 'Platform', 'Manager portal: customers, health, support and the activity log');
   html += '</div><div class="section-title">Account</div><div class="card">'
-    +'<button class="menu-row" data-action="open-profile"><div class="qa-icon">'+initials(myName())+'</div><div style="flex:1;"><div class="qa-title">'+myName()+'</div><div class="qa-sub">'+S.boot.me.email+'</div></div>'+ICONS.chevron+'</button>'
+    +'<button class="menu-row" data-action="open-profile"><div class="qa-icon">'+initials(myName())+'</div><div style="flex:1;"><div class="qa-title">Account settings</div><div class="qa-sub">'+myName()+' · '+S.boot.me.email+' · name, password, sign-in</div></div>'+ICONS.chevron+'</button>'
     +'<button class="menu-row" data-action="open-feedback"><div class="qa-icon">'+ICONS.alert+'</div><div style="flex:1;"><div class="qa-title">Report a problem or suggest an idea</div><div class="qa-sub">Goes straight to the COMVERA team</div></div>'+ICONS.chevron+'</button>'
     +'<a class="menu-row" href="/privacy" target="_blank" rel="noopener"><div class="qa-icon">'+ICONS.verify+'</div><div style="flex:1;"><div class="qa-title">Privacy &amp; terms</div><div class="qa-sub">How COMVERA handles your information</div></div>'+ICONS.chevron+'</a>'
     +'<button class="menu-row" data-action="auth-signout"><div class="qa-icon">⎋</div><div><div class="qa-title">Sign out</div></div></button></div>';
@@ -942,7 +977,7 @@ function renderWorkforce(){
   if(searching('workforce') && !workers.length) return html + '<div class="list-empty">No worker matches “'+escapeHtml(S.search.workforce)+'”.</div>';
   if(isContractor() || own.length){
     html += '<div class="section-title">'+(isContractor()?'Your workers':'Your own staff')+'</div>'
-      + (own.length ? '<div class="card">'+own.map(w=>workerRow(w)).join('')+'</div>' : '<div class="empty"><h3>No workers yet</h3><p>Add each person on your crew, then record their medical certificate of fitness, site inductions and training with expiry dates. You\'ll get reminders before anything lapses.</p></div>');
+      + (own.length ? '<div class="card">'+own.map(w=>workerRow(w)).join('')+'</div>' : '<div class="empty"><h3>No workers yet</h3><p>Add each person on your crew, then record their medical certificate of fitness, site inductions and training with expiry dates. You\'ll get reminders before anything lapses.</p>'+(canEdit() && !readOnly() ? '<button class="btn primary" data-action="new-worker">+ Add your first worker</button>' : restrictionNotice(readOnly()?'lapsed':'nonadmin','add workers'))+'</div>');
   }
   if(isHost()){
     html += '<div class="section-title">Contractor workers on your sites</div>'
@@ -1077,74 +1112,45 @@ function roleHelp(){
 export function invalidateTeam(){ teamCache = null; }
 
 /* ---- Billing ---- */
-let billingCache = null;
+let billingCache = null, billingLoading = false, billingPolls = 0, billingTimer = null;
 async function loadBilling(){
-  const b = await api.get('/api/billing');
-  if(b.provider==='paystack' && isOrgAdmin()) b.history = (await api.get('/api/billing/payments').catch(()=>({payments:[]}))).payments;
-  billingCache = b; render();
+  if(billingLoading) return;
+  billingLoading = true;
+  try{
+    const b = await api.get('/api/billing');
+    if(b.provider==='paystack' && isOrgAdmin()) b.history = (await api.get('/api/billing/payments').catch(()=>({payments:[]}))).payments;
+    const wasPending = !!S.billingReturn && S.billingReturn!=='cancelled' && !(billingCache && paymentConfirmed(billingCache));
+    billingCache = b;
+    // The page may only say "done" once the server shows it; refresh the app's own plan data at that moment.
+    if(wasPending && paymentConfirmed(b)){ billingLoading = false; await reload().catch(()=>{}); billingLoading = true; }
+  } finally { billingLoading = false; }
+  render();
 }
 const rands = c => 'R'+(c/100).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2});
 const PAY_STATUS = { pending:'Waiting for payment', success:'Paid', failed:'Not accepted', abandoned:'Not completed', refunded:'Refunded' };
-/** Paystack: flat monthly plans (no seat count), a once-off safety file, card updates on Paystack's own page. */
-function paystackPlans(b, html, promo){
-  if(b.grant && !b.grant.until) return html + promo;
-  html += '<div class="section-title">'+(b.paystackSubscription?'Change plan':'Choose a plan')+'</div>';
-  html += b.plans.filter(p=>p.paid).map(p=>{
-    const current = p.id===b.plan && (b.paystackSubscription || (p.once && b.grant));
-    const price = p.priceCents!=null ? rands(p.priceCents)+(p.once?' once-off':' / '+escapeHtml(p.per)) : 'Contact us';
-    const label = p.once ? 'Pay once' : b.paystackSubscription ? 'Switch to '+escapeHtml(p.name) : 'Subscribe';
-    const blocked = p.once && b.paystackSubscription;
-    return '<div class="plan-card'+(current?' current':'')+'"><div class="flexbetween"><div class="site-card-title">'+escapeHtml(p.name)+'</div><div class="site-card-title">'+price+'</div></div>'
-      +'<div class="site-card-sub">'+escapeHtml(p.blurb)+'</div>'
-      +(current && !p.once ? '<span class="badge approved" style="margin-top:8px;">Current</span>'
-        : blocked ? '' : p.purchasable ? '<button class="btn '+(p.once?'secondary':'primary')+' small" style="margin-top:8px;" data-action="paystack-checkout" data-plan="'+p.id+'">'+label+'</button>' : '<div class="site-card-sub" style="margin-top:6px;"><a href="/contact" target="_blank" rel="noopener">Contact us</a> for this plan.</div>')
-      +'</div>';
-  }).join('');
-  html += '<div class="site-card-sub" style="margin-top:8px;">You pay on Paystack’s secure page; COMVERA never sees your card. A plan is switched on only once Paystack confirms the payment. Switching plans starts the new one and stops the old one. Cancelling keeps what you paid for until the end of the month, and your data stays readable after that.</div>';
-  if(b.paystackSubscription) html += '<div class="row-actions" style="margin-top:10px;"><button class="btn secondary" data-action="billing-portal">Update card</button><button class="btn danger" data-action="paystack-cancel">Cancel subscription</button></div>';
-  if(b.history && b.history.length){
-    html += '<div class="section-title">Payments</div><div class="card">'+b.history.map(p=>'<div class="kv"><span>'+escapeHtml(String(p.paid_at||p.created_at).slice(0,10))+' · '+escapeHtml(p.planName)+'</span><span>'+rands(p.amount_cents)+' · '+(PAY_STATUS[p.status]||escapeHtml(p.status))+'</span></div>').join('')+'</div>';
-  }
-  return html + promo;
+/** After a checkout redirect, keep asking the server (a few times) until it shows the new plan. */
+function pollBillingReturn(){
+  clearTimeout(billingTimer);
+  if(S.billingReturn!=='success' || !billingCache || paymentConfirmed(billingCache) || billingPolls>=8 || S.moreView!=='billing') return;
+  billingTimer = setTimeout(()=>{ billingPolls++; if(S.moreView==='billing') loadBilling().catch(()=>{}); }, 4000);
 }
 function renderBilling(){
+  if(S.billingReturn && !S.billingReturnLoaded){ S.billingReturnLoaded = true; billingCache = null; billingPolls = 0; }
   if(!billingCache){ loadBilling().catch(e=>showToast(e.message)); return '<div class="empty"><p>Loading…</p></div>'; }
-  const b = billingCache;
-  let html = '<div class="view-head"><h1>Plan &amp; billing</h1><p>'+org().name+'</p></div>';
-  const promo = '<div class="section-title">Have a promo code?</div><div class="card"><div class="row-actions"><input type="text" id="promoCode" maxlength="40" placeholder="e.g. PARTNER2026" style="flex:1;min-width:140px;" autocapitalize="characters"><button class="btn secondary" data-action="billing-redeem">Apply</button></div></div>';
-  if(!b.enabled){
-    return html + '<div class="card"><div class="site-card-sub">Billing isn\'t configured on this server (no Stripe keys), so every organisation has full access. Set STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and the plan price IDs to turn on plans, trials and seat limits.</div></div>';
-  }
-  if(b.grant) html += '<div class="card checkpoint"><div class="site-card-title">'+escapeHtml(b.grant.plan)+' — given by COMVERA</div><div class="site-card-sub">'+(b.grant.until ? 'Until '+escapeHtml(String(b.grant.until).slice(0,10))+'.' : 'No end date.')+' No payment needed while this lasts.</div></div>';
-  else if(isContractor() && !b.ownAccess) html += '<div class="notice">'+(b.sponsored ? 'You have no plan of your own. Sites that sponsor you are covered; your own projects and other clients need a contractor plan.' : 'You have no plan of your own and no site is sponsoring you right now. Everything stays readable; choose a plan to keep working.')+'</div>';
-  if(b.coupon) html += '<div class="notice" style="background:var(--green-bg);color:var(--green);">Promo code '+escapeHtml(b.coupon)+' will be applied when you subscribe.</div>';
-  const current = b.plans.find(p=>p.id===b.plan);
-  html += '<div class="card checkpoint"><div class="kv"><span>Current plan</span><span>'+escapeHtml(current?current.name:b.plan)+'</span></div>'
-    +'<div class="kv"><span>Status</span><span>'+(b.grant ? 'Given by COMVERA' : b.status==='trialing' && b.trialEndsAt ? (new Date(b.trialEndsAt) > new Date() ? 'Trial until '+timeAgo(b.trialEndsAt) : 'Trial ended '+timeAgo(b.trialEndsAt)) : escapeHtml(b.status))+'</span></div>'
-    +'<div class="kv"><span>Seats</span><span>'+b.seatsUsed+' used of '+b.seatLimit+'</span></div>'
-    +(b.activeSites!==null?'<div class="kv"><span>Sites</span><span>'+b.activeSites+(current&&current.siteLimit?' of '+current.siteLimit:'')+'</span></div>':'')
-    +(b.connectedSites!=null?'<div class="kv"><span>Connected sites</span><span>'+b.connectedSites+(current&&current.connectedSiteLimit?' of '+current.connectedSiteLimit:'')+' <span class="muted">(sponsored sites are free)</span></span></div>':'')
-    +(b.currentPeriodEnd?'<div class="kv"><span>Renews</span><span>'+timeAgo(b.currentPeriodEnd)+'</span></div>':'')
-    +(b.hasCustomer && b.provider==='stripe'?'<button class="btn secondary block" style="margin-top:10px;" data-action="billing-portal">Payment method &amp; invoices</button>':'')+'</div>';
-  if(b.provider==='paystack') return paystackPlans(b, html, promo);
-  // A plan given with no end date needs nothing more from the customer.
-  if(b.grant && !b.grant.until) return html + promo;
-  html += '<div class="section-title">'+(b.hasSubscription?'Change plan or seats':'Choose a plan')+'</div>';
-  html += '<label class="field-label" for="billSeats">Seats</label><input type="number" id="billSeats" min="'+Math.max(1,b.seatsUsed)+'" value="'+Math.max(b.seatLimit, b.seatsUsed)+'">';
-  html += b.plans.map(p=>'<div class="plan-card'+(p.id===b.plan?' current':'')+'"><div class="flexbetween"><div class="site-card-title">'+escapeHtml(p.name)+'</div>'+(p.id===b.plan && (b.ownAccess || b.status!=='trialing') ?'<span class="badge approved">Current</span>':'')+'</div>'
-    +'<div class="site-card-sub">'+escapeHtml(p.blurb)+'</div>'
-    +(p.paid ? (p.purchasable ? '<button class="btn '+(p.id===b.plan?'secondary':'primary')+' small" style="margin-top:8px;" data-action="billing-choose" data-plan="'+p.id+'">'+(b.hasSubscription ? (p.id===b.plan?'Update seats':'Switch to '+escapeHtml(p.name)) : 'Subscribe')+'</button>' : '<div class="site-card-sub" style="margin-top:6px;">'+(b.payments ? 'Not available yet.' : 'Online payment is coming soon — <a href="/contact" target="_blank" rel="noopener">contact us</a> to subscribe, or use a promo code below.')+'</div>') : '<div class="site-card-sub" style="margin-top:6px;">'+(p.id==='contractor_free' ? '' : 'No card needed.')+'</div>')
-    +'</div>').join('');
-  html += '<div class="site-card-sub" style="margin-top:8px;">Plan changes are prorated. Cancel any time from “Payment method &amp; invoices”; your data stays readable.</div>';
-  return html + promo;
+  const promo = '<div class="section-title">Have a promo code?</div><div class="card"><div class="row-actions"><input type="text" id="promoCode" maxlength="40" placeholder="e.g. PARTNER2026" aria-label="Promo code" style="flex:1;min-width:140px;" autocapitalize="characters"><button class="btn secondary" data-action="billing-redeem">Apply</button></div></div>';
+  const html = renderBillingPage(billingCache, { isContractor: isContractor(), admin: isOrgAdmin(), promo, ret: S.billingReturn, refreshing: billingLoading, payStatus: PAY_STATUS, orgName: org().name });
+  setTimeout(pollBillingReturn, 0);
+  return html;
 }
+on('billing-refresh', async (el)=>{ if(el) el.disabled = true; billingPolls = 0; try{ await loadBilling(); }catch(e){ showToast(e.message); } });
 export function invalidateBilling(){ billingCache = null; }
 
 /* ---- Settings ---- */
 function renderSettings(){
   const o = org(), s = S.state.settings || {};
   const ro = readOnly();
-  let html = '<div class="view-head"><h1>Organisation settings</h1><p>'+o.name+'</p></div>'
+  let html = '<div class="view-head"><h1>Organisation settings</h1><p>'+o.name+' · these settings apply to everyone in the organisation</p></div>'
+    +(isOrgAdmin() ? '<div class="card" style="padding:4px;"><button class="menu-row" data-action="goto-more" data-view="billing"><div class="qa-icon">'+ICONS.card+'</div><div style="flex:1;min-width:0;"><div class="qa-title">Plans &amp; billing</div><div class="qa-sub">'+billingSummary()+'</div></div>'+ICONS.chevron+'</button></div>' : '')
     +'<div class="section-title">Company details</div><div class="card">'
     +'<div class="site-card-sub" style="margin-bottom:2px;">Used on exports and to fill in AI-drafted documents so they read as genuine company paperwork.</div>'
     +'<label class="field-label" for="orgName">Legal / trade name</label><input type="text" id="orgName" value="'+o.name+'">'
@@ -1258,7 +1264,7 @@ export function exportSafetyFile(siteId){
 }
 
 /* ============ view-level actions ============ */
-on('nav', (el)=>{ S.nav = el.dataset.nav; if(S.nav==='setup') S.ob = null; if(S.nav==='sites'){ S.activeSiteId=null; S.activeWorkplaceId=null; } if(S.nav==='more') S.moreView=null; S.docSelectMode=false; render(); window.scrollTo(0,0); });
+on('nav', (el)=>{ S.billingReturn = null; S.billingReturnLoaded = false; S.nav = el.dataset.nav; if(S.nav==='setup') S.ob = null; if(S.nav==='sites'){ S.activeSiteId=null; S.activeWorkplaceId=null; } if(S.nav==='more') S.moreView=null; S.docSelectMode=false; render(); window.scrollTo(0,0); });
 on('open-site', (el)=>{ S.activeSiteId = el.dataset.site; S.nav='sites'; S.siteTab='compliance'; render(); window.scrollTo(0,0); });
 on('back-sites', ()=>{
   // A contractor's file on a shared site goes back to that site's page on the mine side.
@@ -1268,7 +1274,7 @@ on('back-sites', ()=>{
 });
 on('focus-site', (el, e)=>{ e.stopPropagation(); S.focusSiteId = el.dataset.site; render(); });
 on('site-tab', (el)=>{ S.siteTab = el.dataset.tab; render(); });
-on('goto-more', (el)=>{ if(el.dataset.view==='platform'){ location.href = '/manager'; return; } if(el.dataset.view==='studio'){ S.nav='studio'; render(); window.scrollTo(0,0); return; } S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); if(S.moreView==='exchanges'){ invalidateExchanges(); S.exchangeId = null; } render(); window.scrollTo(0,0); });
+on('goto-more', (el)=>{ if(el.dataset.view==='platform'){ location.href = '/manager'; return; } if(el.dataset.view==='studio'){ S.nav='studio'; render(); window.scrollTo(0,0); return; } S.nav='more'; S.moreView = el.dataset.view || null; if(S.moreView!=='billing'){ S.billingReturn = null; S.billingReturnLoaded = false; } if(S.moreView==='team') invalidateTeam(); if(S.moreView==='billing') invalidateBilling(); if(S.moreView==='platform') invalidatePlatform(); if(S.moreView==='exchanges'){ invalidateExchanges(); S.exchangeId = null; } render(); window.scrollTo(0,0); });
 on('doc-centre-filter', (el)=>{ S.docCentreFilter = el.dataset.filter; render(); });
 on('doc-centre-jump', (el)=>{ S.docCentreFilter = el.dataset.filter; S.hostPeopleTab = 'documents'; S.nav='passport'; render(); });
 on('safety-filter', (el)=>{ S.safetyFilter = el.dataset.filter; render(); });

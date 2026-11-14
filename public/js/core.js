@@ -130,6 +130,32 @@ export const myRoleLabel = () => S.boot.me.roleLabel;
 export const myContractorId = () => S.boot.myContractorId;
 export const isDemoMode = () => !!S.boot.org.isDemo;
 
+/**
+ * Why something is unavailable, and the one next step, as escaped HTML for any page.
+ * kind: 'lapsed' (read-only: trial ended or plan inactive), 'noplan' (contractor without its own plan),
+ * 'nonadmin' (needs an owner or admin). The button only appears for owners and admins.
+ */
+export function restrictionNotice(kind, what){
+  const o = S.boot.org, admin = isOrgAdmin();
+  const target = what ? escapeHtml(what) : 'do this';
+  const go = (label) => '<button class="btn primary" data-action="goto-more" data-view="billing">'+label+'</button>';
+  let title, reason, tone = 'warn', btn = '';
+  if(kind === 'lapsed'){
+    tone = 'bad';
+    title = o.subscriptionStatus === 'trialing' ? 'Your trial has ended' : 'This workspace is read-only';
+    reason = 'You can still open and download everything, but you cannot '+target+' until a plan is active.';
+    btn = admin ? go('Choose a plan') : '<p style="margin:0;">Ask an owner or admin of '+o.name+' to choose a plan.</p>';
+  } else if(kind === 'noplan'){
+    title = 'This needs your own plan';
+    reason = 'Sites that sponsor you cover only their own files. To '+target+', your company needs a contractor plan.';
+    btn = admin ? go('See plans') : '<p style="margin:0;">Ask an owner or admin of '+o.name+' to choose a plan.</p>';
+  } else {
+    title = 'Only owners and admins can do this';
+    reason = 'To '+target+', ask an owner or admin of '+o.name+'.';
+  }
+  return '<div class="next-card '+tone+'" role="note"><h3>'+title+'</h3><p>'+reason+'</p>'+btn+'</div>';
+}
+
 /* ============ DATES & READINESS (ported from the MVP) ============ */
 export function todayStr(){ return new Date().toISOString().slice(0,10); }
 export function daysUntil(dateStr){
@@ -303,14 +329,26 @@ export function openSheet(innerHtml){
   overlay.querySelectorAll('input[type=text]:not([maxlength]),input[type=email]:not([maxlength])').forEach(i=>i.setAttribute('maxlength','300'));
   overlay.querySelectorAll('textarea:not([maxlength])').forEach(t=>t.setAttribute('maxlength','2000'));
   const first = overlay.querySelector('[autofocus]');
-  if(first) setTimeout(()=>first.focus(), 30);
+  // Keyboard users: focus moves into the sheet, Tab stays inside it, and focus returns to where it was when it closes.
+  overlay._returnFocus = document.activeElement;
+  const focusables = () => [...overlay.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])')].filter(el=>el.offsetParent !== null);
+  overlay.addEventListener('keydown', (e)=>{
+    if(e.key !== 'Tab') return;
+    const f = focusables(); if(!f.length) return;
+    const a = f[0], z = f[f.length-1];
+    if(e.shiftKey && (document.activeElement === a || !overlay.contains(document.activeElement))){ e.preventDefault(); z.focus(); }
+    else if(!e.shiftKey && (document.activeElement === z || !overlay.contains(document.activeElement))){ e.preventDefault(); a.focus(); }
+  });
+  setTimeout(()=>{ if(!overlay.isConnected) return; const t = first || overlay.querySelector('.sheet-close') || overlay.querySelector('.sheet'); if(t){ if(!t.hasAttribute('tabindex') && t.classList.contains('sheet')) t.setAttribute('tabindex','-1'); t.focus(); } }, 30);
   if(S.boot && S.boot.authenticated && !(history.state && history.state.sheet)) history.pushState(Object.assign({}, history.state, { sheet:true }), '');
   return overlay;
 }
 /** Closes any open sheet. `fromHistory` is true when Back already removed its history entry. */
 export function closeSheet(fromHistory){
   const open = document.querySelectorAll('.overlay:not(.tutorial)');
+  const back = [...open].map(o=>o._returnFocus).filter(Boolean).pop();
   open.forEach(o=>o.remove());
+  if(back && back.isConnected && typeof back.focus === 'function') setTimeout(()=>{ if(!document.querySelector('.overlay:not(.tutorial)')) back.focus(); }, 0);
   S.openReq = null;
   if(open.length && fromHistory !== true && history.state && history.state.sheet){ skipPops++; history.back(); }
 }

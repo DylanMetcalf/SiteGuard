@@ -20,8 +20,9 @@ import { publishChange } from '../lib/realtime.js';
 import { track } from '../lib/events.js';
 import {
   accessState, CODE_MINUTES, codeHash, EXCHANGE_SESSION_HOURS, exchangeAudit, maskEmail, MAX_CODE_ATTEMPTS, newCode,
-  notifySender, recipientActor, refLabel, refreshRequestStatus, storeExchangeFile, type ExchangeRow,
+  fileToRequirement, notifySender, recipientActor, refLabel, refreshRequestStatus, storeExchangeFile, type ExchangeRow,
 } from '../lib/exchange.js';
+import { MUST_EXPIRE } from './documents.js';
 import { sendFile } from './files.js';
 import { rl } from './auth.js';
 
@@ -79,8 +80,11 @@ async function session(req: FastifyRequest, db: Db = pool, write = false): Promi
 /** Only what the recipient needs for this exchange — no ids or details of anything else. */
 async function view(db: Db, s: PortalSession) {
   const { x } = s;
-  const items = await many(db, `select i.id, i.document_type, i.person_name, i.note, i.status, i.review_note, i.downloaded_at, f.filename
-                                   from exchange_items i left join files f on f.id = i.file_id where i.exchange_id = $1 order by i.position`, [x.id]);
+  const items = await many(db, `select i.id, i.document_type, i.person_name, i.note, i.status, i.review_note, i.downloaded_at, f.filename,
+                                       i.kind, i.reason, to_char(i.due_date, 'YYYY-MM-DD') as due, i.requirement_id, to_char(i.expiry_date, 'YYYY-MM-DD') as expiry,
+                                       i.source_label, i.source_version, i.source_file_id, r.name as requirement_name
+                                   from exchange_items i left join files f on f.id = i.file_id left join requirements r on r.id = i.requirement_id
+                                  where i.exchange_id = $1 order by i.position`, [x.id]);
   const subs = x.direction === 'request'
     ? await many(db, `select u.item_id, u.version, u.submitted_at, u.uploaded_at, f.filename from exchange_submissions u join files f on f.id = u.file_id
                        join exchange_items i on i.id = u.item_id where i.exchange_id = $1 order by u.version desc`, [x.id])
@@ -100,6 +104,10 @@ async function view(db: Db, s: PortalSession) {
       const sent = mine.find((u) => u.submitted_at);
       return {
         id: i.id, documentType: i.document_type, personName: i.person_name, note: i.note, status: i.status, reviewNote: i.status === 'rejected' ? i.review_note : '',
+        kind: i.kind, reason: i.reason, dueDate: i.due, expiryDate: i.expiry,
+        // Only the requirement-linked kinds are filed on the sender's file, so only they ask for an expiry date.
+        needsExpiry: !!i.requirement_id && i.kind !== 'signature', expiryRequired: !!i.requirement_id && i.kind !== 'signature' && MUST_EXPIRE.test(i.requirement_name ?? i.document_type),
+        sourceLabel: i.kind === 'signature' ? i.source_label : '', sourceVersion: i.kind === 'signature' ? i.source_version : '', hasSource: i.kind === 'signature' && !!i.source_file_id,
         filename: x.direction === 'share' ? i.filename : null, downloaded: !!i.downloaded_at,
         draft: draft ? { filename: draft.filename, uploadedAt: new Date(draft.uploaded_at).toISOString() } : null,
         submitted: sent ? { filename: sent.filename, version: sent.version, submittedAt: new Date(sent.submitted_at).toISOString() } : null,
@@ -252,15 +260,29 @@ export default async function exchangePortalRoutes(app: FastifyInstance) {
     return withTx(async (db) => {
       const s = await session(req, db, true);
       if (s.x.direction !== 'request') throw notFound();
-      const drafts = await many<{ id: string; item_id: string; file_id: string; version: number; document_type: string }>(
+      const drafts = await many<{ id: string; item_id: string; file_id: string; version: number; document_type: string; requirement_id: string | null; kind: string; expiry_date: string | null; requirement_name: string | null }>(
         db,
-        `select u.id, u.item_id, u.file_id, u.version, i.document_type from exchange_submissions u join exchange_items i on i.id = u.item_id
-          where i.exchange_id = $1 and u.submitted_at is null and i.status in ('requested', 'rejected')`,
+        `select u.id, u.item_id, u.file_id, u.version, i.document_type, i.requirement_id, i.kind, to_char(i.expiry_date, 'YYYY-MM-DD') as expiry_date, r.name as requirement_name
+           from exchange_submissions u join exchange_items i on i.id = u.item_id left join requirements r on r.id = i.requirement_id
+          where i.exchange_id = $1 and u.submitted_at is null and i.status in ('requested', 'rejected') for update of u`,
         [s.x.id],
       );
       if (!drafts.length) throw badRequest('Upload at least one document before submitting.');
+      // Documents that lapse must carry their date, or nobody gets warned before they do.
+      for (const d of drafts) {
+        if (d.requirement_id && d.kind !== 'signature' && !d.expiry_date && MUST_EXPIRE.test(d.requirement_name ?? d.document_type)) {
+          throw badRequest(`Add the valid-until date printed on “${d.document_type}” before sending it.`, 'expiry_required');
+        }
+      }
       for (const d of drafts) {
         await db.query('update exchange_submissions set submitted_at = now(), note = $2 where id = $1', [d.id, b.message]);
+        if (d.requirement_id && d.kind !== 'signature') {
+          const version = await fileToRequirement(db, s.x, { requirement_id: d.requirement_id, expiry_date: d.expiry_date, document_type: d.document_type }, d.file_id, b.message, s.email);
+          if (version) {
+            await db.query('update exchange_submissions set document_version = $2 where id = $1', [d.id, version]);
+            await exchangeAudit(db, s.x, recipientActor(s.email), 'Exchange document filed for review', `${d.document_type} (${version})`);
+          }
+        }
         await db.query(`update exchange_items set status = 'submitted', file_id = $2, reviewed_at = null, reviewed_by_name = '' where id = $1`, [d.item_id, d.file_id]);
       }
       const resubmission = drafts.some((d) => d.version > 1) || !!s.x.submitted_at;
@@ -303,6 +325,45 @@ export default async function exchangePortalRoutes(app: FastifyInstance) {
       await publishChange(db, [s.x.sender_org_id]);
     });
     return sendFile(reply, file, download);
+  });
+
+  /**
+   * The document the sender wants signed, for this recipient only: a signature item of this exchange, while access lasts.
+   * The sender chose to send it by making the request; every view and download is recorded on both sides.
+   */
+  app.get('/api/x/items/:id/source', async (req, reply) => {
+    const itemId = (req.params as { id: string }).id;
+    const s = await session(req);
+    if (s.x.direction !== 'request' || !isUuid(itemId)) throw notFound();
+    const download = (req.query as { download?: string }).download === '1';
+    const file = await one<any>(
+      pool,
+      `select f.*, i.document_type from exchange_items i join files f on f.id = i.source_file_id
+        where i.id = $1 and i.exchange_id = $2 and i.kind = 'signature'`, [itemId, s.x.id]);
+    if (!file) throw notFound();
+    await withTx(async (db) => {
+      await exchangeAudit(db, s.x, recipientActor(s.email), download ? 'Exchange document downloaded to sign' : 'Exchange document viewed to sign', file.document_type);
+      await publishChange(db, [s.x.sender_org_id]);
+    });
+    return sendFile(reply, file, download);
+  });
+
+  /** The valid-until date printed on a returned document, filed with the new version. */
+  app.post('/api/x/items/:id/expiry', rl(60), async (req) => {
+    const itemId = (req.params as { id: string }).id;
+    const b = z.object({ expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable() }).parse(req.body ?? {});
+    return withTx(async (db) => {
+      const s = await session(req, db, true);
+      if (s.x.direction !== 'request' || !isUuid(itemId)) throw notFound();
+      const item = await one<{ id: string; status: string; requirement_id: string | null; kind: string }>(
+        db, 'select id, status, requirement_id, kind from exchange_items where id = $1 and exchange_id = $2 for update', [itemId, s.x.id]);
+      if (!item || !item.requirement_id || item.kind === 'signature') throw notFound();
+      if (item.status !== 'requested' && item.status !== 'rejected') throw conflict('This document is already with the sender.');
+      if (b.expiryDate && b.expiryDate < new Date().toISOString().slice(0, 10)) throw badRequest('That date has already passed. Check the year.', 'expired_date');
+      if (b.expiryDate && b.expiryDate > `${new Date().getFullYear() + 25}-12-31`) throw badRequest('That date is too far ahead. Check the year.', 'bad_date');
+      await db.query('update exchange_items set expiry_date = $2 where id = $1', [item.id, b.expiryDate]);
+      return view(db, s);
+    });
   });
 
   /** Product news by email: only ever with an explicit yes, and a no is recorded too. */

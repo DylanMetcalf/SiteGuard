@@ -318,3 +318,12 @@ Newest first.
 **DECISION** The public pricing page is one toggle (Contractors, Safety consultants, Mines and sites) with exactly three plans each and one marked "Most popular". Contractor Business stays available by asking us.
 **REASON** Fewer choices sell better than a comparison table, and the pilot will tell us which numbers to move.
 **DATE** 2026-11-12
+
+**DECISION** Document requests (replacement, signed copy, general, other) are built on Exchange items rather than a new request system or the older text-only `info_requests`. A replacement is filed on the requirement as the next version awaiting review; a signed copy is a returned copy tied to the document version it was sent with and is never described as a verified e-signature; an "other" request never becomes a requirement. Duplicates return the existing request, reminders are limited to one an hour, and the screen reports email as not configured, queued, sent or failed.
+**REASON** Exchange already has the secure link, one-time code, expiry, revocation, versioned submissions, review and audit; reusing it keeps one source of truth and means a recipient needs no account or paid workspace. The older request form stays for information and feedback.
+**DATE** 2026-11-14
+
+**DECISION** The reported "contractor owner cannot do any exchanges" was an unexplained restriction, not a permission defect: the server lets a contractor owner use Exchange in trial, sponsored and paid states and blocks writes only when the organisation is lapsed (trial ended with no sponsoring site). The screen hid the buttons without saying why. It now explains, links to Plans & billing, and says that answering a received request still needs no plan.
+**REASON** Reproduced with synthetic accounts in each state (`test/docrequests.test.ts`, `scripts/docrequests-journey.mts` J7). The live account was not inspected or changed.
+**DATE** 2026-11-14
+

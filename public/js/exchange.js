@@ -80,8 +80,15 @@ function renderExchange(){
     let meta = '';
     if(it.personName) meta += 'For '+esc(it.personName);
     if(it.note) meta += (meta ? ' · ' : '')+esc(it.note);
-    h += '<div class="xp-item"><div class="xp-item-main"><div class="xp-item-name">'+esc(it.documentType)+'</div>'
-      + (meta ? '<div class="xp-item-meta">'+meta+'</div>' : '')
+    const KIND = { replacement:'Replacement needed', signature:'Signed copy needed', other:'Other document' };
+    const kindTag = it.kind && KIND[it.kind] ? '<span class="badge blue">'+KIND[it.kind]+'</span> ' : '';
+    const why = request && it.reason ? '<div class="xp-item-meta"><strong>'+(it.kind === 'replacement' ? 'Why:' : 'Note:')+'</strong> '+esc(it.reason)+(it.dueDate ? ' · due '+esc(fmtDate(it.dueDate)) : '')+'</div>' : request && it.dueDate ? '<div class="xp-item-meta">Due '+esc(fmtDate(it.dueDate))+'</div>' : '';
+    const sign = request && it.hasSource && canUpload ? '<div class="xp-review" style="background:var(--paper-raised,#f3f6f4);"><strong>How to return it:</strong> open the document, sign it (print and sign, or use a signing tool you trust), then upload the signed copy. '
+      + '<div class="xp-row" style="margin-top:8px;"><a class="btn small secondary" target="_blank" rel="noopener" href="/api/x/items/'+encodeURIComponent(it.id)+'/source">View '+esc(it.sourceLabel || 'document')+(it.sourceVersion ? ' (version '+esc(it.sourceVersion)+')' : '')+'</a>'
+      + '<a class="btn small secondary" href="/api/x/items/'+encodeURIComponent(it.id)+'/source?download=1">Download</a></div></div>' : '';
+    const expiry = request && it.needsExpiry && canUpload ? '<div class="xp-item-meta"><label for="xe-'+esc(it.id)+'">Valid until'+(it.expiryRequired ? ' (required)' : ' (if it has one)')+'</label> <input id="xe-'+esc(it.id)+'" type="date" data-x-expiry="'+esc(it.id)+'" value="'+esc(it.expiryDate || '')+'"></div>' : '';
+    h += '<div class="xp-item"><div class="xp-item-main"><div class="xp-item-name">'+kindTag+esc(it.documentType)+'</div>'
+      + (meta ? '<div class="xp-item-meta">'+meta+'</div>' : '') + why + sign + expiry
       + '<div class="xp-item-meta"><span class="badge '+cls+'">'+esc(label)+'</span>'
       + (it.draft && canUpload ? ' &nbsp;Ready to submit: '+esc(it.draft.filename) : '')
       + (it.submitted && !(it.draft && canUpload) ? ' &nbsp;Sent: '+esc(it.submitted.filename)+(it.submitted.version > 1 ? ' (version '+it.submitted.version+')' : '')+' · '+esc(fmtTime(it.submitted.submittedAt)) : '')
@@ -89,7 +96,7 @@ function renderExchange(){
       + (it.status === 'rejected' && it.reviewNote ? '<div class="xp-review"><strong>What to fix:</strong> '+esc(it.reviewNote)+'</div>' : '')
       + '</div><div class="xp-item-actions">';
     if(canUpload){
-      h += '<label class="btn small '+(it.draft ? 'secondary' : 'primary')+'">'+(it.draft || it.status === 'rejected' ? 'Replace file' : 'Upload file')
+      h += '<label class="btn small '+(it.draft ? 'secondary' : 'primary')+'">'+(it.draft || it.status === 'rejected' ? 'Replace file' : it.kind === 'signature' ? 'Upload signed copy' : it.kind === 'replacement' ? 'Upload replacement' : 'Upload file')
         + '<input class="xp-file" type="file" data-x-upload="'+esc(it.id)+'" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx,.txt,application/pdf,image/*"></label>';
     }
     if(!request){
@@ -194,6 +201,9 @@ root.addEventListener('change', (ev) => {
     const fd = new FormData();
     fd.append('file', file);
     busy(async () => { X.data = await call('POST', '/api/x/items/'+encodeURIComponent(input.dataset.xUpload)+'/upload', fd, true); X.info = 'Uploaded '+file.name+'. Submit when you\'re ready.'; });
+  } else if(input.dataset.xExpiry){
+    const id = input.dataset.xExpiry, d = input.value || null;
+    busy(async () => { X.data = await call('POST', '/api/x/items/'+encodeURIComponent(id)+'/expiry', { expiryDate: d }); });
   } else if(input.dataset.x === 'consent'){
     const consented = input.checked;
     busy(async () => { await call('POST', '/api/x/consent', { consented }); X.consent = consented; X.info = consented ? 'Thanks — you can unsubscribe from any email.' : 'Okay — no product news.'; });

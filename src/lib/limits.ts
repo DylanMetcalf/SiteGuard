@@ -25,15 +25,32 @@ export async function hasLooseFiles(db: Db, orgId: string): Promise<boolean> {
   return !!(await one(db, `select 1 from sites where org_id = $1 and status <> 'declined' and workplace_id is null limit 1`, [orgId]));
 }
 
-export async function contractorSitesInUse(db: Db, orgId: string): Promise<number> {
+async function contractorFileIds(db: Db, orgId: string): Promise<string[]> {
   const rows = await many<{ id: string }>(
     db,
     `select s.id from sites s join contractors c on c.id = s.contractor_id
       where c.linked_org_id = $1 and s.status not in ('declined', 'invited')`,
     [orgId],
   );
-  const sponsored = await sponsoredSiteIds(db, rows.map((r) => r.id));
-  return rows.filter((r) => !sponsored.has(r.id)).length;
+  return rows.map((r) => r.id);
+}
+
+export async function contractorSitesInUse(db: Db, orgId: string): Promise<number> {
+  const ids = await contractorFileIds(db, orgId);
+  const sponsored = await sponsoredSiteIds(db, ids);
+  return ids.filter((id) => !sponsored.has(id)).length;
+}
+
+/** Files at sites that currently sponsor this contractor: free, and not counted against the plan. */
+export async function contractorSponsoredSites(db: Db, orgId: string): Promise<number> {
+  const ids = await contractorFileIds(db, orgId);
+  const sponsored = await sponsoredSiteIds(db, ids);
+  return ids.filter((id) => sponsored.has(id)).length;
+}
+
+/** Worker records on file (people on site; they are not logins and never use a seat). */
+export async function activeWorkers(db: Db, orgId: string): Promise<number> {
+  return Number((await one<{ n: number }>(db, 'select count(*) as n from workers where org_id = $1 and active', [orgId]))?.n ?? 0);
 }
 
 export function siteLimitError(limit: number) {

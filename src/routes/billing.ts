@@ -15,13 +15,14 @@ import { requireAdmin, requireOrg, type OrgCtx } from '../lib/authz.js';
 import { PLANS, TRIAL_DAYS, grantActive, hasOwnAccess, planAllowedFor, planOf, plansFor, standing } from '../lib/plans.js';
 import { redeemPromo } from '../lib/promos.js';
 import { pricingTable } from '../lib/pricing.js';
+import { PLAN_FEATURES, FEATURE_NAMES } from '../lib/entitlements.js';
 import { rl } from './auth.js';
 import { audit } from '../lib/audit.js';
 import { publishChange } from '../lib/realtime.js';
 import { appUrl } from '../lib/email.js';
 import { seatsUsed } from './org.js';
 import { securityEvent } from '../lib/securityLog.js';
-import { contractorSitesInUse, hostSitesInUse } from '../lib/limits.js';
+import { activeWorkers, contractorSitesInUse, contractorSponsoredSites, hostSitesInUse } from '../lib/limits.js';
 
 let stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -123,6 +124,13 @@ export default async function billingRoutes(app: FastifyInstance) {
       seatsUsed: await seatsUsed(pool, ctx.org.id),
       activeSites: ctx.org.kind === 'host' ? await hostSitesInUse(pool, ctx.org.id) : null,
       connectedSites: ctx.org.kind === 'contractor' ? await contractorSitesInUse(pool, ctx.org.id) : null,
+      sponsoredSites: ctx.org.kind === 'contractor' ? await contractorSponsoredSites(pool, ctx.org.id) : null,
+      workers: await activeWorkers(pool, ctx.org.id),
+      // COMVERA has no tax configuration: prices are the display prices set by the platform admin.
+      vatNote: 'Prices are shown as set by COMVERA. Confirm VAT on your invoice.',
+      pendingPayment: !!(await one(pool, `select 1 from payments where org_id = $1 and status = 'pending' and created_at > now() - interval '2 hours' limit 1`, [ctx.org.id]).catch(() => null)),
+      isConsultant: !!ctx.org.is_consultant,
+      coveredByConsultant: !!ctx.org.billing_parent_id,
       hasSubscription: !!ctx.org.stripe_subscription_id || !!ctx.org.paystack_subscription_code,
       ownAccess: hasOwnAccess(ctx.org),
       sponsored: !!ctx.org.sponsored,
@@ -131,7 +139,7 @@ export default async function billingRoutes(app: FastifyInstance) {
       hasCustomer: !!ctx.org.stripe_customer_id,
       plans: plansFor(ctx.org.kind, !!ctx.org.is_consultant).map((p) => ({
         id: p.id, name: p.name, blurb: p.blurb, siteLimit: p.siteLimit, connectedSiteLimit: p.connectedSiteLimit, maxSeats: p.maxSeats, ai: p.ai, paid: p.paid,
-        once: !!p.once, priceCents: prices.get(p.id)?.priceCents ?? null, per: prices.get(p.id)?.per ?? 'month',
+        once: !!p.once, clientLimit: p.clientLimit ?? null, features: (PLAN_FEATURES[p.id] ?? []).map((f) => FEATURE_NAMES[f]), priceCents: prices.get(p.id)?.priceCents ?? null, per: prices.get(p.id)?.per ?? 'month',
         purchasable: !p.paid || (paystack ? (prices.get(p.id)?.priceCents ?? 0) >= 100 : features.paymentProvider === 'stripe' && !!p.stripePrice),
       })),
     };

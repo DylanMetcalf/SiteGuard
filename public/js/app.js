@@ -12,6 +12,7 @@ import { refreshGuide } from './guide.js';
 import { renderReview, openGuestReview, refreshReview, openReview } from './review.js';
 import './inbox.js';
 import './builder.js';
+import './requests.js';
 import './safetyfiles.js';
 import { maybeOfferTour } from './tour.js';
 import { renderMfaGate } from './mfa.js';
