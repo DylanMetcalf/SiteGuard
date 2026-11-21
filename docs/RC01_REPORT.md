@@ -83,7 +83,7 @@ The live site responds (`/healthz` 200). **Until this release is deployed, the l
 ## 7. Automated tests (last full run, 2026-11-21, Chromium, isolated local server)
 | Suite | Result |
 |---|---|
-| `npm test` (backend, tenancy, billing, documents, onboarding, profile, pricing switch) | **372 pass, 0 fail, 0 skipped** |
+| `npm test` (backend, tenancy, billing, documents, onboarding, profile, pricing switch) | **373 pass, 0 fail, 0 skipped** |
 | `scripts/rc01.mts` (30 acceptance scenarios, 150 checks) | **30/30 scenarios, 150/150 checks**, on two consecutive runs. 0 server errors, 0 script errors |
 | Contractor journey | 44/44 |
 | Document-request journey | 46/46 |
@@ -104,6 +104,13 @@ The live site responds (`/healthz` 200). **Until this release is deployed, the l
 - **Purpose:** it is a fixed list, stored only, and never read by permission checks.
 - **Abuse tests:** cross-organisation access, wrong roles, a missing CSRF token, an expired session, a revoked invitation, program and HTML uploads, HTML in names and over-long fields were all exercised (S25–S28) and refused.
 - **Earlier work still in place:** findings register `docs/security/COMVERA_SECURITY_FINDINGS.md`; 2,224 cross-organisation probes; two independent reviews.
+- **Independent review (an agent that did not write the code):** no security defects found in sign-up, the profile route, the migration, escaping, or price hiding. Fixed after its findings:
+  - People with one name could not save their profile; last name is now optional.
+  - "About you" showed stale values after saving; fixed without redrawing the page.
+  - The older name route now keeps first and last name in step.
+  - Members who cannot review no longer see "No reviews waiting".
+  - Plan text on the pricing page is now escaped, as a precaution.
+- **Accepted:** people who signed up before migration 031 have no recorded terms acceptance; ask them at the next terms change.
 - **Still open:** production backup restore, an external penetration test, the hosted virus scanner and hosted storage are unverified. A test alone does not establish security.
 
 ## 9. UX: top friction points

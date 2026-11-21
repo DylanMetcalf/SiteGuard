@@ -514,8 +514,11 @@ export default async function authRoutes(app: FastifyInstance) {
       .object({ name: name.optional(), title: z.string().trim().max(120).optional(), phone: z.string().trim().max(60).optional() })
       .parse(req.body);
     await pool.query(
-      `update users set name = coalesce($2, name), title = coalesce($3, title), phone = coalesce($4, phone) where id = $1`,
-      [ctx.user.id, body.name ?? null, body.title ?? null, body.phone ?? null],
+      // A new display name also updates first and last name, so the two never disagree.
+      `update users set name = coalesce($2, name), title = coalesce($3, title), phone = coalesce($4, phone),
+              first_name = coalesce($5, first_name), last_name = coalesce($6, last_name) where id = $1`,
+      [ctx.user.id, body.name ?? null, body.title ?? null, body.phone ?? null,
+        body.name ? body.name.split(/\s+/)[0].slice(0, 100) : null, body.name ? body.name.split(/\s+/).slice(1).join(' ').slice(0, 100) : null],
     );
     if (ctx.org) await withTx((db) => publishChange(db, [ctx.org!.id]));
     return { ok: true };
@@ -530,7 +533,8 @@ export default async function authRoutes(app: FastifyInstance) {
     const ctx = requireUser(req.ctx);
     const b = z.object({
       firstName: z.string().trim().min(1, 'Enter your first name.').max(100),
-      lastName: z.string().trim().min(1, 'Enter your last name.').max(100),
+      // Optional: some people go by one name.
+      lastName: z.string().trim().max(100).default(''),
       title: z.string().trim().max(120).default(''),
       phone: z.string().trim().max(60).default(''),
       purpose: z.enum(['site', 'contractors', 'documents', 'review', 'invited', 'clients'], { message: 'Choose how you will use COMVERA.' }),
@@ -539,7 +543,7 @@ export default async function authRoutes(app: FastifyInstance) {
     await withTx(async (db) => {
       await db.query(
         `update users set first_name = $2, last_name = $3, name = $4, title = $5, phone = $6, purpose = $7, profile_completed_at = coalesce(profile_completed_at, now()) where id = $1`,
-        [ctx.user.id, b.firstName, b.lastName, `${b.firstName} ${b.lastName}`.slice(0, 200), b.title, b.phone, b.purpose],
+        [ctx.user.id, b.firstName, b.lastName, [b.firstName, b.lastName].filter(Boolean).join(' ').slice(0, 200), b.title, b.phone, b.purpose],
       );
       if (b.productNews !== undefined) {
         await db.query(

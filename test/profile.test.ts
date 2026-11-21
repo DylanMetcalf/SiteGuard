@@ -64,6 +64,14 @@ describe('about you', () => {
     assert.equal((await pool.query(`select consented from marketing_consents where email = $1`, [memberEmail])).rows[0].consented, false);
   });
 
+  it('someone with one name can save their profile, and the older name route keeps first and last name in step', async () => {
+    assert.equal((await member.put('/api/me/profile', { firstName: 'Lindiwe', lastName: '', purpose: 'review' })).status, 200);
+    assert.equal((await member.state()).me.name, 'Lindiwe');
+    assert.equal((await member.patch('/api/me', { name: 'Lindiwe Mokoena-Dube' })).status, 200);
+    const u = (await pool.query('select name, first_name, last_name from users where email = $1', [memberEmail])).rows[0];
+    assert.deepEqual([u.name, u.first_name, u.last_name], ['Lindiwe Mokoena-Dube', 'Lindiwe', 'Mokoena-Dube']);
+  });
+
   it('existing people are never pushed through it again, and signed-out callers are refused', async () => {
     assert.equal((await owner.state()).me.profileComplete, true);
     assert.equal((await new Agent(app).put('/api/me/profile', { firstName: 'A', lastName: 'B', purpose: 'site' })).status, 401);

@@ -118,7 +118,7 @@ await scenario(2, 'Complete the individual profile during sign-up', async () => 
   ok(2, 'first and last name are carried over from sign-up', (await p.inputValue('#obFirst')) === 'Thandi' && (await p.inputValue('#obLast')) === 'Nkosi');
   ok(2, 'no ID number or photo is asked for', !(await p.$('input[id*="IdNo"], input[type="file"]')));
   await p.fill('#obFirst', ''); await p.click('[data-action="ob-save"]'); await p.waitForTimeout(400);
-  ok(2, 'a missing first name is explained', /first and last name/i.test(await text(p, '.ob-card')));
+  ok(2, 'a missing first name is explained', /first name/i.test(await text(p, '.ob-card')));
   await p.fill('#obFirst', 'Thandi'); await p.fill('#obTitle', 'SHE Manager'); await p.check('input[name="obPurpose"][value="site"]'); await p.click('[data-action="ob-save"]'); await p.waitForTimeout(600);
   const u = (await db.query('select title, purpose, profile_completed_at from users where email = $1', [hostEmail])).rows[0];
   ok(2, 'job title and purpose are saved, and the step is marked done', u.title === 'SHE Manager' && u.purpose === 'site' && !!u.profile_completed_at);

@@ -117,7 +117,7 @@ async function save(step){
     services: () => ({ trade: v('obTrade'), services: v('obServices'), industries: [...document.querySelectorAll('.obInd:checked')].map((x) => x.value) }),
     documents: () => { const c = document.querySelector('input[name="obDocs"]:checked'); return c ? { answer: c.value } : null; },
   }[step];
-  if(step === 'you') await saveProfile();
+  if(step === 'you') await saveProfile(); // also refreshes the local profile, so later steps show what was just saved
   if(body){
     const b = body();
     if(!b){ o.err = 'Choose one of the answers.'; return redraw(); }

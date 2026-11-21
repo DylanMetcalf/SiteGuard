@@ -33,6 +33,8 @@ function mock(){
 }
 
 /* ---------- the public site: one question per page ---------- */
+/** Text the platform admin types (plan names, blurbs, highlights) is escaped before it reaches the page. */
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
 export const PUBLIC_PAGES = {
   landing: '/', features: '/features', builder: '/safety-file-builder', contractors: '/for-contractors',
   sites: '/for-sites', pricing: '/pricing', how: '/how-it-works', contact: '/contact',
@@ -159,8 +161,8 @@ function pricingPage(pricing, audience){
   const byId = Object.fromEntries(pricing.plans.map(p=>[p.planId, p]));
   const card = (p) => {
     const perClient = p.clientLimit && p.priceCents ? '<p class="lp-perclient">About '+rands(Math.round(p.priceCents / p.clientLimit))+' per client a month</p>' : '';
-    return '<div class="lp-price'+(p.planId===set.pick?' lp-pick':'')+'">'+(p.planId===set.pick?'<span class="lp-flag">Most popular</span>':'')+'<h3>'+p.name+'</h3><div class="lp-amount">'+(p.priceCents===null ? 'Contact us' : rands(p.priceCents)+'<span> '+(p.per==='month' ? '/ month' : p.per==='safety file' ? 'once, for one file' : '/ '+p.per)+'</span>')+'</div>'+perClient
-      + '<p class="lp-p">'+p.blurb+'</p>'+list(p.highlights)
+    return '<div class="lp-price'+(p.planId===set.pick?' lp-pick':'')+'">'+(p.planId===set.pick?'<span class="lp-flag">Most popular</span>':'')+'<h3>'+esc(p.name)+'</h3><div class="lp-amount">'+(p.priceCents===null ? 'Contact us' : rands(p.priceCents)+'<span> '+(p.per==='month' ? '/ month' : p.per==='safety file' ? 'once, for one file' : '/ '+p.per)+'</span>')+'</div>'+perClient
+      + '<p class="lp-p">'+esc(p.blurb)+'</p>'+list((p.highlights||[]).map(esc))
       + (p.priceCents===null ? go('contact','Talk to us','btn secondary block') : trial(p.planId==='contractor_once' ? 'Build my one file' : 'Start free trial', set.kind))+'</div>';
   };
   const tabs = [['contractor', 'Contractors'], ['consultant', 'Safety consultants'], ['host', 'Mines and sites']];

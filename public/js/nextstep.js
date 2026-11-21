@@ -19,7 +19,7 @@ export function nextStepCard(){
     const files = sites.filter((s) => s.status !== 'declined');
     const waiting = files.reduce((n, s) => n + (st.requirements[s.id] || []).filter((r) => effectiveStatus(docs[r.id]) === 'awaiting_review').length, 0);
     if(canReview() && waiting) return card(waiting + ' document' + (waiting === 1 ? '' : 's') + ' waiting for your review', 'Contractors have submitted evidence. Approve it, or send it back with a reason.', btn('Review now', 'open-tasks', ' data-filter="all"'));
-    if(!isOrgAdmin()) return me.purpose === 'review' ? card('No reviews waiting', 'When a contractor submits a document for one of your sites, it appears here first.', btn('See sites', 'nav', ' data-nav="sites"')) : '';
+    if(!isOrgAdmin()) return me.purpose === 'review' && canReview() ? card('No reviews waiting', 'When a contractor submits a document for one of your sites, it appears here first.', btn('See sites', 'nav', ' data-nav="sites"')) : '';
     if(!wps.length && !files.length) return card('Create your first site', 'A site is where contractors file their safety documents. Name it, and choose what every contractor must provide.', btn(ICONS.plus + ' Create site', 'new-site'));
     const bare = wps.find((w) => !(w.requirements || []).length);
     if(bare) return card('Set what contractors must provide at ' + bare.name, 'Choose the documents every contractor’s safety file needs. Start from a researched South African list and change anything.', btn('Set requirements', 'ns-open-wp', ' data-id="' + bare.id + '" data-tab="requirements"'));
