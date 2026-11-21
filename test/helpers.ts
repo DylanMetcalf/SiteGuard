@@ -102,10 +102,11 @@ export async function signup(app: FastifyInstance, opts: { orgName: string; orgK
   const a = new Agent(app);
   const email = opts.email ?? uniqueEmail(opts.orgKind);
   const { keepOnboarding: _k, ...body } = opts;
-  const r = await a.post('/api/auth/signup', { name: opts.name ?? 'Test User', email, password: PASSWORD, ...body });
+  const r = await a.post('/api/auth/signup', { acceptTerms: true, name: opts.name ?? 'Test User', email, password: PASSWORD, ...body });
   if (r.status !== 200) throw new Error(`signup failed: ${r.status} ${JSON.stringify(r.body)}`);
   await pool.query('update users set email_verified_at = now() where email = $1', [email]);
   // Guided set-up is tested on its own (onboarding.test.ts); everywhere else the organisation starts set up.
+  if (!opts.keepOnboarding) await pool.query(`update users set profile_completed_at = now() where email = $1`, [email]);
   if (!opts.keepOnboarding) await pool.query(`update organisations set onboarding_completed_at = now() where onboarding_completed_at is null and id in (select org_id from memberships m join users u on u.id = m.user_id where u.email = $1)`, [email]);
   await a.refresh();
   return { agent: a, email };

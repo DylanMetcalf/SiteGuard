@@ -13,13 +13,13 @@ const people = Array.from({ length: N }, (_, i) => `shift${i}.${tag}@example.com
 // invited sign-ups (they carry a valid invitation) must also get through from one shared address
 {
   const { sha256 } = await import('../src/lib/security.ts');
-  const owner = await post('/api/auth/signup', { name: 'Mine Owner', email: `mineowner.${tag}@example.com`, password: PW, orgName: `Shift Mine ${tag}`, orgKind: 'host' });
+  const owner = await post('/api/auth/signup', { acceptTerms: true, name: 'Mine Owner', email: `mineowner.${tag}@example.com`, password: PW, orgName: `Shift Mine ${tag}`, orgKind: 'host' });
   const orgId = (await db.query(`select m.org_id from memberships m join users u on u.id = m.user_id where u.email = $1`, [`mineowner.${tag}@example.com`])).rows[0]?.org_id;
   let invOk = 0, invBlocked = 0;
   for (let i = 0; i < 30 && orgId; i++) {
     const tok = `inv-${tag}-${i}`;
     await db.query(`insert into user_invites (org_id, email, role, token_hash, invited_by, expires_at) select $1, $2, 'member', $3, u.id, now() + interval '1 day' from users u where u.email = $4`, [orgId, `staff${i}.${tag}@example.com`, sha256(tok), `mineowner.${tag}@example.com`]);
-    const r = await post('/api/auth/signup', { name: 'Staff ' + i, email: `staff${i}.${tag}@example.com`, password: PW, inviteToken: tok });
+    const r = await post('/api/auth/signup', { acceptTerms: true, name: 'Staff ' + i, email: `staff${i}.${tag}@example.com`, password: PW, inviteToken: tok });
     if (r.status === 200) invOk++; else if (r.status === 429) invBlocked++;
   }
   console.log(`Invited sign-ups from one address: ${invOk}/30 accepted, ${invBlocked} turned away`);
@@ -28,7 +28,7 @@ const people = Array.from({ length: N }, (_, i) => `shift${i}.${tag}@example.com
 // everyone is registered in the database first (a mine's staff were invited earlier; this scenario is about sign-in)
 let created = 0, signupBlocked = 0;
 for (const [i, email] of people.entries()) {
-  const r = await post('/api/auth/signup', { name: 'Worker ' + i, email, password: PW, orgName: `Shift Co ${i} ${tag}`, orgKind: 'contractor' });
+  const r = await post('/api/auth/signup', { acceptTerms: true, name: 'Worker ' + i, email, password: PW, orgName: `Shift Co ${i} ${tag}`, orgKind: 'contractor' });
   if (r.status === 200) created++; else if (r.status === 429) signupBlocked++;
 }
 console.log(`Sign-up from one address: ${created}/${N} accepted, ${signupBlocked} turned away by the limit`);

@@ -11,6 +11,7 @@ import {
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
 import { studioBlueprintFor } from './studio.js';
 import { requirementRequestBlock, hydrateOutstanding, signatureButton } from './requests.js';
+import { profileFields, saveProfile } from './profile.js';
 
 const refreshSheet = (html) => { const el = sheetEl(); if(el) el.innerHTML = html; };
 
@@ -1124,9 +1125,8 @@ function renderProfileSheet(){
     body += '<div class="notice">This is a demo persona. Use the persona menu at the top to switch between sample users, or create a real account from the banner.</div>';
     return body;
   }
-  body += '<label class="field-label" for="profileName">Your name</label><input type="text" id="profileName" value="'+me.name+'">'
-    +'<label class="field-label" for="profileTitle">Your title / role (shown on records)</label><input type="text" id="profileTitle" value="'+me.title+'" placeholder="e.g. Mine SHE Officer">'
-    +'<label class="field-label" for="profilePhone">Contact number</label><input type="tel" id="profilePhone" value="'+me.phone+'">'
+  body += '<div class="section-title" style="margin-top:0;">Just for you</div><div class="site-card-sub">Your own details and preferences. Company details are under Organisation settings.</div>'
+    + profileFields()
     +'<button class="btn primary block" style="margin-top:12px;" data-action="save-profile">Save</button>';
   if(!me.verified) body += '<button class="btn secondary block" style="margin-top:8px;" data-action="resend-verification">Resend confirmation email</button>';
   body += '<div class="section-title">Organisations</div>'
@@ -1145,8 +1145,7 @@ function renderProfileSheet(){
 }
 on('open-profile', ()=>openSheet(renderProfileSheet()));
 on('save-profile', async (el)=>{
-  const u = val;
-  if(await act(()=>api.patch('/api/me', { name:u('profileName'), title:u('profileTitle'), phone:u('profilePhone') }), 'Profile saved', el)) closeSheet();
+  if(await act(()=>saveProfile(), 'Profile saved', el)) closeSheet();
 });
 on('change-password', async (el)=>{
   const current = document.getElementById('pwCurrent').value, next = document.getElementById('pwNext').value;

@@ -42,17 +42,21 @@ export function publicPageFor(path){
   return hit ? hit[0] : null;
 }
 const NAV = [['features','Features'],['builder','Safety File Builder'],['contractors','Contractors'],['sites','Sites & mines'],['pricing','Pricing'],['contact','Contact']];
-const go = (page, label, cls) => '<a href="'+PUBLIC_PAGES[page]+'" class="'+(cls||'')+'" data-action="public-go" data-page="'+page+'">'+label+'</a>';
+// Prices are published only when the server says so (PUBLIC_PRICING_ENABLED); until then pricing links point to How it works.
+let pricingOn = false;
+const navItems = () => NAV.filter(([k])=>k!=='pricing' || pricingOn);
+const go = (page, label, cls) => { if(page==='pricing' && !pricingOn){ page = 'how'; label = 'How it works'; } return go2(page, label, cls); };
+const go2 = (page, label, cls) => '<a href="'+PUBLIC_PAGES[page]+'" class="'+(cls||'')+'" data-action="public-go" data-page="'+page+'">'+label+'</a>';
 const trial = (label, kind) => '<button class="btn primary" data-action="auth-go" data-view="signup"'+(kind?' data-kind="'+kind+'"':'')+'>'+(label||'Start free trial')+'</button>';
 
 function header(current){
   return '<header class="lp-top"><a href="/" class="brand lp-brand" data-action="public-go" data-page="landing" aria-label="COMVERA home"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">COMVERA</div></div></a>'
     +'<div class="lp-actions"><button class="linkish" data-action="auth-go" data-view="signin">Sign in</button>'+trial('Start free trial')+'</div>'
-    +'<nav class="lp-nav" aria-label="Main">'+NAV.map(([k,l])=>go(k, l, 'lp-link'+(current===k?' active':''))).join('')+'</nav></header>';
+    +'<nav class="lp-nav" aria-label="Main">'+navItems().map(([k,l])=>go(k, l, 'lp-link'+(current===k?' active':''))).join('')+'</nav></header>';
 }
 function footer(){
   return '<footer class="lp-foot"><span>COMVERA</span>'
-    +'<span class="lp-foot-links">'+NAV.map(([k,l])=>go(k,l)).join(' · ')+' · '+go('how','How it works')+' · <a href="/walkthrough">Interactive walkthrough</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>'
+    +'<span class="lp-foot-links">'+navItems().map(([k,l])=>go(k,l)).join(' · ')+' · '+go('how','How it works')+' · <a href="/walkthrough">Interactive walkthrough</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>'
     +'<span>Requirement lists are a starting point, not legal advice. COMVERA shows the status held in its records; it does not certify legal compliance.</span></footer>';
 }
 const page = (current, body) => '<div class="lp">'+header(current)+'<main>'+body+'</main>'+footer()+'</div>';
@@ -62,12 +66,13 @@ const list = (items) => '<ul class="lp-list">'+items.map(x=>'<li>'+tick+'<span>'
 
 export function renderPublic(name, features, ctx){
   const f = features || {};
+  pricingOn = !!f.publicPricing;
   switch(name){
     case 'features': return page(name, featuresPage());
     case 'builder': return page(name, builderPage());
     case 'contractors': return page(name, contractorsPage());
     case 'sites': return page(name, sitesPage());
-    case 'pricing': return page(name, pricingPage(ctx && ctx.pricing, ctx && ctx.audience));
+    case 'pricing': return page(name, pricingOn ? pricingPage(ctx && ctx.pricing, ctx && ctx.audience) : pricingSoon());
     case 'how': return page(name, howPage());
     case 'contact': return page(name, contactPage(f.contact || {}, ctx || {}));
     default: return renderLanding(f);
@@ -216,7 +221,14 @@ function painSection(){
     +'<a class="btn primary" href="/walkthrough">Try the walkthrough</a></div></section>';
 }
 
+/** Shown at /pricing while prices are not published: no amounts, a free trial instead. */
+function pricingSoon(){
+  return intro('Pricing', 'Pricing is being finalised', 'Every new account starts with a free trial of the full product. No card is needed.')
+    + '<section class="lp-close"><h2>Try COMVERA free</h2><p>Set up your company, build a safety file or invite a contractor, and see whether it saves you time.</p><div class="lp-cta">'+trial('Start free trial')+go2('contact','Talk to us','btn secondary')+'</div></section>';
+}
+
 export function renderLanding(features){
+  pricingOn = !!(features && features.publicPricing);
   const demo = features && features.demo;
   return page('landing', ''
     +'<section class="lp-hero"><div class="lp-hero-text">'

@@ -9,8 +9,8 @@ import { trackFirst } from '../lib/events.js';
 import Stripe from 'stripe';
 import { z } from 'zod';
 import { one, pool, withTx } from '../db/pool.js';
-import { config, features } from '../config.js';
-import { badRequest, conflict, unavailable } from '../lib/errors.js';
+import { config, features, isPlatformAdmin } from '../config.js';
+import { badRequest, conflict, notFound, unavailable } from '../lib/errors.js';
 import { requireAdmin, requireOrg, type OrgCtx } from '../lib/authz.js';
 import { PLANS, TRIAL_DAYS, grantActive, hasOwnAccess, planAllowedFor, planOf, plansFor, standing } from '../lib/plans.js';
 import { redeemPromo } from '../lib/promos.js';
@@ -99,8 +99,10 @@ async function syncSubscription(sub: Stripe.Subscription) {
 
 export default async function billingRoutes(app: FastifyInstance) {
   /** Public: what the pricing page shows (set by the platform admin; display only). */
-  app.get('/api/pricing', async (_req, reply) => {
-    reply.header('cache-control', 'public, max-age=60');
+  app.get('/api/pricing', async (req, reply) => {
+    // Prices are not final: nothing is disclosed publicly until PUBLIC_PRICING_ENABLED is switched on (platform admins can still preview).
+    if (!features.publicPricing && !(req.ctx?.user && isPlatformAdmin(req.ctx.user))) throw notFound('Pricing is not published yet.');
+    reply.header('cache-control', features.publicPricing ? 'public, max-age=60' : 'private, no-store');
     const plans = (await pricingTable(pool)).filter((p) => p.visible).map(({ defaultBlurb, ...p }) => ({ ...p, blurb: p.blurb || defaultBlurb }));
     return { trialDays: TRIAL_DAYS, plans };
   });
@@ -108,11 +110,14 @@ export default async function billingRoutes(app: FastifyInstance) {
   app.get('/api/billing', async (req) => {
     const ctx = requireOrg(req.ctx);
     const plan = planOf(ctx.org);
-    const prices = new Map((await pricingTable(pool)).map((p) => [p.planId, p]));
+    // Nobody may be charged without seeing the price: with online payments on, prices always show in the app.
+    const showPrices = features.publicPricing || features.payments || isPlatformAdmin(ctx.user);
+    const prices = new Map((await pricingTable(pool)).map((p) => [p.planId, showPrices ? p : { ...p, priceCents: null }]));
     const paystack = features.paymentProvider === 'paystack';
     return {
       enabled: features.billing,
       payments: features.payments,
+      pricesHidden: !showPrices,
       provider: features.paymentProvider,
       paystackSubscription: !!ctx.org.paystack_subscription_code,
       plan: plan.id,

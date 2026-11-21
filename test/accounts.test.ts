@@ -336,7 +336,7 @@ describe('review fixes: deletion edge cases and closed-organisation surfaces', (
     const email = uniqueEmail('late');
     assert.equal((await o.agent.post('/api/org/invites', { email, role: 'member' })).status, 200);
     assert.equal((await ops.post(`/api/manager/orgs/${oid}/status`, { status: 'suspended', reason: 'Testing invites', confirmName: 'Invite Closed Co' })).status, 200);
-    const r = await new Agent(app).post('/api/auth/signup', { name: 'Late Joiner', email, password: PASSWORD, inviteToken: await lastEmailToken(email, '/invite') });
+    const r = await new Agent(app).post('/api/auth/signup', { acceptTerms: true, name: 'Late Joiner', email, password: PASSWORD, inviteToken: await lastEmailToken(email, '/invite') });
     assert.equal(r.status, 400);
     assert.equal((await pool.query(`select 1 from users where email = $1`, [email])).rowCount, 0);
   });

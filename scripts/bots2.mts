@@ -109,7 +109,7 @@ await db.query(`insert into user_invites (org_id, email, role, token_hash, invit
 let staff: Bot | null = null;
 if (invToken) {
   staff = new Bot('staff'); staff.email = `staff.${tag}@example.com`;
-  const r = await staff.post('/api/auth/signup', { name: 'Staff', email: staff.email, password: PW, inviteToken: invToken });
+  const r = await staff.post('/api/auth/signup', { acceptTerms: true, name: 'Staff', email: staff.email, password: PW, inviteToken: invToken });
   if (r.status === 200) { await db.query('update users set email_verified_at = now() where email = $1', [staff.email]); await staff.refresh(); }
   else staff = null;
 }
@@ -205,7 +205,7 @@ log('3. Sessions and tokens');
   const m = new Bot('S5'); await m.signup('Mfa Co ' + tag, 'host'); await m.finishSetup();
   const ownerMfa = process.env.PLATFORM_ADMIN_EMAILS?.split(',')[0]?.trim();
   if (ownerMfa) {
-    const o = new Bot('own'); o.email = ownerMfa; await o.post('/api/auth/signup', { name: 'Owner', email: ownerMfa, password: PW, orgName: 'Own ' + tag, orgKind: 'host' });
+    const o = new Bot('own'); o.email = ownerMfa; await o.post('/api/auth/signup', { acceptTerms: true, name: 'Owner', email: ownerMfa, password: PW, orgName: 'Own ' + tag, orgKind: 'host' });
     await db.query('update users set email_verified_at = now() where email = $1', [ownerMfa]); o.orgId = (await o.refresh())?.org?.id ?? ''; await o.finishSetup();
     const s = await o.post('/api/manager/mfa/setup'); await o.post('/api/manager/mfa/enable', { code: codeAt(s.json.secret, currentStep()) });
     const fresh = new Bot('own2'); fresh.ip = '10.31.3.3';

@@ -68,6 +68,8 @@ const schema = z.object({
    * paid plan are invoiced by hand or given a plan in Platform.
    */
   ENFORCE_PLANS: bool(false),
+  /** Public pricing page and prices. Off until prices are final: plans, entitlements and promo codes keep working underneath. */
+  PUBLIC_PRICING_ENABLED: bool(false),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_HOST_STARTER: z.string().optional(),
@@ -130,6 +132,8 @@ export const features = {
   payments: !!config.STRIPE_SECRET_KEY || !!config.PAYSTACK_SECRET_KEY,
   paymentProvider: (config.PAYSTACK_SECRET_KEY ? 'paystack' : config.STRIPE_SECRET_KEY ? 'stripe' : null) as 'paystack' | 'stripe' | null,
   email: !!config.SMTP_URL,
+  /** Prices may be shown publicly (and to customers in the app). Platform admins always see them. */
+  publicPricing: config.PUBLIC_PRICING_ENABLED,
   /** Never on without email: nobody could ever receive the link. */
   verifyEmail: config.REQUIRE_EMAIL_VERIFICATION === 'true' || (config.REQUIRE_EMAIL_VERIFICATION === 'auto' && !!config.SMTP_URL),
   demo: config.DEMO_SANDBOX_ENABLED,

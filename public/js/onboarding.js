@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { S, ICONS, escapeHtml, on, render, reload, showToast } from './core.js';
 import { openUploadSheet, invalidateDocstore } from './docstore.js';
 import { loadPacks } from './sheets.js';
+import { profileFields, saveProfile } from './profile.js';
 
 const ob = () => (S.ob ??= { data: null, step: null, err: '', docs: null, packs: null });
 const v = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
@@ -63,6 +64,7 @@ function stepBody(id, d){
   const a = d.answers || {}, saved = a.contact || {}, me = (S.boot && S.boot.me) || {};
   // The safety contact starts as the person who signed up, so they only have to correct it, not type it again.
   const c = { name: saved.name || me.name || '', role: saved.role || '', phone: saved.phone || me.phone || '', email: saved.email || me.email || '' };
+  if(id === 'you') return profileFields();
   if(id === 'organisation') return fld('obName', d.org.kind === 'host' ? 'Organisation name' : 'Company name', d.org.name, 'maxlength="200" autocomplete="organization"')
     + fld('obReg', 'Company registration number (optional)', d.org.regNumber, 'maxlength="60" placeholder="e.g. 2015/123456/07"')
     + fld('obAddr', 'Physical address (optional)', d.org.address, 'maxlength="400"')
@@ -115,6 +117,7 @@ async function save(step){
     services: () => ({ trade: v('obTrade'), services: v('obServices'), industries: [...document.querySelectorAll('.obInd:checked')].map((x) => x.value) }),
     documents: () => { const c = document.querySelector('input[name="obDocs"]:checked'); return c ? { answer: c.value } : null; },
   }[step];
+  if(step === 'you') await saveProfile();
   if(body){
     const b = body();
     if(!b){ o.err = 'Choose one of the answers.'; return redraw(); }
@@ -123,7 +126,7 @@ async function save(step){
   if(step === 'site' && v('obSite')) await addSite();
   await loadOnboarding();
   const steps = o.data.steps, i = steps.findIndex((s) => s.id === step);
-  if(steps.find((s) => s.id === step).done || !body) o.step = (steps[i + 1] || steps[i]).id;
+  if(steps.find((s) => s.id === step).done || (!body && step !== 'you')) o.step = (steps[i + 1] || steps[i]).id;
   redraw(); window.scrollTo(0, 0);
 }
 async function addSite(){

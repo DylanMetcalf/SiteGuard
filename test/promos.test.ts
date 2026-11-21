@@ -1,5 +1,6 @@
 /** Promo codes, plans given by the platform admin, and the editable pricing page. */
 import './billing-env.js';
+import './support/pricing-on-env.js';
 import './support/platform-env.js';
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';

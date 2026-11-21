@@ -56,7 +56,7 @@ const act = async (p, sel) => { await p.locator(sel).first().click({ timeout: 80
 await host.goto(base);
 await act(host, '[data-action="auth-go"][data-view="signup"]');
 await act(host, '[data-action="pick-kind"][data-kind="host"]');
-await host.fill('#suName', 'Thandi Nkosi');
+await host.fill('#suFirst', 'Thandi'); await host.fill('#suLast', 'Nkosi'); await host.check('#suTerms');
 await host.fill('#suEmail', hostEmail);
 await host.fill('#suPassword', 'a long enough passphrase');
 await host.fill('#suOrgName', 'Riverside Mining <b>Group</b>');
@@ -103,7 +103,7 @@ log('host created site, invited contractor by email, added a requirement');
 // 3. Contractor accepts from the emailed link and signs up
 await contractor.goto(base + '/site-invite?token=' + (await token(contractorEmail, '/site-invite')));
 await contractor.waitForSelector('text=Site invitation');
-await contractor.fill('#suName', 'Sipho Ndlovu');
+await contractor.fill('#suFirst', 'Sipho'); await contractor.fill('#suLast', 'Ndlovu'); await contractor.check('#suTerms');
 await contractor.fill('#suPassword', 'another long passphrase');
 await act(contractor, '[data-action="signup"][data-mode="site-invite"]');
 await contractor.waitForSelector('text=North Pit — Pump Station Upgrade');

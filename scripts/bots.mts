@@ -29,13 +29,13 @@ log('Phase 0: 15 bots sign up at the same time');
   check('all', 'fifteen simultaneous sign-ups all succeed', out.every((r) => r.status === 200), JSON.stringify(out.map((r) => r.status)));
   // two bots race to register the same address
   const racer = `racer.${tag}@example.com`;
-  const two = await Promise.all([1, 2, 3, 4, 5, 6].map((i) => new Bot('R' + i).post('/api/auth/signup', { name: 'Racer', email: racer, password: PW, orgName: 'Racer Co ' + i + tag, orgKind: 'host' })));
+  const two = await Promise.all([1, 2, 3, 4, 5, 6].map((i) => new Bot('R' + i).post('/api/auth/signup', { acceptTerms: true, name: 'Racer', email: racer, password: PW, orgName: 'Racer Co ' + i + tag, orgKind: 'host' })));
   const wins = two.filter((r) => r.status === 200).length;
   check('A1', 'six sign-ups for one address at once: exactly one wins, none crash', wins === 1 && two.every((r) => r.status < 500), JSON.stringify(two.map((r) => r.status)));
   check('A1', 'losers are told the address is taken', two.filter((r) => r.status !== 200).every((r) => [400, 409].includes(r.status)), JSON.stringify(two.map((r) => r.status)));
-  const weak = await new Bot('W').post('/api/auth/signup', { name: 'W', email: `weak.${tag}@example.com`, password: 'short', orgName: 'Weak', orgKind: 'host' });
+  const weak = await new Bot('W').post('/api/auth/signup', { acceptTerms: true, name: 'W', email: `weak.${tag}@example.com`, password: 'short', orgName: 'Weak', orgKind: 'host' });
   check('A1', 'a weak password is refused', weak.status === 400, String(weak.status));
-  const noOrg = await new Bot('N').post('/api/auth/signup', { name: 'N', email: `noorg.${tag}@example.com`, password: PW, orgName: '', orgKind: 'host' });
+  const noOrg = await new Bot('N').post('/api/auth/signup', { acceptTerms: true, name: 'N', email: `noorg.${tag}@example.com`, password: PW, orgName: '', orgKind: 'host' });
   check('A1', 'sign-up without an organisation name is refused', noOrg.status === 400, String(noOrg.status));
 }
 await db.query('update organisations set onboarding_completed_at = null where id = any($1::uuid[])', [[mines[0].orgId, cons[0].orgId]]);
@@ -91,7 +91,7 @@ for (const m of mines) { const f = await m.post('/api/doc-folders', { name: `${m
 // the platform owner (with an authenticator) signs in
 if (ownerEmail) {
   owner.email = ownerEmail;
-  const su = await owner.post('/api/auth/signup', { name: 'Owner Bot', email: ownerEmail, password: PW, orgName: 'Bot Platform ' + tag, orgKind: 'host' });
+  const su = await owner.post('/api/auth/signup', { acceptTerms: true, name: 'Owner Bot', email: ownerEmail, password: PW, orgName: 'Bot Platform ' + tag, orgKind: 'host' });
   if (su.status === 200) {
     await db.query('update users set email_verified_at = now() where email = $1', [ownerEmail]);
     const st = await owner.refresh(); owner.orgId = st.org.id; await owner.finishSetup();

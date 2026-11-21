@@ -17,7 +17,7 @@ before(async () => {
 });
 after(teardown);
 
-const rawSignup = (body: Record<string, unknown>) => app.inject({ method: 'POST', url: '/api/auth/signup', payload: { name: 'Mom', password: PASSWORD, orgKind: 'contractor', ...body } });
+const rawSignup = (body: Record<string, unknown>) => app.inject({ method: 'POST', url: '/api/auth/signup', payload: { acceptTerms: true, name: 'Mom', password: PASSWORD, orgKind: 'contractor', ...body } });
 
 describe('lifetime access with a promo code at sign-up', () => {
   it('gives the new company the plan with no end date, and it survives the trial ending', async () => {

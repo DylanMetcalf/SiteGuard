@@ -6,11 +6,12 @@
 import type { Db } from '../db/pool.js';
 import { one } from '../db/pool.js';
 
-export type StepId = 'organisation' | 'contact' | 'services' | 'site' | 'areas' | 'documents' | 'connect';
+export type StepId = 'you' | 'organisation' | 'contact' | 'services' | 'site' | 'areas' | 'documents' | 'connect';
 export type Need = 'required' | 'recommended' | 'optional';
 export interface StepDef { id: StepId; title: string; why: string; need: Need }
 
 const HOST: StepDef[] = [
+  { id: 'you', title: 'About you', need: 'required', why: 'Your name and role appear on what you send and sign off, so colleagues, sites and contractors know who did what.' },
   { id: 'organisation', title: 'Your organisation', need: 'required', why: 'Your company name and details appear on documents, invitations and what contractors see.' },
   { id: 'contact', title: 'Safety contact', need: 'required', why: 'Contractors and COMVERA need one named person to contact about safety files.' },
   { id: 'site', title: 'Your first site', need: 'required', why: 'Contractors file their safety documents against a site. You can add more sites later.' },
@@ -18,6 +19,7 @@ const HOST: StepDef[] = [
   { id: 'documents', title: 'Your site documents', need: 'required', why: 'Policies, procedures, site rules and templates you already have. Uploading them is optional; we only need to know your answer.' },
 ];
 const CONTRACTOR: StepDef[] = [
+  { id: 'you', title: 'About you', need: 'required', why: 'Your name and role appear on what you send and sign off, so colleagues, sites and contractors know who did what.' },
   { id: 'organisation', title: 'Your company', need: 'required', why: 'Your company details go on every safety file and document you send.' },
   { id: 'services', title: 'What you do', need: 'required', why: 'Sites see your trade and services, and COMVERA suggests the documents that kind of work usually needs.' },
   { id: 'contact', title: 'Safety contact', need: 'required', why: 'The person sites should contact about your safety files.' },
@@ -29,7 +31,8 @@ export const stepsFor = (kind: string) => (kind === 'host' ? HOST : CONTRACTOR);
 type Answers = { phone?: string; contact?: { name?: string; role?: string; phone?: string; email?: string };
   services?: string; industries?: string[]; documents?: 'yes' | 'no' | 'later'; areasSkipped?: boolean; connectSkipped?: boolean };
 
-export async function onboardingStatus(db: Db, org: { id: string; kind: string; name: string; trade?: string; onboarding?: unknown; onboarding_completed_at?: unknown }) {
+export async function onboardingStatus(db: Db, org: { id: string; kind: string; name: string; trade?: string; onboarding?: unknown; onboarding_completed_at?: unknown },
+  user?: { profile_completed_at?: unknown } | null) {
   const a = (org.onboarding ?? {}) as Answers;
   const counts = await one<{ workplaces: number; areas: number; docs: number; joined: number }>(db,
     `select (select count(*) from workplaces where org_id = $1 and archived_at is null)::int as workplaces,
@@ -38,6 +41,8 @@ export async function onboardingStatus(db: Db, org: { id: string; kind: string; 
             (select count(*) from contractors c join sites s on s.contractor_id = c.id where c.linked_org_id = $1 and s.status <> 'declined')::int as joined`, [org.id]);
   const c = counts ?? { workplaces: 0, areas: 0, docs: 0, joined: 0 };
   const done: Record<StepId, boolean> = {
+    // The person setting up: their own profile (users.profile_completed_at). Without a user (e.g. counts), it never blocks.
+    you: user ? !!user.profile_completed_at : true,
     organisation: !!org.name?.trim() && !!a.phone?.trim(),
     contact: !!a.contact?.name?.trim() && !!(a.contact?.phone?.trim() || a.contact?.email?.trim()),
     services: !!(org.trade ?? '').trim(),

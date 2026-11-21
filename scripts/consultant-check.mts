@@ -39,7 +39,7 @@ async function page(w = 1280, h = 900) {
   if (process.env.DEBUG) p.on('response', async (r) => { if (r.url().includes('/api/consultant') || r.status() >= 400) console.log('  [net]', r.status(), r.request().method(), r.url().replace(BASE, ''), (await r.text().catch(() => '')).slice(0, 140)); });
   await p.goto(BASE + '/pricing'); await p.waitForSelector('.lp-toggle'); await p.click('.lp-toggle [data-who="consultant"]');
   await p.locator('.lp-price').filter({ has: p.locator('h3', { hasText: /^Consultant Practice$/ }) }).locator('[data-kind]').click(); await p.waitForSelector('#suEmail');
-  await p.fill('#suName', 'Naledi Khumalo'); await p.fill('#suEmail', email); await p.fill('#suOrgName', 'Khumalo Safety Advisory ' + tag); await p.fill('#suPassword', 'correct horse battery staple');
+  await p.fill('#suFirst', 'Naledi'); await p.fill('#suLast', 'Khumalo'); await p.check('#suTerms'); await p.fill('#suEmail', email); await p.fill('#suOrgName', 'Khumalo Safety Advisory ' + tag); await p.fill('#suPassword', 'correct horse battery staple');
   await p.click('[data-action="signup"][data-mode="new"]');
   for (let i = 0; i < 20; i++) { const r = await db.query('update users set email_verified_at = now() where email = $1', [email]); if (r.rowCount) break; await p.waitForTimeout(250); } // wait for the account to exist, then confirm the address
   for (let i = 0; i < 12; i++) {

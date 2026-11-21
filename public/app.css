@@ -1105,3 +1105,18 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .rq-block{margin-top:12px;}
 .chip{padding:6px 12px;border:1.5px solid var(--line,#E2E7E4);border-radius:999px;background:var(--paper-raised,#fff);color:var(--ink,#0E1A2B);font:inherit;font-size:13px;cursor:pointer;}
 .chip:hover{border-color:var(--brand,#16325C);}
+
+/* ---- Sign-up names, consent, purpose ---- */
+.ob-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media (max-width:380px){.ob-two{grid-template-columns:1fr;}}
+.ob-consent{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink-soft,#5E6A7A);margin-top:10px;line-height:1.45;}
+.ob-consent input{margin-top:3px;flex:none;}
+.ob-purpose{border:none;padding:0;margin:14px 0 0;}
+.ob-purpose legend{padding:0;margin-bottom:6px;}
+
+/* ---- Your next step ---- */
+.next-step{border-left:4px solid var(--brand,#16325C);padding:14px 16px;margin-bottom:14px;}
+.next-step-label{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand,#16325C);margin-bottom:4px;}
+.next-step-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+.next-step h2{font-size:17px;margin:0 0 4px;}
+.next-step .site-card-sub{margin:0;}

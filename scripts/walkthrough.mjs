@@ -27,7 +27,7 @@ async function account(kind, org, email, width = 1280) {
   const ctx = await browser.newContext({ viewport: { width, height: width < 600 ? 860 : 820 }, deviceScaleFactor: width < 600 ? 2 : 1 });
   await ctx.addInitScript(() => { try { localStorage.setItem('sg_tutorial_seen', '1'); } catch {} });
   const page = await ctx.newPage();
-  const r = await page.request.post(B + '/api/auth/signup', { data: { name: kind === 'host' ? 'Thandi Nkosi' : 'Sipho Ndlovu', email, password: PASSWORD, orgName: org, orgKind: kind } });
+  const r = await page.request.post(B + '/api/auth/signup', { data: { acceptTerms: true, name: kind === 'host' ? 'Thandi Nkosi' : 'Sipho Ndlovu', email, password: PASSWORD, orgName: org, orgKind: kind } });
   if (!r.ok()) {
     // Re-running: the owner account already exists, so sign in instead.
     const l = await page.request.post(B + '/api/auth/login', { data: { email, password: PASSWORD } });

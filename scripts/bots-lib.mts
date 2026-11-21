@@ -65,9 +65,9 @@ export class Bot {
   }
   async signup(org: string, kind: string, extra: object = {}) {
     this.email = `${this.name.toLowerCase()}.${tag}@example.com`; this.kind = kind;
-    const r = await this.post('/api/auth/signup', { name: `${this.name} Bot`, email: this.email, password: PW, orgName: org, orgKind: kind, ...extra });
+    const r = await this.post('/api/auth/signup', { acceptTerms: true, name: `${this.name} Bot`, email: this.email, password: PW, orgName: org, orgKind: kind, ...extra });
     if (r.status !== 200) return r;
-    await db.query('update users set email_verified_at = now() where email = $1', [this.email]);
+    await db.query('update users set email_verified_at = now(), profile_completed_at = now() where email = $1', [this.email]);
     const st = await this.refresh(); this.orgId = st?.org?.id ?? ''; this.userId = st?.me?.id ?? '';
     return r;
   }

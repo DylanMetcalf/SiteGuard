@@ -1,6 +1,7 @@
 // Main screens. Rendering is ported from the original MVP; data now comes
 // from the server and every button is a data-action handled in app.js.
 
+import { nextStepCard } from './nextstep.js';
 import { renderClients, clientsWidget, managedBanner } from './consultant.js';
 import { api } from './api.js';
 import {
@@ -230,6 +231,8 @@ function renderDashboard(){
   let start = gettingStarted();
   const welcome = welcomeCard();
   if(welcome) return head + welcome;
+  // One next step, worked out from the workspace itself (public/js/nextstep.js), before everything else.
+  start = nextStepCard() + start;
   if(!parts.length) return head + start + '<div class="empty"><h3>Nothing on your dashboard</h3><p>Use Customise to choose what shows here.</p></div>';
   // When there is work waiting, the Today card comes before the set-up checklist.
   if(order.filter(id=>!hidden.includes(id))[0]==='today' && todo.length) return head + parts[0] + start + parts.slice(1).join('');
