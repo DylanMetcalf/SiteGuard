@@ -343,3 +343,11 @@ Newest first.
 **REASON** The owner found the previous hero flat and confusing: eight elements competed and the steps repeated the paragraph. The copy rules in `scripts/landing-audit.mts` (13/13) and its accessibility checks in light and dark mode still pass.
 **DATE** 2026-11-22
 
+**DECISION** The once-off safety file (Paystack, already built server-side) is offered where a contractor without a plan is blocked: the Safety files page, Exchanges and the requirement sheet. It shows its price and a Pay once button only when Paystack is configured; otherwise it says plainly that online payment is not switched on yet and how to buy one. If Paystack cannot start a checkout, the person is told nothing was charged and the started payment is closed. After payment the plans page says the file is paid for, until when, and links back to the safety files.
+**REASON** Contractors who need one file should be able to buy it at the moment they need it, without ever seeing a button that cannot work or a price they cannot pay.
+**DATE** 2026-11-22
+
+**DECISION** Public pages share one simple look: a soft tinted header panel with a pill label and one "Start free trial" button, cards with a coloured top edge, a light "problem" section between the dark hero and the dark closing banner, and the closing banner's buttons matching the hero (the old navy button was invisible on the navy banner). The feature grid is three columns.
+**REASON** The owner found the inner pages flat and too plain; the changes add colour and rhythm without adding content or steps.
+**DATE** 2026-11-22
+

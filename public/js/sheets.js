@@ -6,7 +6,7 @@ import {
   org, isContractor, isHost, isOrgAdmin, canReview, canEdit, readOnly, myName, myContractorId,
   computeReadiness, effectiveStatus, certStatus, badge, timeAgo, dateTime, todayStr, daysUntil, incidentTypeInfo, permitTypeInfo,
   permitEffectiveStatus, findReq, siteIdForReq, libraryReqId, contractorOf, escapeHtml, unescapeHtml, deepEscape, libraryCopyFor, sitesNeedingLibrary,
-  on, actions, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val,
+  on, actions, act, reload, render, showToast, openSheet, closeSheet, sheetEl, sheetHead, val, onceOffOffer,
 } from './core.js';
 import { permitBadge, DASHBOARD_WIDGETS, dashboardLayout, workerSummary, appointmentRow } from './views.js';
 import { studioBlueprintFor } from './studio.js';
@@ -238,7 +238,7 @@ function renderReqSheet(reqId){
   body += '<div class="divider"></div>';
 
   if(isContractor()){
-    if(ro){ body += '<p class="site-card-sub">Read-only — your organisation needs an active plan to submit.</p>'; }
+    if(ro){ body += '<p class="site-card-sub">Read-only — your organisation needs an active plan to submit.</p>' + onceOffOffer(); }
     else if(eff==='awaiting_review'){ body += '<p class="site-card-sub">Submitted — waiting on reviewer sign-off.</p>'; }
     else if(eff==='complete' && !reqId.startsWith('lib:')){ body += '<p class="site-card-sub">This requirement is complete.</p>'; }
     else {

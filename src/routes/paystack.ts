@@ -13,7 +13,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { many, one, pool, withTx, type Db } from '../db/pool.js';
 import { config, features } from '../config.js';
-import { badRequest, conflict, notFound, unavailable } from '../lib/errors.js';
+import { badRequest, conflict, HttpError, notFound, unavailable } from '../lib/errors.js';
 import { requireAdmin, requireOrg } from '../lib/authz.js';
 import { PLANS, grantActive, planAllowedFor, type Plan } from '../lib/plans.js';
 import { pricingTable } from '../lib/pricing.js';
@@ -246,15 +246,23 @@ export default async function paystackRoutes(app: FastifyInstance) {
       );
       await audit(db, ctx, 'Started checkout', `${plan.name}, ${rands(price.priceCents!)} (ref ${reference})`);
     });
-    const data = await paystack<{ authorization_url: string }>('POST', '/transaction/initialize', {
-      email: ctx.user.email,
-      amount: price.priceCents,
-      currency: 'ZAR',
-      reference,
-      ...(planCode ? { plan: planCode } : {}),
-      callback_url: appUrl('/?billing=success'),
-      metadata: { org_id: ctx.org.id, plan_id: plan.id, kind: plan.once ? 'once_off' : 'subscription' },
-    });
+    let data: { authorization_url: string };
+    try {
+      data = await paystack<{ authorization_url: string }>('POST', '/transaction/initialize', {
+        email: ctx.user.email,
+        amount: price.priceCents,
+        currency: 'ZAR',
+        reference,
+        ...(planCode ? { plan: planCode } : {}),
+        callback_url: appUrl('/?billing=success'),
+        metadata: { org_id: ctx.org.id, plan_id: plan.id, kind: plan.once ? 'once_off' : 'subscription' },
+      });
+    } catch (err) {
+      // Nothing was charged: say so plainly, and don't leave the plans page waiting for a payment that never started.
+      req.log.error({ err }, 'paystack checkout could not start');
+      await pool.query(`update payments set status = 'failed', failure_reason = 'Checkout could not start' where reference = $1 and status = 'pending'`, [reference]);
+      throw new HttpError(502, 'payment_provider', 'The payment page could not be opened just now. Nothing was charged. Please try again in a minute.');
+    }
     return { url: data.authorization_url, reference };
   });
 

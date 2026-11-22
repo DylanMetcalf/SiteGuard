@@ -111,6 +111,8 @@ export function returnNotice(b, ret, refreshing){
   if(ret === 'cancelled') return '<div class="notice" role="status">Checkout cancelled. Nothing was charged and your plan has not changed.</div>';
   const latest = (b.history || [])[0];
   const failed = latest && ['failed', 'abandoned'].includes(latest.status) && Date.now() - new Date(latest.created_at).getTime() < 6 * 3600e3;
+  if(paymentConfirmed(b) && b.grant && /once/i.test(b.grant.plan || '')) return '<div class="notice ok" role="status"><strong>Payment confirmed. Your safety file is paid for.</strong> Finish it'+(b.grant.until ? ' by ' + escapeHtml(String(b.grant.until).slice(0, 10)) : '')+' and download it from its page.'
+    + '<div style="margin-top:8px;"><button class="btn primary small" data-action="nav" data-nav="sites">Open my safety files</button></div></div>';
   if(paymentConfirmed(b)) return '<div class="notice ok" role="status"><strong>Payment confirmed.</strong> Your plan is now ' + escapeHtml((b.plans.find((p) => p.id === b.plan) || {}).name || b.plan) + '.</div>';
   if(failed) return '<div class="notice bad" role="alert"><strong>Your payment was not accepted.</strong> Nothing has been charged and your plan has not changed. You can try again below, or use another card.</div>';
   return '<div class="notice warn" role="status"><strong>Waiting for confirmation from your payment provider.</strong> Your plan has not changed yet; it switches as soon as the payment is confirmed. This usually takes under a minute.'
