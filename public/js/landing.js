@@ -28,7 +28,7 @@ function mock(){
     + row('Medical — S. Nkosi', 'Expires in 12 days', 'warn', 3)
     + cycle
     +'</div>'
-    +'<div class="lp-mgate"><div class="lp-mgate-q">'+I.sparkle+'</div><div><div class="lp-mgate-s">OSCAR</div><div class="lp-msub">I drafted your fall protection plan. Check it, then send.</div></div></div>'
+    +'<div class="lp-mgate"><div class="lp-mgate-q">'+I.sparkle+'</div><div><div class="lp-mgate-s">DRAFT READY</div><div class="lp-msub">Your fall protection plan is drafted. Check it, then send.</div></div></div>'
     +'</div>';
 }
 
@@ -233,19 +233,18 @@ export function renderLanding(features){
   pricingOn = !!(features && features.publicPricing);
   const demo = features && features.demo;
   return page('landing', ''
-    +'<section class="lp-hero"><div class="lp-hero-text">'
-    +'<p class="lp-eyebrow">For contractors on South African mines</p>'
-    +'<h1>Build your safety file <span class="lp-mark">once</span>. Send it to any mine.</h1>'
-    +'<p class="lp-lead"><strong>COMVERA is an online portal for contractor safety files.</strong> Upload your documents once. Oscar drafts what is missing. See what is approved, missing or expiring.</p>'
-    +'<div class="lp-cta lp-cta-main">'+trial('Build my safety file','contractor')+'<a class="btn secondary" href="/walkthrough">Watch the 6-minute walkthrough</a></div>'
-    +'<p class="lp-sub-links lp-hlinks"><span>No card needed for the 14-day trial.</span>'+(demo?'<button class="linkish" data-action="start-demo" data-tour="1">Explore the demo</button>':'')+'</p>'
+    // One message, one main button, one door for mines, then three plain steps. The card on the right shows it working.
+    +'<section class="lp-hero v2"><div class="lp-hero-text">'
+    +'<p class="lp-eyebrow">For contractors and mines in South Africa</p>'
+    +'<h1>Safety files that get <span class="lp-mark">approved</span>, not sent back.</h1>'
+    +'<p class="lp-lead"><strong>COMVERA is an online portal for contractor safety files.</strong> Keep your documents in one place. Send a complete file to any mine. See what is approved, missing or about to expire.</p>'
+    +'<div class="lp-cta lp-cta-main">'+trial('Build my safety file','contractor')+'<button class="btn lp-btn-ghost" data-action="auth-go" data-view="signup" data-kind="host">I run a mine or site</button></div>'
+    +'<p class="lp-trust"><span>Free 14-day trial</span><span>No card needed</span><span>Works on any phone</span><a href="/walkthrough">Watch how it works</a>'+(demo?'<button class="linkish" data-action="start-demo" data-tour="1">Try the demo</button>':'')+'</p>'
     +'<ol class="lp-hsteps" aria-label="How it works">'
-      +'<li><b>1</b><span>Upload your company documents once</span></li>'
-      +'<li><b>2</b><span>Oscar drafts what is missing</span></li>'
-      +'<li><b>3</b><span>Send one complete file to any mine</span></li>'
+      +'<li><b>1</b><span><strong>Add your documents once</strong>Registration, insurance, certificates</span></li>'
+      +'<li><b>2</b><span><strong>Fill the gaps</strong>See what each mine needs; get drafts to check</span></li>'
+      +'<li><b>3</b><span><strong>Send and track</strong>Know the moment it is approved</span></li>'
     +'</ol>'
-    +'<div class="lp-minebar"><div><b>Run a mine or site?</b><span>See which contractors are approved and cleared before they reach the gate.</span></div>'+trial('Start as a mine','host')+'</div>'
-    +'<ul class="lp-proof"><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li><li>'+tick+'Reuse documents on every site</li></ul>'
     +'</div>'+mock()+'</section>'
     + painSection()
     +'<section class="lp-sides"><div class="lp-side"><p class="lp-eyebrow">For contractors</p><h2>Build a professional safety file in minutes.</h2>'

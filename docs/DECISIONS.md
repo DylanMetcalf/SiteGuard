@@ -339,3 +339,7 @@ Newest first.
 **REASON** Product-led activation needs an obvious next action; acceptance tests that create accounts and probe access must never touch real customers.
 **DATE** 2026-11-21
 
+**DECISION** The homepage hero is one dark brand panel with a single message ("Safety files that get approved, not sent back."), one main button for contractors, one door for mines ("I run a mine or site"), a short trust line, three plain steps and the live safety-file card. The separate mine box, the proof list, the repeated step text and the unexplained name "Oscar" were removed from the hero.
+**REASON** The owner found the previous hero flat and confusing: eight elements competed and the steps repeated the paragraph. The copy rules in `scripts/landing-audit.mts` (13/13) and its accessibility checks in light and dark mode still pass.
+**DATE** 2026-11-22
+
