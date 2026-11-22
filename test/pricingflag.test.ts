@@ -36,6 +36,12 @@ describe('public pricing switched off', () => {
     assert.equal((await con.get('/api/pricing')).status, 404);
   });
 
+  it('the once-off offer carries no price while online payment is off', async () => {
+    const f = (await con.state()).features.onceOff;
+    assert.equal(f.payable, false);
+    assert.equal(f.priceCents, null);
+  });
+
   it('a platform admin can still preview prices', async () => {
     assert.equal((await ops.get('/api/pricing')).status, 200);
     const b = (await ops.get('/api/billing')).body;

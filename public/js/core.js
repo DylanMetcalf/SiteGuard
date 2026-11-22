@@ -135,6 +135,22 @@ export const isDemoMode = () => !!S.boot.org.isDemo;
  * kind: 'lapsed' (read-only: trial ended or plan inactive), 'noplan' (contractor without its own plan),
  * 'nonadmin' (needs an owner or admin). The button only appears for owners and admins.
  */
+/**
+ * "Need just one safety file?": the once-off purchase, offered where a contractor without a plan is blocked.
+ * With online payment off it says so honestly instead of showing a button that cannot work.
+ */
+export function onceOffOffer(){
+  const f = (S.boot.features || {}).onceOff;
+  if(!f || !isOrgAdmin()) return '';
+  const price = f.priceCents != null ? 'R' + (f.priceCents / 100).toLocaleString('en-ZA') : '';
+  const contact = (S.boot.features.contact || {}).email;
+  return '<div class="once-card"><div class="once-text"><h3>Need just one safety file?</h3><p>Pay once' + (price ? ' (' + price + ')' : '') + ' and get '
+    + f.days + ' days to finish one safety file and download it as a PDF. No subscription. It stays readable afterwards.</p></div>'
+    + (f.payable ? '<button class="btn primary" data-action="paystack-checkout" data-plan="contractor_once">Pay once' + (price ? ' · ' + price : '') + '</button>'
+      : '<p class="once-note">Online card payment is not switched on yet.' + (contact ? ' Email <a href="mailto:' + escapeHtml(contact) + '">' + escapeHtml(contact) + '</a> to buy one.' : ' Contact COMVERA to buy one.') + '</p>')
+    + '</div>';
+}
+
 export function restrictionNotice(kind, what){
   const o = S.boot.org, admin = isOrgAdmin();
   const target = what ? escapeHtml(what) : 'do this';
@@ -153,7 +169,7 @@ export function restrictionNotice(kind, what){
     title = 'Only owners and admins can do this';
     reason = 'To '+target+', ask an owner or admin of '+o.name+'.';
   }
-  return '<div class="next-card '+tone+'" role="note"><h3>'+title+'</h3><p>'+reason+'</p>'+btn+'</div>';
+  return '<div class="next-card '+tone+'" role="note"><h3>'+title+'</h3><p>'+reason+'</p>'+btn+'</div>' + (kind === 'lapsed' || kind === 'noplan' ? onceOffOffer() : '');
 }
 
 /* ============ DATES & READINESS (ported from the MVP) ============ */

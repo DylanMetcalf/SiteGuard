@@ -1155,3 +1155,42 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .lp-hero.v2 .lp-mcard{color:var(--ink);}
 .lp-hero.v2 .lp-mcard .lp-mtitle{color:var(--ink);}
 .lp-hero.v2{margin-bottom:28px;}
+
+/* ---- Once-off safety file offer ---- */
+.once-card{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between;margin:12px 0;padding:16px 18px;border-radius:16px;
+  background:linear-gradient(135deg, var(--sage-bg,#EAF4EE), var(--paper-raised,#fff));border:1px solid var(--sage-soft,#CFE5D7);}
+.once-text{flex:1 1 260px;min-width:0;} .once-card h3{margin:0 0 4px;font-size:16px;} .once-card p{margin:0;font-size:13.5px;color:var(--ink-soft);}
+.once-note{flex:1 1 220px;} .once-note a{color:var(--brand);font-weight:600;}
+
+/* ---- Public pages: friendlier, still simple ---- */
+.lp-page-head{max-width:none; margin:12px 0 12px; padding:32px 22px; border-radius:24px; border:1px solid var(--sage-soft, #D6E8DD);
+  background:radial-gradient(60% 120% at 100% 0%, rgba(108,211,162,.22), transparent 60%), radial-gradient(50% 120% at 0% 100%, rgba(80,130,220,.12), transparent 60%), var(--sage-bg, #EEF6F1);}
+.lp-page-head h1, .lp-page-head .lp-lead{max-width:760px;}
+.lp-page-head .lp-eyebrow{display:inline-block; padding:5px 12px; border-radius:999px; background:var(--paper-raised); border:1px solid var(--sage-soft, #D6E8DD); margin-bottom:14px;}
+.lp-page-head .lp-cta{display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin-top:18px;}
+.lp-head-note{font-size:13.5px; color:var(--ink-soft);}
+@media (min-width:900px){ .lp-page-head{padding:52px 48px;} .lp-grid{grid-template-columns:repeat(3, 1fr);} }
+/* Cards get a little colour on top. */
+.lp-side{border-top:4px solid var(--sage, #6E9C80);}
+.lp-feat{transition:transform .15s ease, box-shadow .15s ease;}
+.lp-feat:hover{transform:translateY(-2px); box-shadow:var(--shadow-lg);}
+@media (prefers-reduced-motion: reduce){ .lp-feat{transition:none;} .lp-feat:hover{transform:none;} }
+/* Closing banner: the same clear buttons as the hero (the old navy button disappeared on the navy banner). */
+.lp-close .btn.primary{background:#8BDDB1; color:#0B1A2E; border-color:#8BDDB1;}
+.lp-close .btn.primary:hover{background:#A6E8C4;}
+.lp-close .btn.secondary{border:1.5px solid rgba(255,255,255,.55); color:#fff;}
+.lp-close .btn:focus-visible{outline:3px solid #fff; outline-offset:3px;}
+/* "The problem" is light, so the dark hero and the dark closing banner are not stacked on top of each other. */
+.lp-pain{background:var(--paper-raised); color:var(--ink); border:1px solid var(--grey-line);}
+.lp-pain .lp-eyebrow{color:var(--sage-strong);}
+.lp .lp-pain h2{color:var(--ink);}
+.lp-pain-head p:last-child{color:var(--ink-soft);}
+.lp-pain-was{background:var(--red-bg, #FDECEA); border:1px solid transparent;}
+.lp-pain-was p{color:var(--ink-soft);}
+.lp-pain-was .lp-pain-ic{background:var(--red, #B42318); color:#fff;}
+.lp-pain-now{background:var(--green-bg, #E8F5EE); border:1px solid transparent;}
+.lp-pain-arrow{color:var(--sage-strong);}
+.lp-pain-foot{border-top-color:var(--grey-line);}
+.lp-pain-foot p{color:var(--ink);}
+.lp-pain-foot .btn{background:var(--brand); color:var(--on-brand);}
+.lp select{width:100%; min-height:46px; padding:0 12px; border:1px solid var(--grey-line); border-radius:12px; background:var(--paper-raised); font:inherit; color:var(--ink);}

@@ -15,6 +15,7 @@ import type { FastifyInstance } from 'fastify';
 import { templatesForSites } from './templates.js';
 import { many, one, pool, type Db } from '../db/pool.js';
 import { config, features, isPlatformAdmin } from '../config.js';
+import { pricingTable } from '../lib/pricing.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
 import { PLANS, grantActive, hasOwnAccess, planOf, standing } from '../lib/plans.js';
 import { sponsoredSiteIds } from '../lib/sponsorship.js';
@@ -389,6 +390,18 @@ async function inboxFor(userId: string, orgId: string) {
   return { unread: unread[0]?.n ?? 0, items: items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, body: i.body, link: i.link, createdAt: i.created_at, read: !!i.read_at })) };
 }
 
+/**
+ * The once-off safety file, offered to a contractor (not a consultant) where it is blocked. The price is only sent when
+ * online payment is on (nobody sees a price they cannot pay, and draft prices stay private); \`payable\` says whether the
+ * button can take them to Paystack now.
+ */
+async function onceOffOffer(org: { kind: string; is_consultant?: boolean; billing_parent_id?: string | null }) {
+  if (org.kind !== 'contractor' || org.is_consultant || org.billing_parent_id || !features.billing) return null;
+  const payable = features.paymentProvider === 'paystack';
+  const price = payable ? (await pricingTable(pool)).find((p) => p.planId === 'contractor_once')?.priceCents ?? null : null;
+  return { payable: payable && price !== null && price >= 100, priceCents: price, days: config.ONCE_OFF_DAYS };
+}
+
 export default async function bootstrapRoutes(app: FastifyInstance) {
   app.get('/api/bootstrap', async (req, reply) => {
     reply.header('cache-control', 'no-store');
@@ -448,7 +461,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
         branding: brandingOf(c),
         entitlements: entitlementsFor(c.org),
       },
-      features: { ...baseFeatures, ai: can(c.org, 'AI_GENERATION') },
+      features: { ...baseFeatures, ai: can(c.org, 'AI_GENERATION'), onceOff: await onceOffOffer(c.org) },
       personas: await personasFor(pool, c),
       myContractorId: c.org.kind === 'contractor' ? c.org.id : null,
       state: await buildState(pool, c),

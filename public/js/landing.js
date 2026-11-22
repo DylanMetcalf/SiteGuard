@@ -62,7 +62,9 @@ function footer(){
     +'<span>Requirement lists are a starting point, not legal advice. COMVERA shows the status held in its records; it does not certify legal compliance.</span></footer>';
 }
 const page = (current, body) => '<div class="lp">'+header(current)+'<main>'+body+'</main>'+footer()+'</div>';
-const intro = (eyebrow, title, lead) => '<section class="lp-page-head"><p class="lp-eyebrow">'+eyebrow+'</p><h1>'+title+'</h1>'+(lead?'<p class="lp-lead">'+lead+'</p>':'')+'</section>';
+// Every inner page opens the same way: a soft panel with what the page is about and one way to start.
+const intro = (eyebrow, title, lead, cta = true) => '<section class="lp-page-head"><p class="lp-eyebrow">'+eyebrow+'</p><h1>'+title+'</h1>'+(lead?'<p class="lp-lead">'+lead+'</p>':'')
+  +(cta?'<div class="lp-cta">'+trial('Start free trial')+'<span class="lp-head-note">14 days free · No card needed</span></div>':'')+'</section>';
 const closing = (title, text) => '<section class="lp-close"><h2>'+title+'</h2><p>'+text+'</p><div class="lp-cta">'+trial()+go('pricing','View pricing','btn secondary')+'</div></section>';
 const list = (items) => '<ul class="lp-list">'+items.map(x=>'<li>'+tick+'<span>'+x+'</span></li>').join('')+'</ul>';
 
@@ -94,7 +96,7 @@ function featureGrid(short){
     share: feat(I.share, 'Share securely', 'Expiring links for auditors and clients, and individual documents or a merged PDF for the site.'),
     popia: feat(I.shield, 'Built for POPIA', 'Every company sees only its own data. ID numbers are never stored in full. Every action is logged.'),
   };
-  const keys = short ? ['builder', 'studio', 'oscar', 'expire'] : ['builder', 'studio', 'oscar', 'reqs', 'review', 'gate', 'expire', 'share', 'popia'];
+  const keys = short ? ['builder', 'studio', 'expire'] : ['builder', 'studio', 'oscar', 'reqs', 'review', 'gate', 'expire', 'share', 'popia'];
   return '<div class="lp-grid">' + keys.map((k) => all[k]).join('') + '</div>'
     + (short ? '<p class="lp-more">' + go('features', 'See everything COMVERA does', 'btn secondary small') + '</p>' : '');
 }
@@ -225,7 +227,7 @@ function painSection(){
 
 /** Shown at /pricing while prices are not published: no amounts, a free trial instead. */
 function pricingSoon(){
-  return intro('Pricing', 'Pricing is being finalised', 'Every new account starts with a free trial of the full product. No card is needed.')
+  return intro('Pricing', 'Pricing is being finalised', 'Every new account starts with a free trial of the full product. No card is needed.', false)
     + '<section class="lp-close"><h2>Try COMVERA free</h2><p>Set up your company, build a safety file or invite a contractor, and see whether it saves you time.</p><div class="lp-cta">'+trial('Start free trial')+go2('contact','Talk to us','btn secondary')+'</div></section>';
 }
 
