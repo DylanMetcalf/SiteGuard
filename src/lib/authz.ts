@@ -68,6 +68,8 @@ export interface UserRow {
   status?: string;
   /** Signed up after email confirmation became a requirement (migration 027). */
   verify_required?: boolean;
+  /** Set once the person has completed the "About you" step (migration 031); existing users were marked complete. */
+  profile_completed_at?: string | null;
 }
 
 export interface Ctx {

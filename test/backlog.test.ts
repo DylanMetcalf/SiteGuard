@@ -49,7 +49,7 @@ describe('bulk invitations', () => {
     const owner = (await pool.query(`select user_id from memberships where org_id = $1 limit 1`, [org])).rows[0].user_id;
     await pool.query(`insert into user_invites (org_id, email, role, token_hash, invited_by, expires_at) values ($1, 'ro@example.com', 'member', $2, $3, now() + interval '1 day')`, [org, sha256('ro-token'), owner]);
     const ro = new Agent(app);
-    assert.equal((await ro.post('/api/auth/signup', { name: 'RO', email: 'ro@example.com', password: 'correct horse battery staple', inviteToken: 'ro-token' })).status, 200);
+    assert.equal((await ro.post('/api/auth/signup', { acceptTerms: true, name: 'RO', email: 'ro@example.com', password: 'correct horse battery staple', inviteToken: 'ro-token' })).status, 200);
     await pool.query(`update users set email_verified_at = now() where email = 'ro@example.com'`);
     await ro.refresh();
     assert.equal((await ro.post('/api/org/invites/bulk', { rows: [{ email: 'x@example.com', role: 'member' }] })).status, 403);

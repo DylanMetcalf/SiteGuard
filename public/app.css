@@ -1105,3 +1105,53 @@ body:has(.guest-top) .rv-bar{bottom:calc(14px + env(safe-area-inset-bottom,0px))
 .rq-block{margin-top:12px;}
 .chip{padding:6px 12px;border:1.5px solid var(--line,#E2E7E4);border-radius:999px;background:var(--paper-raised,#fff);color:var(--ink,#0E1A2B);font:inherit;font-size:13px;cursor:pointer;}
 .chip:hover{border-color:var(--brand,#16325C);}
+
+/* ---- Sign-up names, consent, purpose ---- */
+.ob-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media (max-width:380px){.ob-two{grid-template-columns:1fr;}}
+.ob-consent{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink-soft,#5E6A7A);margin-top:10px;line-height:1.45;}
+.ob-consent input{margin-top:3px;flex:none;}
+.ob-purpose{border:none;padding:0;margin:14px 0 0;}
+.ob-purpose legend{padding:0;margin-bottom:6px;}
+
+/* ---- Your next step ---- */
+.next-step{border-left:4px solid var(--brand,#16325C);padding:14px 16px;margin-bottom:14px;}
+.next-step-label{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand,#16325C);margin-bottom:4px;}
+.next-step-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+.next-step h2{font-size:17px;margin:0 0 4px;}
+.next-step .site-card-sub{margin:0;}
+
+/* ---- Homepage hero (v2): one dark brand panel, high contrast, one message ---- */
+.lp-hero.v2{background:radial-gradient(70% 90% at 85% 10%, rgba(108,211,162,.16), transparent 60%), radial-gradient(60% 80% at 0% 100%, rgba(80,130,220,.18), transparent 65%), var(--panel);
+  color:var(--panel-ink); border-radius:28px; padding:28px 20px 30px; margin:8px 0 8px; overflow:hidden;}
+.lp-hero.v2 .lp-eyebrow{color:#9FDBB9;}
+.lp-hero.v2 h1{color:#fff; font-size:clamp(32px, 7vw, 54px); line-height:1.04; margin-bottom:14px;}
+.lp-hero.v2 .lp-mark{text-decoration-color:#6CD3A2; text-decoration-thickness:.12em;}
+.lp-hero.v2 .lp-lead{color:var(--panel-ink-soft); font-size:17px; line-height:1.55; max-width:38em;}
+.lp-hero.v2 .lp-lead strong{color:#fff;}
+.lp-hero.v2 .lp-cta-main{display:flex; flex-wrap:wrap; gap:10px; margin:22px 0 12px;}
+.lp-hero.v2 .lp-cta-main .btn.primary{background:#8BDDB1; color:#0B1A2E; border-color:#8BDDB1; box-shadow:0 10px 28px rgba(108,211,162,.28);}
+.lp-hero.v2 .lp-cta-main .btn.primary:hover{background:#A6E8C4;}
+.lp-btn-ghost{background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.55); min-height:54px; padding:0 22px; font-size:16px; font-weight:600; border-radius:var(--radius-btn, 12px); cursor:pointer;}
+.lp-btn-ghost:hover{background:rgba(255,255,255,.08); border-color:#fff;}
+.lp-hero.v2 .btn:focus-visible{outline:3px solid #fff; outline-offset:3px;}
+.lp-trust{display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; margin:0; font-size:13.5px; color:var(--panel-ink-soft);}
+.lp-trust span{display:inline-flex; align-items:center; gap:6px;}
+.lp-trust span::before{content:""; width:6px; height:6px; border-radius:50%; background:#6CD3A2;}
+.lp-trust a, .lp-trust .linkish{color:#fff; font-weight:600; text-decoration:underline; text-underline-offset:3px; min-height:32px; display:inline-flex; align-items:center; background:none; border:none; padding:0; font-size:13.5px; cursor:pointer;}
+.lp-hero.v2 .lp-hsteps{margin-top:24px; padding-top:20px; border-top:1px solid var(--panel-line);}
+.lp-hero.v2 .lp-hsteps li{color:var(--panel-ink); align-items:flex-start;}
+.lp-hero.v2 .lp-hsteps li span{display:flex; flex-direction:column; gap:2px; font-size:13px; color:var(--panel-ink-soft); line-height:1.4;}
+.lp-hero.v2 .lp-hsteps li strong{color:#fff; font-size:14.5px;}
+.lp-hero.v2 .lp-hsteps b{background:#6CD3A2; color:#0B1A2E;}
+.lp-hero.v2 .lp-mock{padding:4px 0 70px;}
+.lp-hero.v2 .lp-mcard{box-shadow:0 30px 60px rgba(0,0,0,.35); border-color:transparent;}
+.lp-hero.v2 .lp-mgate{background:#fff; color:#0E1A2B; box-shadow:0 18px 40px rgba(0,0,0,.3);}
+.lp-hero.v2 .lp-mgate .lp-msub{color:#4A5768;}
+.lp-hero.v2 .lp-mgate-s{color:#1F7A4D;}
+.lp-hero.v2 .lp-mgate-q{color:#1F7A4D;}
+@media (min-width:900px){ .lp-hero.v2{padding:52px 48px 48px; margin-top:12px;} }
+@media (max-width:420px){ .lp-hero.v2 .lp-cta-main .btn{width:100%;} .lp-hero.v2{border-radius:22px; padding:24px 18px 26px;} }
+.lp-hero.v2 .lp-mcard{color:var(--ink);}
+.lp-hero.v2 .lp-mcard .lp-mtitle{color:var(--ink);}
+.lp-hero.v2{margin-bottom:28px;}

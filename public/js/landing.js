@@ -28,11 +28,13 @@ function mock(){
     + row('Medical — S. Nkosi', 'Expires in 12 days', 'warn', 3)
     + cycle
     +'</div>'
-    +'<div class="lp-mgate"><div class="lp-mgate-q">'+I.sparkle+'</div><div><div class="lp-mgate-s">OSCAR</div><div class="lp-msub">I drafted your fall protection plan. Check it, then send.</div></div></div>'
+    +'<div class="lp-mgate"><div class="lp-mgate-q">'+I.sparkle+'</div><div><div class="lp-mgate-s">DRAFT READY</div><div class="lp-msub">Your fall protection plan is drafted. Check it, then send.</div></div></div>'
     +'</div>';
 }
 
 /* ---------- the public site: one question per page ---------- */
+/** Text the platform admin types (plan names, blurbs, highlights) is escaped before it reaches the page. */
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
 export const PUBLIC_PAGES = {
   landing: '/', features: '/features', builder: '/safety-file-builder', contractors: '/for-contractors',
   sites: '/for-sites', pricing: '/pricing', how: '/how-it-works', contact: '/contact',
@@ -42,17 +44,21 @@ export function publicPageFor(path){
   return hit ? hit[0] : null;
 }
 const NAV = [['features','Features'],['builder','Safety File Builder'],['contractors','Contractors'],['sites','Sites & mines'],['pricing','Pricing'],['contact','Contact']];
-const go = (page, label, cls) => '<a href="'+PUBLIC_PAGES[page]+'" class="'+(cls||'')+'" data-action="public-go" data-page="'+page+'">'+label+'</a>';
+// Prices are published only when the server says so (PUBLIC_PRICING_ENABLED); until then pricing links point to How it works.
+let pricingOn = false;
+const navItems = () => NAV.filter(([k])=>k!=='pricing' || pricingOn);
+const go = (page, label, cls) => { if(page==='pricing' && !pricingOn){ page = 'how'; label = 'How it works'; } return go2(page, label, cls); };
+const go2 = (page, label, cls) => '<a href="'+PUBLIC_PAGES[page]+'" class="'+(cls||'')+'" data-action="public-go" data-page="'+page+'">'+label+'</a>';
 const trial = (label, kind) => '<button class="btn primary" data-action="auth-go" data-view="signup"'+(kind?' data-kind="'+kind+'"':'')+'>'+(label||'Start free trial')+'</button>';
 
 function header(current){
   return '<header class="lp-top"><a href="/" class="brand lp-brand" data-action="public-go" data-page="landing" aria-label="COMVERA home"><div class="brand-mark"></div><div class="brand-text"><div class="brand-name">COMVERA</div></div></a>'
     +'<div class="lp-actions"><button class="linkish" data-action="auth-go" data-view="signin">Sign in</button>'+trial('Start free trial')+'</div>'
-    +'<nav class="lp-nav" aria-label="Main">'+NAV.map(([k,l])=>go(k, l, 'lp-link'+(current===k?' active':''))).join('')+'</nav></header>';
+    +'<nav class="lp-nav" aria-label="Main">'+navItems().map(([k,l])=>go(k, l, 'lp-link'+(current===k?' active':''))).join('')+'</nav></header>';
 }
 function footer(){
   return '<footer class="lp-foot"><span>COMVERA</span>'
-    +'<span class="lp-foot-links">'+NAV.map(([k,l])=>go(k,l)).join(' · ')+' · '+go('how','How it works')+' · <a href="/walkthrough">Interactive walkthrough</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>'
+    +'<span class="lp-foot-links">'+navItems().map(([k,l])=>go(k,l)).join(' · ')+' · '+go('how','How it works')+' · <a href="/walkthrough">Interactive walkthrough</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>'
     +'<span>Requirement lists are a starting point, not legal advice. COMVERA shows the status held in its records; it does not certify legal compliance.</span></footer>';
 }
 const page = (current, body) => '<div class="lp">'+header(current)+'<main>'+body+'</main>'+footer()+'</div>';
@@ -62,12 +68,13 @@ const list = (items) => '<ul class="lp-list">'+items.map(x=>'<li>'+tick+'<span>'
 
 export function renderPublic(name, features, ctx){
   const f = features || {};
+  pricingOn = !!f.publicPricing;
   switch(name){
     case 'features': return page(name, featuresPage());
     case 'builder': return page(name, builderPage());
     case 'contractors': return page(name, contractorsPage());
     case 'sites': return page(name, sitesPage());
-    case 'pricing': return page(name, pricingPage(ctx && ctx.pricing, ctx && ctx.audience));
+    case 'pricing': return page(name, pricingOn ? pricingPage(ctx && ctx.pricing, ctx && ctx.audience) : pricingSoon());
     case 'how': return page(name, howPage());
     case 'contact': return page(name, contactPage(f.contact || {}, ctx || {}));
     default: return renderLanding(f);
@@ -154,8 +161,8 @@ function pricingPage(pricing, audience){
   const byId = Object.fromEntries(pricing.plans.map(p=>[p.planId, p]));
   const card = (p) => {
     const perClient = p.clientLimit && p.priceCents ? '<p class="lp-perclient">About '+rands(Math.round(p.priceCents / p.clientLimit))+' per client a month</p>' : '';
-    return '<div class="lp-price'+(p.planId===set.pick?' lp-pick':'')+'">'+(p.planId===set.pick?'<span class="lp-flag">Most popular</span>':'')+'<h3>'+p.name+'</h3><div class="lp-amount">'+(p.priceCents===null ? 'Contact us' : rands(p.priceCents)+'<span> '+(p.per==='month' ? '/ month' : p.per==='safety file' ? 'once, for one file' : '/ '+p.per)+'</span>')+'</div>'+perClient
-      + '<p class="lp-p">'+p.blurb+'</p>'+list(p.highlights)
+    return '<div class="lp-price'+(p.planId===set.pick?' lp-pick':'')+'">'+(p.planId===set.pick?'<span class="lp-flag">Most popular</span>':'')+'<h3>'+esc(p.name)+'</h3><div class="lp-amount">'+(p.priceCents===null ? 'Contact us' : rands(p.priceCents)+'<span> '+(p.per==='month' ? '/ month' : p.per==='safety file' ? 'once, for one file' : '/ '+p.per)+'</span>')+'</div>'+perClient
+      + '<p class="lp-p">'+esc(p.blurb)+'</p>'+list((p.highlights||[]).map(esc))
       + (p.priceCents===null ? go('contact','Talk to us','btn secondary block') : trial(p.planId==='contractor_once' ? 'Build my one file' : 'Start free trial', set.kind))+'</div>';
   };
   const tabs = [['contractor', 'Contractors'], ['consultant', 'Safety consultants'], ['host', 'Mines and sites']];
@@ -216,22 +223,28 @@ function painSection(){
     +'<a class="btn primary" href="/walkthrough">Try the walkthrough</a></div></section>';
 }
 
+/** Shown at /pricing while prices are not published: no amounts, a free trial instead. */
+function pricingSoon(){
+  return intro('Pricing', 'Pricing is being finalised', 'Every new account starts with a free trial of the full product. No card is needed.')
+    + '<section class="lp-close"><h2>Try COMVERA free</h2><p>Set up your company, build a safety file or invite a contractor, and see whether it saves you time.</p><div class="lp-cta">'+trial('Start free trial')+go2('contact','Talk to us','btn secondary')+'</div></section>';
+}
+
 export function renderLanding(features){
+  pricingOn = !!(features && features.publicPricing);
   const demo = features && features.demo;
   return page('landing', ''
-    +'<section class="lp-hero"><div class="lp-hero-text">'
-    +'<p class="lp-eyebrow">For contractors on South African mines</p>'
-    +'<h1>Build your safety file <span class="lp-mark">once</span>. Send it to any mine.</h1>'
-    +'<p class="lp-lead"><strong>COMVERA is an online portal for contractor safety files.</strong> Upload your documents once. Oscar drafts what is missing. See what is approved, missing or expiring.</p>'
-    +'<div class="lp-cta lp-cta-main">'+trial('Build my safety file','contractor')+'<a class="btn secondary" href="/walkthrough">Watch the 6-minute walkthrough</a></div>'
-    +'<p class="lp-sub-links lp-hlinks"><span>No card needed for the 14-day trial.</span>'+(demo?'<button class="linkish" data-action="start-demo" data-tour="1">Explore the demo</button>':'')+'</p>'
+    // One message, one main button, one door for mines, then three plain steps. The card on the right shows it working.
+    +'<section class="lp-hero v2"><div class="lp-hero-text">'
+    +'<p class="lp-eyebrow">For contractors and mines in South Africa</p>'
+    +'<h1>Safety files that get <span class="lp-mark">approved</span>, not sent back.</h1>'
+    +'<p class="lp-lead"><strong>COMVERA is an online portal for contractor safety files.</strong> Keep your documents in one place. Send a complete file to any mine. See what is approved, missing or about to expire.</p>'
+    +'<div class="lp-cta lp-cta-main">'+trial('Build my safety file','contractor')+'<button class="btn lp-btn-ghost" data-action="auth-go" data-view="signup" data-kind="host">I run a mine or site</button></div>'
+    +'<p class="lp-trust"><span>Free 14-day trial</span><span>No card needed</span><span>Works on any phone</span><a href="/walkthrough">Watch how it works</a>'+(demo?'<button class="linkish" data-action="start-demo" data-tour="1">Try the demo</button>':'')+'</p>'
     +'<ol class="lp-hsteps" aria-label="How it works">'
-      +'<li><b>1</b><span>Upload your company documents once</span></li>'
-      +'<li><b>2</b><span>Oscar drafts what is missing</span></li>'
-      +'<li><b>3</b><span>Send one complete file to any mine</span></li>'
+      +'<li><b>1</b><span><strong>Add your documents once</strong>Registration, insurance, certificates</span></li>'
+      +'<li><b>2</b><span><strong>Fill the gaps</strong>See what each mine needs; get drafts to check</span></li>'
+      +'<li><b>3</b><span><strong>Send and track</strong>Know the moment it is approved</span></li>'
     +'</ol>'
-    +'<div class="lp-minebar"><div><b>Run a mine or site?</b><span>See which contractors are approved and cleared before they reach the gate.</span></div>'+trial('Start as a mine','host')+'</div>'
-    +'<ul class="lp-proof"><li>'+tick+'Works on any phone</li><li>'+tick+'You see only your own data</li><li>'+tick+'Reuse documents on every site</li></ul>'
     +'</div>'+mock()+'</section>'
     + painSection()
     +'<section class="lp-sides"><div class="lp-side"><p class="lp-eyebrow">For contractors</p><h2>Build a professional safety file in minutes.</h2>'

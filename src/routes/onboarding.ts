@@ -22,7 +22,7 @@ export default async function onboardingRoutes(app: FastifyInstance) {
     const org = (await one<Record<string, unknown> & { id: string; kind: string; name: string }>(pool,
       `select id, kind, name, reg_number, address, trade, onboarding, onboarding_completed_at from organisations where id = $1`, [ctx.org.id]))!;
     const [status, workplaces] = await Promise.all([
-      onboardingStatus(pool, org),
+      onboardingStatus(pool, org, await one<{ profile_completed_at: Date | null }>(pool, 'select profile_completed_at from users where id = $1', [ctx.user.id])),
       many(pool, `select w.id, w.name, w.location, coalesce((select json_agg(json_build_object('id', a.id, 'name', a.name, 'kind', a.kind) order by a.kind, a.name) from site_areas a where a.workplace_id = w.id), '[]'::json) as areas
                     from workplaces w where w.org_id = $1 and w.archived_at is null order by w.created_at`, [ctx.org.id]),
     ]);
@@ -73,7 +73,7 @@ export default async function onboardingRoutes(app: FastifyInstance) {
     return withTx(async (db) => {
       const org = (await one<{ id: string; kind: string; name: string; trade: string; onboarding: unknown; onboarding_completed_at: Date | null }>(db,
         `select id, kind, name, trade, onboarding, onboarding_completed_at from organisations where id = $1 for update`, [ctx.org.id]))!;
-      const s = await onboardingStatus(db, org);
+      const s = await onboardingStatus(db, org, await one<{ profile_completed_at: Date | null }>(db, 'select profile_completed_at from users where id = $1', [ctx.user.id]));
       if (!s.canComplete) throw conflict('Still to do: ' + s.missing.join(', ') + '.');
       if (!org.onboarding_completed_at) {
         await db.query(`update organisations set onboarding_completed_at = now() where id = $1`, [ctx.org.id]);

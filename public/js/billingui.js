@@ -140,7 +140,7 @@ function planCard(b, p, o){
   const cur = b.plans.find((x) => x.id === b.plan);
   const paystack = b.provider === 'paystack';
   const subscribed = paystack ? b.paystackSubscription : b.hasSubscription;
-  const price = !p.paid ? '<span class="plan-price">Free</span>' : p.priceCents != null ? '<span class="plan-price">' + rands(p.priceCents) + '</span><span class="plan-per">' + (p.once ? 'once-off' : (b.provider === 'stripe' ? '/ seat / ' : '/ ') + escapeHtml(p.per)) + '</span>' : '<span class="plan-price sm">Contact us</span>';
+  const price = !p.paid ? '<span class="plan-price">Free</span>' : p.priceCents != null ? '<span class="plan-price">' + rands(p.priceCents) + '</span><span class="plan-per">' + (p.once ? 'once-off' : (b.provider === 'stripe' ? '/ seat / ' : '/ ') + escapeHtml(p.per)) + '</span>' : b.pricesHidden ? '<span class="plan-price sm">Price to be confirmed</span>' : '<span class="plan-price sm">Contact us</span>';
   const facts = [];
   if(p.clientLimit) facts.push('Up to ' + p.clientLimit + ' client companies');
   else if(p.siteLimit != null) facts.push(p.siteLimit === 1 ? '1 site' : 'Up to ' + p.siteLimit + ' sites');

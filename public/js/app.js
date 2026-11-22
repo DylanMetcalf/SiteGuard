@@ -17,6 +17,7 @@ import './safetyfiles.js';
 import { maybeOfferTour } from './tour.js';
 import { renderMfaGate } from './mfa.js';
 import { renderVerifyGate, renderOnboarding, renderOnboardingWait } from './onboarding.js';
+import { renderProfileGate } from './profile.js';
 import { mountOscar } from './assistant.js';
 import { invalidateDocstore } from './docstore.js';
 
@@ -80,6 +81,8 @@ function render(){
   if(b.mfaSetupRequired){ app.innerHTML = renderMfaGate(); stopLive(); return; }
   if(b.onboardingRequired){ app.innerHTML = b.canSetUp ? renderOnboarding(false) : renderOnboardingWait(); stopLive(); wasOutside = true; return; }
   if(!b.org){ app.innerHTML = renderNoOrg(); stopLive(); return; }
+  // Someone who joined an existing organisation: one short "About you" page before the app opens (existing users were marked done).
+  if(b.me && b.me.profileComplete === false){ app.innerHTML = renderProfileGate(); stopLive(); wasOutside = true; return; }
   // Don't yank the page out from under someone typing in it.
   const active = document.activeElement;
   if(active && app.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) && S.deferRender){

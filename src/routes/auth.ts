@@ -46,6 +46,8 @@ export const rlSignup = {
 const email = z.string().trim().toLowerCase().email().max(254);
 const password = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(200);
+/** The draft terms and privacy notice in force; bump when /terms or /privacy change materially. */
+export const TERMS_VERSION = '2026-11-draft';
 
 /** Emails a one-hour, single-use password reset link (used by "forgot password" and by platform support). */
 export async function queueResetEmail(db: Db, user: { id: string; name: string; email: string }) {
@@ -141,7 +143,11 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/signup', rlSignup, async (req, reply) => {
     const body = z
       .object({
-        name,
+        name: name.optional(),
+        firstName: z.string().trim().max(100).optional(),
+        lastName: z.string().trim().max(100).optional(),
+        /** The terms and privacy notice must be accepted; recorded with the version shown. */
+        acceptTerms: z.literal(true, { message: 'Accept the terms and privacy notice to create an account.' }),
         email,
         password,
         orgName: z.string().trim().max(200).optional(),
@@ -156,6 +162,8 @@ export default async function authRoutes(app: FastifyInstance) {
       .parse(req.body);
     const problem = passwordProblem(body.password);
     if (problem) throw badRequest(problem, 'weak_password');
+    const fullName = (body.name || [body.firstName, body.lastName].filter(Boolean).join(' ')).trim();
+    if (!fullName) throw badRequest('Enter your first and last name.', 'name_required');
 
     const result = await withTx(async (db) => {
       // The roomy invited-sign-up limit must not become an "is this email registered?" oracle: without a live invitation the
@@ -207,15 +215,16 @@ export default async function authRoutes(app: FastifyInstance) {
 
       const user = (await one<{ id: string }>(
         db,
-        `insert into users (email, name, password_hash, email_verified_at, last_active_org_id)
-         values ($1, $2, $3, $4, $5) returning id`,
-        [body.email, body.name, await hashPassword(body.password), verified ? new Date() : null, orgId],
+        `insert into users (email, name, password_hash, email_verified_at, last_active_org_id, first_name, last_name, terms_accepted_at, terms_version)
+         values ($1, $2, $3, $4, $5, $6, $7, now(), $8) returning id`,
+        [body.email, fullName.slice(0, 200), await hashPassword(body.password), verified ? new Date() : null, orgId,
+          (body.firstName ?? fullName.split(' ')[0] ?? '').slice(0, 100), (body.lastName ?? fullName.split(' ').slice(1).join(' ')).slice(0, 100), TERMS_VERSION],
       ))!;
       await db.query('insert into memberships (org_id, user_id, role) values ($1, $2, $3)', [orgId, user.id, role]);
-      if (!verified) await sendVerification(db, user.id, body.email, body.name);
+      if (!verified) await sendVerification(db, user.id, body.email, fullName);
 
       const org = (await one(db, 'select * from organisations where id = $1', [orgId]))!;
-      const ctx = { user: { id: user.id, email: body.email, name: body.name, title: '', phone: '', email_verified_at: null, is_demo: false }, sessionId: '', csrfToken: '', org, role } as OrgCtx;
+      const ctx = { user: { id: user.id, email: body.email, name: fullName, title: '', phone: '', email_verified_at: null, is_demo: false }, sessionId: '', csrfToken: '', org, role } as OrgCtx;
       await audit(db, ctx, body.inviteToken ? 'Joined organisation' : 'Organisation created', org.name);
       if (!body.inviteToken) {
         await track(db, orgId, 'signup');
@@ -505,10 +514,49 @@ export default async function authRoutes(app: FastifyInstance) {
       .object({ name: name.optional(), title: z.string().trim().max(120).optional(), phone: z.string().trim().max(60).optional() })
       .parse(req.body);
     await pool.query(
-      `update users set name = coalesce($2, name), title = coalesce($3, title), phone = coalesce($4, phone) where id = $1`,
-      [ctx.user.id, body.name ?? null, body.title ?? null, body.phone ?? null],
+      // A new display name also updates first and last name, so the two never disagree.
+      `update users set name = coalesce($2, name), title = coalesce($3, title), phone = coalesce($4, phone),
+              first_name = coalesce($5, first_name), last_name = coalesce($6, last_name) where id = $1`,
+      [ctx.user.id, body.name ?? null, body.title ?? null, body.phone ?? null,
+        body.name ? body.name.split(/\s+/)[0].slice(0, 100) : null, body.name ? body.name.split(/\s+/).slice(1).join(' ').slice(0, 100) : null],
     );
     if (ctx.org) await withTx((db) => publishChange(db, [ctx.org!.id]));
+    return { ok: true };
+  });
+
+  /**
+   * "About you": the personal part of sign-up (also editable later under Account settings). The purpose only shapes the
+   * person's first screen and suggestions; it never grants a role. Product news is optional, off unless ticked, and
+   * kept separately from operational email (marketing_consents).
+   */
+  app.put('/api/me/profile', rl(30), async (req) => {
+    const ctx = requireUser(req.ctx);
+    const b = z.object({
+      firstName: z.string().trim().min(1, 'Enter your first name.').max(100),
+      // Optional: some people go by one name.
+      lastName: z.string().trim().max(100).default(''),
+      title: z.string().trim().max(120).default(''),
+      phone: z.string().trim().max(60).default(''),
+      purpose: z.enum(['site', 'contractors', 'documents', 'review', 'invited', 'clients'], { message: 'Choose how you will use COMVERA.' }),
+      productNews: z.boolean().optional(),
+    }).parse(req.body);
+    await withTx(async (db) => {
+      await db.query(
+        `update users set first_name = $2, last_name = $3, name = $4, title = $5, phone = $6, purpose = $7, profile_completed_at = coalesce(profile_completed_at, now()) where id = $1`,
+        [ctx.user.id, b.firstName, b.lastName, [b.firstName, b.lastName].filter(Boolean).join(' ').slice(0, 200), b.title, b.phone, b.purpose],
+      );
+      if (b.productNews !== undefined) {
+        await db.query(
+          `insert into marketing_consents (email, consented, source, updated_at) values ($1, $2, 'profile', now())
+           on conflict (email) do update set consented = excluded.consented, source = excluded.source, updated_at = now()`,
+          [ctx.user.email, b.productNews],
+        );
+      }
+      if (ctx.org) {
+        await audit(db, ctx as OrgCtx, 'Updated their profile', '');
+        await publishChange(db, [ctx.org.id]);
+      }
+    });
     return { ok: true };
   });
 

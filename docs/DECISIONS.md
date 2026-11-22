@@ -327,3 +327,19 @@ Newest first.
 **REASON** Reproduced with synthetic accounts in each state (`test/docrequests.test.ts`, `scripts/docrequests-journey.mts` J7). The live account was not inspected or changed.
 **DATE** 2026-11-14
 
+**DECISION** Sign-up and set-up are one flow: sign-up requires accepting the terms and privacy notice (enforced and recorded on the server with a version), takes first and last name, and set-up begins with "About you" (job title and phone optional; a purpose that only shapes the first screen; product news opt-in, off by default). People who join an existing organisation answer it once before the app opens; existing users were marked complete. No ID number or photo is collected.
+**REASON** People should enter the workspace with their essentials recorded and know what to do first, without being forced through anything twice and without collecting personal data we do not need.
+**DATE** 2026-11-21
+
+**DECISION** Public pricing is behind `PUBLIC_PRICING_ENABLED` (off by default): the public pricing API returns 404, pricing links and the pricing page show no amounts, and the app shows "Price to be confirmed" while payments are off. Platform admins always see prices, and when online payments are on, prices always show in the app.
+**REASON** Prices are not final; plans, entitlements and promo codes must keep working underneath, and nobody may ever be charged without seeing a price.
+**DATE** 2026-11-21
+
+**DECISION** The dashboard shows one "Your next step" card computed from the workspace's own data (site, requirements, contractors, submissions, company documents), never stored and never an action the role cannot take. Release acceptance is `scripts/rc01.mts` (30 scenarios) on an isolated server; the live site only gets read-only checks.
+**REASON** Product-led activation needs an obvious next action; acceptance tests that create accounts and probe access must never touch real customers.
+**DATE** 2026-11-21
+
+**DECISION** The homepage hero is one dark brand panel with a single message ("Safety files that get approved, not sent back."), one main button for contractors, one door for mines ("I run a mine or site"), a short trust line, three plain steps and the live safety-file card. The separate mine box, the proof list, the repeated step text and the unexplained name "Oscar" were removed from the hero.
+**REASON** The owner found the previous hero flat and confusing: eight elements competed and the steps repeated the paragraph. The copy rules in `scripts/landing-audit.mts` (13/13) and its accessibility checks in light and dark mode still pass.
+**DATE** 2026-11-22
+

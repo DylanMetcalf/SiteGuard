@@ -13,7 +13,7 @@ import { rulesOf } from '../lib/validity.js';
 import { reminderDaysOf } from '../jobs/reminders.js';
 import type { FastifyInstance } from 'fastify';
 import { templatesForSites } from './templates.js';
-import { many, pool, type Db } from '../db/pool.js';
+import { many, one, pool, type Db } from '../db/pool.js';
 import { config, features, isPlatformAdmin } from '../config.js';
 import { actorRole, canAdminOrg, isHost, roleLabel, uiRole, type OrgCtx } from '../lib/authz.js';
 import { PLANS, grantActive, hasOwnAccess, planOf, standing } from '../lib/plans.js';
@@ -393,7 +393,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
   app.get('/api/bootstrap', async (req, reply) => {
     reply.header('cache-control', 'no-store');
     const ctx = req.ctx;
-    const baseFeatures = { demo: features.demo, billing: features.billing, payments: features.payments, paymentProvider: features.paymentProvider, email: features.email, aiConfigured: features.ai, contact: { email: config.SUPPORT_EMAIL ?? null, phone: config.CONTACT_PHONE ?? null } };
+    const baseFeatures = { demo: features.demo, publicPricing: features.publicPricing, billing: features.billing, payments: features.payments, paymentProvider: features.paymentProvider, email: features.email, aiConfigured: features.ai, contact: { email: config.SUPPORT_EMAIL ?? null, phone: config.CONTACT_PHONE ?? null } };
     if (!ctx) return { authenticated: false, features: baseFeatures };
 
     const orgs = await many(
@@ -403,7 +403,9 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
       [ctx.user.id],
     );
     const me = {
-      id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, title: ctx.user.title, phone: ctx.user.phone,
+      id: ctx.user.id, name: ctx.user.name, email: ctx.user.email, title: ctx.user.title, phone: ctx.user.phone, ...(await one<{ firstName: string; lastName: string; purpose: string; productNews: boolean | null }>(pool,
+        `select u.first_name as "firstName", u.last_name as "lastName", u.purpose, (select consented from marketing_consents m where m.email = u.email) as "productNews" from users u where u.id = $1`, [ctx.user.id])),
+      profileComplete: !!ctx.user.profile_completed_at || ctx.user.is_demo,
       verified: !!ctx.user.email_verified_at || ctx.user.is_demo, isDemo: ctx.user.is_demo, platformAdmin: isPlatformAdmin(ctx.user), mfaEnabled: !!ctx.user.mfa,
     };
     // Email not confirmed yet (when email sending is on): only the "check your inbox" page.
@@ -419,7 +421,7 @@ export default async function bootstrapRoutes(app: FastifyInstance) {
     }
     // Set-up not finished: only the set-up screens (admins fill them in; everyone else waits for them).
     if (mustOnboard(ctx)) {
-      return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: { id: ctx.org.id, name: ctx.org.name, kind: ctx.org.kind, role: ctx.role },
+      return { authenticated: true, csrfToken: ctx.csrfToken, me, orgs, org: { id: ctx.org.id, name: ctx.org.name, kind: ctx.org.kind, role: ctx.role, isConsultant: !!(ctx.org as { is_consultant?: boolean }).is_consultant },
         onboardingRequired: true, canSetUp: ['owner', 'admin'].includes(ctx.role), features: baseFeatures };
     }
     const c = ctx as OrgCtx;

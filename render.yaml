@@ -40,6 +40,9 @@ services:
       # Card payments switch on separately when STRIPE_SECRET_KEY is set.
       - key: ENFORCE_PLANS
         value: "true"
+      # Public prices stay hidden until they are final; set to "true" to publish the pricing page.
+      - key: PUBLIC_PRICING_ENABLED
+        value: "false"
       # Your address once the domain is connected, e.g. https://app.comvera.co.za.
       # Until then Render's own onrender.com address is used automatically.
       - key: APP_URL

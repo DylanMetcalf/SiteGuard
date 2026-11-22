@@ -112,6 +112,8 @@ the next plan is about $20/month for 50,000.
    (Check spam the first time and mark it "not spam".)
 
 Once `SMTP_URL` is set, new customers must confirm their email before they can use COMVERA (set `REQUIRE_EMAIL_VERIFICATION=false` to switch that off). Until `SMTP_URL` is set, emails aren't sent: they are written to Render's log (**comvera →
+
+**Prices.** Public prices are hidden until you set `PUBLIC_PRICING_ENABLED` = `true` in Render (then redeploy). While it is off, the pricing page says pricing is being finalised, the app shows "Price to be confirmed", and plans, trials and promo codes keep working. You (as platform admin) still see and edit prices under Manager → Prices.
 Logs**), which is handy for testing but not for customers.
 
 **Your own mailbox** (e.g. `you@yourdomain.co.za` to receive replies) is separate from Resend,

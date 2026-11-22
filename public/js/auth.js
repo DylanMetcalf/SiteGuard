@@ -20,9 +20,9 @@ function go(view, extra){
 /** Keeps what the person typed when the form re-renders (e.g. after an error). */
 function keepTyped(fn){
   const kept = {};
-  document.querySelectorAll('#app input[id], #app select[id], #app textarea[id]').forEach(el=>{ if(el.type!=='file') kept[el.id] = el.value; });
+  document.querySelectorAll('#app input[id], #app select[id], #app textarea[id]').forEach(el=>{ if(el.type!=='file') kept[el.id] = el.type==='checkbox' ? el.checked : el.value; });
   fn();
-  for(const [id, v] of Object.entries(kept)){ const el = document.getElementById(id); if(el && el.type!=='file' && !el.readOnly && v) el.value = v; }
+  for(const [id, v] of Object.entries(kept)){ const el = document.getElementById(id); if(!el || el.type==='file' || el.readOnly) continue; if(el.type==='checkbox') el.checked = !!v; else if(v) el.value = v; }
 }
 function fail(e){ S.authContext.error = e.message || 'Something went wrong'; keepTyped(render); }
 function need(msg, id){ S.authContext.error = msg; keepTyped(render); const el = document.getElementById(id); if(el) el.focus(); }
@@ -97,11 +97,11 @@ export function renderAuth(){
       return wrap(head+signInCard('Sign in as '+escapeHtml(inv.email)+' to accept.', inv.email));
     }
     return wrap(head+'<div class="card">'
-      +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name">'
+      +nameFields()
       +'<label class="field-label" for="suEmail">Email</label><input type="email" id="suEmail" value="'+escapeHtml(inv.email)+'" readonly>'
       +'<label class="field-label" for="suPassword">Choose a password</label><input type="password" id="suPassword" autocomplete="new-password" minlength="10">'
       +'<div class="site-card-sub" style="margin-top:4px;">At least 10 characters. A short phrase works well.</div>'
-      +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="invite">Create account and join</button>'+errorBox()+'</div>');
+      +termsBox()+'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="invite">Create account and join</button>'+errorBox()+'</div>');
   }
 
   if(v === 'site-invite'){
@@ -136,11 +136,11 @@ export function renderAuth(){
         +'<button class="linkish" style="margin-top:6px;" data-action="auth-show-signin" data-show="0">New to COMVERA? Create an account</button>');
     }
     return wrap(head+'<div class="card"><div class="site-card-title" style="font-size:14px;">New to COMVERA?</div>'
-      +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name">'
+      +nameFields()
       +'<label class="field-label" for="suOrgName">Company name</label><input type="text" id="suOrgName" value="'+escapeHtml(si.contractor_name)+'">'
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email" value="'+escapeHtml(si.email||'')+'">'
       +'<label class="field-label" for="suPassword">Choose a password</label><input type="password" id="suPassword" autocomplete="new-password">'
-      +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="site-invite">Create account and accept</button>'+errorBox()
+      +termsBox()+'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="site-invite">Create account and accept</button>'+errorBox()
       +'<div class="auth-links"><button class="linkish" data-action="auth-show-signin" data-show="1">Already have an account? Sign in</button></div></div>');
   }
 
@@ -166,13 +166,13 @@ export function renderAuth(){
         +roleCard('contractor', 'We\'re a contractor', 'Join the sites you work on with their code, or build safety files for any client yourself.')
         +roleCard('consultant', 'We\'re a safety consultant', 'Look after the safety files of several client companies from one portfolio, each kept separate.')
       +'</div>'
-      +'<label class="field-label" for="suName">Your name</label><input type="text" id="suName" autocomplete="name" placeholder="e.g. Thandi Nkosi">'
+      +nameFields()
       +'<label class="field-label" for="suEmail">Work email</label><input type="email" id="suEmail" autocomplete="email">'
       +'<label class="field-label" for="suPassword">Password</label><input type="password" id="suPassword" autocomplete="new-password">'
       +'<div class="site-card-sub" style="margin-top:4px;">At least 10 characters.</div>'
       +'<label class="field-label" for="suOrgName">Organisation name</label><input type="text" id="suOrgName" placeholder="e.g. Riverside Mining Group, or your own company name">'
       +'<details class="promo-box"'+(S.authContext.promo?' open':'')+'><summary class="linkish">Have a promo code?</summary><input type="text" id="suPromo" maxlength="40" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. COMVERA-LIFETIME" value="'+escapeHtml(S.authContext.promo||'')+'"></details>'
-      +'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="new">Create my organisation</button>'+errorBox()
+      +termsBox()+'<button class="btn primary block" style="margin-top:14px;" data-action="signup" data-mode="new">Create my organisation</button>'+errorBox()
       +'<div class="auth-links"><button class="linkish" data-action="auth-go" data-view="signin">Already have an account? Sign in</button></div></div>'
       + demoCard(features));
   }
@@ -232,6 +232,7 @@ export function renderNoOrg(){
 /* ---------- the public site ---------- */
 S.publicCtx = S.publicCtx || {};
 function loadPricing(){
+  if(!(S.boot && S.boot.features && S.boot.features.publicPricing)) return;
   if(S.publicCtx.pricing && !S.publicCtx.pricing.error) return;
   api.get('/api/pricing').then((r)=>{ S.publicCtx.pricing = r; render(); }).catch(()=>{ S.publicCtx.pricing = { error: true }; render(); });
 }
@@ -280,12 +281,19 @@ on('signin-mfa', async (el)=>{
 });
 on('signin-mfa-cancel', ()=>{ S.authContext.mfaTicket = null; S.authContext.error = ''; render(); });
 
+/** First and last name, kept apart from the start (they make the display name). */
+const nameFields = () => '<div class="ob-two"><div><label class="field-label" for="suFirst">First name</label><input type="text" id="suFirst" autocomplete="given-name" maxlength="100"></div>'
+  +'<div><label class="field-label" for="suLast">Last name</label><input type="text" id="suLast" autocomplete="family-name" maxlength="100"></div></div>';
+/** Required, recorded with the version on the server. */
+const termsBox = () => '<label class="ob-consent" style="margin-top:12px;"><input type="checkbox" id="suTerms"> I accept the <a href="/terms" target="_blank" rel="noopener">terms</a> and have read the <a href="/privacy" target="_blank" rel="noopener">privacy notice</a>.</label>';
 on('signup', async (el)=>{
   const mode = el.dataset.mode;
-  const body = { name: val('suName'), email: val('suEmail'), password: document.getElementById('suPassword').value };
-  if(!body.name) return need('Enter your name.', 'suName');
+  const body = { firstName: val('suFirst'), lastName: val('suLast'), email: val('suEmail'), password: document.getElementById('suPassword').value, acceptTerms: !!val('suTerms') };
+  if(!body.firstName) return need('Enter your first name.', 'suFirst');
+  if(!body.lastName) return need('Enter your last name.', 'suLast');
   if(!body.email) return need('Enter your email address.', 'suEmail');
   if(body.password.length < 10) return need('Choose a password of at least 10 characters.', 'suPassword');
+  if(!body.acceptTerms) return need('Tick the box to accept the terms and privacy notice.', 'suTerms');
   if(mode === 'new'){
     body.orgName = val('suOrgName'); body.orgKind = S.authContext.kind;
     if(body.orgKind === 'consultant'){ body.orgKind = 'contractor'; body.consultant = true; }

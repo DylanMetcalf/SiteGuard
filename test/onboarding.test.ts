@@ -25,7 +25,7 @@ describe('email confirmation', () => {
   it('an unconfirmed person sees only the check-your-inbox page, and nothing else works until they confirm', async () => {
     const email = uniqueEmail('unconfirmed');
     const a = new Agent(app);
-    assert.equal((await a.post('/api/auth/signup', { name: 'Nomsa K', email, password: PASSWORD, orgName: 'Unconfirmed Mining', orgKind: 'host' })).status, 200);
+    assert.equal((await a.post('/api/auth/signup', { acceptTerms: true, name: 'Nomsa K', email, password: PASSWORD, orgName: 'Unconfirmed Mining', orgKind: 'host' })).status, 200);
     const st = await a.state();
     assert.equal(st.verifyRequired, true);
     assert.equal(st.state, undefined, 'no workspace data');
@@ -45,7 +45,7 @@ describe('existing accounts after the upgrade', () => {
   it('people who had an account before email confirmation became required are not locked out', async () => {
     const email = uniqueEmail('olduser');
     const a = new Agent(app);
-    await a.post('/api/auth/signup', { name: 'Old Timer', email, password: PASSWORD, orgName: 'Old Mining', orgKind: 'host' });
+    await a.post('/api/auth/signup', { acceptTerms: true, name: 'Old Timer', email, password: PASSWORD, orgName: 'Old Mining', orgKind: 'host' });
     await pool.query(`update users set verify_required = false where email = $1`, [email]);
     await pool.query(`update organisations set onboarding_completed_at = now() where name = 'Old Mining'`);
     const st = await a.state();
@@ -73,13 +73,20 @@ describe('guided set-up', () => {
     await pool.query(`update workplaces set archived_at = now() where id = $1`, [wpEarly.body.id]);
     const early = await host.post('/api/onboarding/complete');
     assert.equal(early.status, 409);
-    assert.match(early.body.message, /Your organisation.*Safety contact.*Your first site.*Your site documents/);
+    assert.match(early.body.message, /About you.*Your organisation.*Safety contact.*Your first site.*Your site documents/);
     const s = (await host.get('/api/onboarding')).body;
-    assert.deepEqual(s.steps.filter((x: { need: string }) => x.need === 'required').map((x: { id: string }) => x.id), ['organisation', 'contact', 'site', 'documents']);
+    assert.deepEqual(s.steps.filter((x: { need: string }) => x.need === 'required').map((x: { id: string }) => x.id), ['you', 'organisation', 'contact', 'site', 'documents']);
     assert.equal(s.steps.find((x: { id: string }) => x.id === 'areas').need, 'optional');
   });
 
   it('saves each step, checks answers, and opens the app when the required ones are done', async () => {
+    // About you: names are required, the purpose must be one of the list, and it never changes the person's role.
+    assert.equal((await host.put('/api/me/profile', { firstName: '', lastName: 'Nkosi', purpose: 'site' })).status, 400);
+    assert.equal((await host.put('/api/me/profile', { firstName: 'Thandi', lastName: 'Nkosi', purpose: 'owner' })).status, 400, 'purpose is a fixed list, not a role');
+    assert.equal((await host.put('/api/me/profile', { firstName: 'Thandi', lastName: 'Nkosi', title: 'SHE Manager', purpose: 'review', productNews: false })).status, 200);
+    const me = (await host.state()).me;
+    assert.equal(me.name, 'Thandi Nkosi'); assert.equal(me.purpose, 'review'); assert.equal(me.productNews, false);
+    assert.equal((await pool.query(`select m.role from memberships m join users u on u.id = m.user_id where u.email = $1`, [hostEmail])).rows[0].role, 'owner', 'choosing "review" does not change the role');
     assert.equal((await host.put('/api/onboarding/organisation', { name: 'Setup Mining', phone: '12' })).status, 400, 'phone checked');
     assert.equal((await host.put('/api/onboarding/organisation', { name: 'Setup Mining (Pty) Ltd', regNumber: '2020/123456/07', address: 'Kathu', phone: '053 723 0000' })).status, 200);
     assert.equal((await host.put('/api/onboarding/contact', { name: 'Pieter van Wyk', role: 'SHE Manager' })).status, 400, 'needs a phone or email');
@@ -117,7 +124,8 @@ describe('guided set-up', () => {
   it('a contractor’s set-up asks what the company does', async () => {
     const { agent: c } = await signup(app, { orgName: 'Setup Scaffolding', orgKind: 'contractor', keepOnboarding: true });
     const s = (await c.get('/api/onboarding')).body;
-    assert.deepEqual(s.steps.filter((x: { need: string }) => x.need === 'required').map((x: { id: string }) => x.id), ['organisation', 'services', 'contact', 'documents']);
+    assert.deepEqual(s.steps.filter((x: { need: string }) => x.need === 'required').map((x: { id: string }) => x.id), ['you', 'organisation', 'services', 'contact', 'documents']);
+    await c.put('/api/me/profile', { firstName: 'Lerato', lastName: 'Dube', purpose: 'documents' });
     await c.put('/api/onboarding/organisation', { name: 'Setup Scaffolding', phone: '0110000000' });
     await c.put('/api/onboarding/contact', { name: 'Lerato D', phone: '0820000000' });
     await c.put('/api/onboarding/documents', { answer: 'later' });

@@ -18,7 +18,7 @@ describe('bot findings', () => {
   it('six sign-ups for one address at once: one account, the rest told it exists, no 500', async () => {
     const email = 'race@example.com';
     const res = await Promise.all(Array.from({ length: 6 }, (_, i) =>
-      new Agent(app).post('/api/auth/signup', { name: 'Racer', email, password: 'correct horse battery staple', orgName: `Racer Co ${i}`, orgKind: 'host' })));
+      new Agent(app).post('/api/auth/signup', { acceptTerms: true, name: 'Racer', email, password: 'correct horse battery staple', orgName: `Racer Co ${i}`, orgKind: 'host' })));
     assert.equal(res.filter((r) => r.status === 200).length, 1, JSON.stringify(res.map((r) => r.status)));
     assert.ok(res.every((r) => r.status === 200 || r.status === 409), JSON.stringify(res.map((r) => r.status)));
     assert.match(String(res.find((r) => r.status === 409)?.body.message), /already exists/);
@@ -41,9 +41,9 @@ describe('bot findings', () => {
 
   it('a fake invitation token cannot be used to find out whether an email is registered', async () => {
     const known = (await signup(app, { orgName: 'Oracle Mining', orgKind: 'host' })).email;
-    const a = await new Agent(app).post('/api/auth/signup', { name: 'X', email: known, password: 'correct horse battery staple', inviteToken: 'not-a-real-token' });
-    const b = await new Agent(app).post('/api/auth/signup', { name: 'X', email: 'nobody-here@example.com', password: 'correct horse battery staple', inviteToken: 'not-a-real-token' });
-    const c = await new Agent(app).post('/api/auth/signup', { name: 'X', email: known, password: 'correct horse battery staple', orgName: 'Y', orgKind: 'host', siteInviteToken: 'not-a-real-token' });
+    const a = await new Agent(app).post('/api/auth/signup', { acceptTerms: true, name: 'X', email: known, password: 'correct horse battery staple', inviteToken: 'not-a-real-token' });
+    const b = await new Agent(app).post('/api/auth/signup', { acceptTerms: true, name: 'X', email: 'nobody-here@example.com', password: 'correct horse battery staple', inviteToken: 'not-a-real-token' });
+    const c = await new Agent(app).post('/api/auth/signup', { acceptTerms: true, name: 'X', email: known, password: 'correct horse battery staple', orgName: 'Y', orgKind: 'host', siteInviteToken: 'not-a-real-token' });
     assert.equal(a.status, 400); assert.equal(b.status, 400); assert.equal(c.status, 400);
     assert.deepEqual(a.body, b.body, 'registered and unregistered addresses must look identical');
   });
